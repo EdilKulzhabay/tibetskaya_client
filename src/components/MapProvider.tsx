@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Dimensions,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 
@@ -121,21 +122,56 @@ const MapProvider: React.FC<MapProviderProps> = ({
     }
   };
 
+  // Определяем провайдер карт в зависимости от платформы
+  // iOS: используем Apple Maps (undefined = Apple Maps по умолчанию)
+  // Android: используем Google Maps
+  const mapProvider = Platform.OS === 'ios' ? undefined : PROVIDER_GOOGLE;
+
   return (
     <View style={styles.container}>
       <MapView 
         style={styles.map} 
-        provider={PROVIDER_GOOGLE} 
+        provider={mapProvider}
         initialRegion={{
           latitude: deliveryLocation?.latitude || 43.2220,
           longitude: deliveryLocation?.longitude || 76.8512,
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         }}
+        showsUserLocation={true}
+        showsMyLocationButton={false}
+        showsCompass={true}
+        showsScale={true}
       >
-        <Marker coordinate={deliveryLocation} />
-        <Marker coordinate={currentCourierLocation} />
-        <Polyline coordinates={[currentCourierLocation, deliveryLocation]} />
+        {/* Маркер места доставки */}
+        {deliveryLocation && (
+          <Marker
+            coordinate={deliveryLocation}
+            title="Место доставки"
+            description="Ваш адрес доставки"
+            pinColor="red"
+          />
+        )}
+
+        {/* Маркер курьера */}
+        {currentCourierLocation && (
+          <Marker
+            coordinate={currentCourierLocation}
+            title="Курьер"
+            description="Ваш курьер едет к вам"
+            pinColor="blue"
+          />
+        )}
+
+        {/* Линия между курьером и местом доставки */}
+        {currentCourierLocation && deliveryLocation && (
+          <Polyline
+            coordinates={[currentCourierLocation, deliveryLocation]}
+            strokeColor="#DC1818"
+            strokeWidth={3}
+            lineDashPattern={[5, 5]}
+          />
+        )}
       </MapView>
     </View>
   );
