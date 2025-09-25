@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -22,11 +22,12 @@ import { RootStackParamList } from '../types/navigation';
 import { useAuth } from '../hooks/useAuth';
 import { apiService } from '../api/services';
 const { tokenStorage } = require('../utils/storage');
+import { useFocusEffect } from '@react-navigation/native';
 
 interface HomeScreenProps {}
 
 const activeOrders = 3;
-const orders: any[] = [];
+// const orders: any[] = [];
 // const orders = [
 //   {
 //     id: 1,
@@ -246,19 +247,30 @@ const orders: any[] = [];
 
 const HomeScreen: React.FC<HomeScreenProps> = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { user,  } = useAuth();
+  const { user, loadingState } = useAuth();
   const [token, setToken] = useState<string | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [orders, setOrders] = useState<any[]>([]);
+
   useEffect(() => {
     tokenStorage.getAuthToken().then((token: any) => {
       setToken(token);
     });
   }, []);
 
-  const test = async () => {
-    console.log("user = ", user, "tokenStorage.getAuthToken() = ", token);
-    // await apiService.updateData(user?.mail || "", "notificationPushToken", "asd");
-  }
+  useFocusEffect(
+    useCallback(() => {
+      // Ждем загрузки пользователя перед отправкой запроса
+      if (user?.mail && loadingState === 'success') {
+        apiService.getActiveOrders(user.mail).then((res: any) => {
+          setOrders(res.orders);
+        }).catch((error) => {
+          console.error('Ошибка при получении активных заказов:', error);
+        });
+      }
+    }, [user?.mail, loadingState])
+  );
+
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -268,10 +280,10 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
         <View style={styles.content}>
           <MainPageBanner navigation={navigation} setIsModalVisible={setIsModalVisible} />
 
-          {activeOrders > 0 && (
+          {orders.length > 0 && (
             <View style={styles.activeOrdersContainer}>
               <View style={styles.activeOrdersTitle}>
-                <Text style={styles.activeOrdersTitleText}>Активные заказы ({activeOrders})</Text>
+                <Text style={styles.activeOrdersTitleText}>Активные заказы ({orders.length})</Text>
                 <TouchableOpacity style={styles.activeOrdersTitleButton}>
                   <Text style={styles.activeOrdersTitleButtonText}>Все заказы</Text>
                 </TouchableOpacity>
@@ -280,7 +292,7 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                 <OrderBlock 
                   key={order.id} 
                   id={order.id} 
-                  date={order.date} 
+                  date={order.date.d} 
                   status={order.status} 
                   products={order.products} 
                   courier={order?.courier}

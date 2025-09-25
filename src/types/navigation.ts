@@ -2,8 +2,6 @@
 export interface OrderProduct {
   b12: number;
   b19: number;
-  name?: string;
-  price?: number;
 }
 
 export interface Location {
@@ -28,7 +26,7 @@ export interface OrderData {
   date: string;
   createdAt?: string;
   status: 'awaitingOrder' | 'confirmed' | 'preparing' | 'onTheWay' | 'completed' | 'cancelled';
-  products: OrderProduct[];
+  products: OrderProduct;
   courier?: Courier | null;
   
   // Адрес и местоположение

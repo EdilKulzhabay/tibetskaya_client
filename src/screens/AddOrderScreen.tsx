@@ -2,9 +2,10 @@ import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, Image, Modal, A
 import Back from "../components/Back";
 import { useAuth } from "../hooks";
 import { useState } from "react";
+import { apiService } from "../api/services";
 
 const payments = [
-    { label: 'Наличными', value: 'cash' },
+    { label: 'Наличными', value: 'fakt' },
     { label: 'Картой', value: 'card' },
     { label: 'С баланса', value: 'balance' },
 ];
@@ -39,9 +40,44 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
             return;
         }
 
-        setTimeout(() => {
-            setLoading(false);
-        }, 4000);
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${yyyy}-${mm}-${dd}`; 
+
+        const orderAddress = {
+            actual: selectedAddress.street,
+            name: selectedAddress.name,
+            phone: user?.phone,
+            point: {
+                lat: selectedAddress?.latitude || "",
+                lng: selectedAddress?.longitude || "",
+            },
+            link: selectedAddress?.link || "",
+        }
+
+        try {
+            const res = await apiService.addOrder(
+                user?.mail || "", 
+                orderAddress, 
+                { b12: count12, b19: count19 }, 
+                [], 
+                {d: todayStr, time: ""}, 
+                selectedPayment?.value
+            );
+
+
+            if (res.success) {
+                Alert.alert('Успешно', 'Заказ оформлен');
+                setLoading(false);
+                navigation.navigate('Home');
+            } else {
+                Alert.alert('Ошибка', res.message);
+            }
+        } catch (error) {
+            console.error('Ошибка при оформлении заказа:', error);
+        }
         setLoading(false);
     }
 
@@ -200,9 +236,9 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                 <TouchableOpacity style={styles.modalOverlay} onPress={() => setAddressModalVisible(false)}>
                     <TouchableOpacity style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
                         <Text style={{fontSize: 24, fontWeight: '600', color: '#101010', marginBottom: 16, textAlign: 'center'}}>Выберите адрес доставки</Text>
-                        {user?.addresses?.map((address) => (
-                            <TouchableOpacity key={address._id} style={styles.modalAddress} onPress={() => {
-                                if (selectedAddress?._id === address._id) {
+                        {user?.addresses?.map((address, index) => (
+                            <TouchableOpacity key={address._id || index} style={styles.modalAddress} onPress={() => {
+                                if (selectedAddress?.name === address.name) {
                                     setSelectedAddress(null);
                                 } else {
                                     setSelectedAddress(address);
@@ -211,7 +247,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                             }}>
                                 <Text style={styles.modalAddressText}>{address.name}</Text>
                                 <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: selectedAddress?._id === address._id ? '#DC1818' : '#101010' }}>
-                                    {selectedAddress?._id === address._id && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
+                                    {selectedAddress?.name === address.name && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
                                 </View>
                             </TouchableOpacity>
                         ))}

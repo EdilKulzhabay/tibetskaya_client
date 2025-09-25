@@ -57,4 +57,31 @@ export const apiService = {
             throw error;
         }
     },
+
+    addOrder: async (mail: string, address: any, products: any, clientNotes: any, date: any, opForm: string) => {
+        try {
+            const response = await api.post('/addOrderClientMobile', {mail, address, products, clientNotes, date, opForm});
+            return response.data;
+        } catch (error) {
+            throw error;
+        }
+    },
+
+    getActiveOrders: async (mail: string) => {
+        try {
+            const response = await api.post('/getActiveOrdersMobile', {mail});
+            return response.data;
+        } catch (error) {
+            throw error;
+        }
+    },
+
+    getOrders: async (mail: string) => {
+        try {
+            const response = await api.post('/getClientOrdersMobile', {mail});
+            return response.data;
+        } catch (error) {
+            throw error;
+        }
+    }
 };

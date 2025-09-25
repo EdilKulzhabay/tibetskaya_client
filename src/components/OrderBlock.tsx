@@ -10,7 +10,7 @@ interface OrderBlockProps {
     id: string;
     date: string;
     status: 'awaitingOrder' | 'confirmed' | 'preparing' | 'onTheWay' | 'completed' | 'cancelled';
-    products: OrderProduct[];
+    products: OrderProduct;
     courier?: Courier | null;
     address: string;
     totalAmount: number;
@@ -37,7 +37,7 @@ const OrderBlock: React.FC<OrderBlockProps> = ({id, date, status, products, cour
     return (
         <TouchableOpacity style={styles.container} onPress={handleOrderPress}>
             <View style={styles.orderHeader}>
-                <Text># <Text style={{fontSize: 18, fontWeight: '600'}}>{id}</Text></Text>
+                <Text># <Text style={{fontSize: 18, fontWeight: '600'}}>{date}</Text></Text>
                 <Text style={
                     [styles.orderStatus, 
                     status === "awaitingOrder" || status === "onTheWay" ? { color: "#EB7E00" } : 
@@ -46,16 +46,14 @@ const OrderBlock: React.FC<OrderBlockProps> = ({id, date, status, products, cour
             </View>
             <View style={{height: 1, backgroundColor: '#E3E3E3', marginVertical: 12, width: '100%' }} />
             <View style={styles.orderBody}>
-                {products.map((product) => (
-                    <View style={styles.orderProduct} key={product.name}>
-                        {product.b12 > 0 && (
-                            <Text>{product.b12}x Вода 12,5 л</Text>
-                        )}
-                        {product.b19 > 0 && (
-                            <Text>{product.b19}x Вода 18,9 л</Text>
-                        )}
-                    </View>
-                ))}
+                <View style={styles.orderProduct}>
+                    {products && products.b12 > 0 && (
+                        <Text>{products.b12}x Вода 12,5 л</Text>
+                    )}
+                    {products && products.b19 > 0 && (
+                        <Text>{products.b19}x Вода 18,9 л</Text>
+                    )}
+                </View>
 
                 {courier && courier.fullName && status !== "awaitingOrder" && (
                     <View style={styles.orderCourier}>

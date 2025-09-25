@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ScrollView,
   Image,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { NavButton, Navigation } from '../components';
 import ButtonWithSwitch from '../components/ButtonWithSwitch';
@@ -22,17 +23,19 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const [notificationSwitchValue, setNotificationSwitchValue] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [language, setLanguage] = useState('Русский');
+  const [loading, setLoading] = useState(false);
 
-  if (!user) {
-    return <SafeAreaView style={notLoggedIn.safeArea}>
-      <Text style={notLoggedIn.text}>Вы не авторизованы</Text>
-        <TouchableOpacity style={notLoggedIn.button} onPress={() => navigation.navigate('Login')}>
-          <Text style={notLoggedIn.buttonText}>Войти</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={notLoggedIn.button} onPress={() => navigation.navigate('Register')}>
-          <Text style={notLoggedIn.buttonText}>Зарегистрироваться</Text>
-        </TouchableOpacity>
-    </SafeAreaView>;
+  // Если пользователь не авторизован, переходим на экран авторизации
+  useEffect(() => {
+    setLoading(true);
+    if (!user) {
+      navigation.navigate('Login');
+    }
+    setLoading(false);
+  }, [user]);
+
+  if (loading) {
+    return <ActivityIndicator size="large" color="#DC1818" style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }} />;
   }
 
   return (
@@ -53,7 +56,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           <TouchableOpacity style={styles.profileImageButton}>
             <Text style={styles.profileImageButtonText}>Изменить{'\n'}фото</Text>
           </TouchableOpacity>
-          <Text style={styles.profileName}>{user.fullName}</Text>
+          <Text style={styles.profileName}>{user?.fullName}</Text>
         </View>
 
         <NavButton title="Изменить данные" onPress={() => navigation.navigate('ChangeData')} icon={require('../assets/edit.png')} />
