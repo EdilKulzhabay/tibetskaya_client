@@ -288,10 +288,10 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                   <Text style={styles.activeOrdersTitleButtonText}>Все заказы</Text>
                 </TouchableOpacity>
               </View>
-              {orders.length > 0 && orders.map((order) => (
+              {orders.length > 0 && orders.map((order, index) => (
                 <OrderBlock 
-                  key={order.id} 
-                  id={order.id} 
+                  key={order._id || index} 
+                  _id={order.id} 
                   date={order.date.d} 
                   status={order.status} 
                   products={order.products} 

@@ -60,3 +60,20 @@ export interface RegisterData {
 }
 
 export type LoadingState = 'idle' | 'loading' | 'success' | 'error';
+
+// Дополнительные типы для приложения
+export interface Franchisee {
+  _id: string;
+  fullName: string;
+  phone: string;
+  email?: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Экспорт типов из navigation.ts
+export * from './navigation';
+
+// Экспорт типов из mongodb.ts
+export * from './mongodb';

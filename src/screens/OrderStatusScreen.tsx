@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,10 @@ const OrderStatusScreen: React.FC = () => {
   
   // Получаем данные заказа из параметров
   const { order } = route.params;
+
+  useEffect(() => {
+    console.log(order);
+  }, [order]);
 
   const getStatusText = (status: string) => {
     switch (status) {
@@ -116,7 +120,7 @@ const OrderStatusScreen: React.FC = () => {
           <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
             <View style={styles.content}>
               <View style={styles.orderHeader}>
-                <Text style={styles.orderTitle}>Заказ #{order.id}</Text>
+                <Text style={styles.orderTitle}>Заказ #{order._id}</Text>
                 <Text style={[styles.orderStatus, { color: getStatusColor(order.status) }]}>
                   {getStatusText(order.status)}
                 </Text>
@@ -124,7 +128,9 @@ const OrderStatusScreen: React.FC = () => {
 
               <View style={styles.infoCard}>
                 <Text style={styles.infoLabel}>Дата заказа:</Text>
-                <Text style={styles.infoValue}>{order.date}</Text>
+                <Text style={styles.infoValue}>
+                  {typeof order.date === 'string' ? order.date : order.date?.d || 'Не указана'}
+                </Text>
               </View>
 
               <View style={styles.infoCard}>
@@ -137,26 +143,28 @@ const OrderStatusScreen: React.FC = () => {
               {order.courier && (
                 <View style={styles.infoCard}>
                   <Text style={styles.infoLabel}>Курьер:</Text>
-                  <Text style={styles.infoValue}>{order.courier.fullName}</Text>
+                  <Text style={styles.infoValue}>
+                    {typeof order.courier === 'string' ? 'ID: ' + order.courier : order.courier?.fullName || 'Неизвестно'}
+                  </Text>
                 </View>
               )}
 
               <View style={styles.productsCard}>
                 <Text style={styles.cardTitle}>Товары в заказе:</Text>
-                {order.products.map((product, index) => (
-                  <View key={index} style={styles.productItem}>
-                    {product.b12 > 0 && (
-                      <Text style={styles.productText}>
-                        Бутылка 12л: {product.b12} шт.
-                      </Text>
-                    )}
-                    {product.b19 > 0 && (
-                      <Text style={styles.productText}>
-                        Бутылка 19л: {product.b19} шт.
-                      </Text>
-                    )}
+                {order.products.b12 > 0 && (
+                  <View style={styles.productItem}>
+                    <Text style={styles.productText}>
+                      Бутылка 12л: {order.products.b12} шт.
+                    </Text>
                   </View>
-                ))}
+                )}
+                {order.products.b19 > 0 && (
+                  <View style={styles.productItem}>
+                    <Text style={styles.productText}>
+                      Бутылка 19л: {order.products.b19} шт.
+                    </Text>
+                  </View>
+                )}
               </View>
 
               <TouchableOpacity 

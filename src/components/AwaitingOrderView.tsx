@@ -77,7 +77,29 @@ const AwaitingOrderView: React.FC<AwaitingOrderViewProps> = ({ order, onCancelOr
           defaultExpanded={true}
           containerStyle={styles.sectionContainer}
         >
-          {order.products.map((product, index) => (
+          {order.products.b12 > 0 && (
+            <View style={styles.productRow}>
+              <View style={styles.productInfo}>
+                <Text style={styles.productText}>Вода 12,5 л</Text>
+                <Text style={styles.productSubtext}>Негазированная</Text>
+              </View>
+              <Text style={styles.productQuantity}>
+                x{order.products.b12}
+              </Text>
+            </View>
+          )}
+          {order.products.b19 > 0 && (
+            <View style={styles.productRow}>
+              <View style={styles.productInfo}>
+                <Text style={styles.productText}>Вода 19 л</Text>
+                <Text style={styles.productSubtext}>Негазированная</Text>
+              </View>
+              <Text style={styles.productQuantity}>
+                x{order.products.b19}
+              </Text>
+            </View>
+          )}
+          {/* {order.products.map((product, index) => (
             <View key={index} style={styles.productRow}>
               <View style={styles.productInfo}>
                 {product.b12 > 0 && (
@@ -92,7 +114,7 @@ const AwaitingOrderView: React.FC<AwaitingOrderViewProps> = ({ order, onCancelOr
                 x{product.b12 > 0 ? product.b12 : product.b19}
               </Text>
             </View>
-          ))}
+          ))} */}
         </CollapsibleSection>
 
         {/* Delivery Info Section - Collapsible */}
@@ -104,29 +126,29 @@ const AwaitingOrderView: React.FC<AwaitingOrderViewProps> = ({ order, onCancelOr
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Адрес</Text>
             <Text style={styles.infoValue}>
-              {order.address || 'Самал-1'}
+              {order.address?.actual || order.address?.name || 'Самал-1'}
             </Text>
           </View>
           
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Способ оплаты</Text>
             <Text style={styles.infoValue}>
-              {order.paymentMethod || 'Нал/карта/QR'}
+              {order.opForm === "fakt" ? "Наличные" : order.opForm === "card" ? "Карта" : order.opForm === "qr" ? "QR" : 'Нал/карта/QR'}
             </Text>
           </View>
           
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Время доставки</Text>
             <Text style={styles.infoValue}>
-              {order.deliveryTime || 'Пятница, 18 апреля'}
+              {order.date?.d || order.deliveryTime || 'Пятница, 18 апреля'}
             </Text>
           </View>
           
-          {order.totalAmount && (
+          {(order.sum || order.totalAmount) && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Сумма заказа</Text>
               <Text style={styles.infoValue}>
-                {order.totalAmount} ₸
+                {order.sum || order.totalAmount} ₸
               </Text>
             </View>
           )}

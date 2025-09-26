@@ -38,9 +38,17 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
 }) => {
   const [estimatedTime, setEstimatedTime] = useState('15-20 мин');
   const [courierDistance, setCourierDistance] = useState('1.2 км');
+  const [currentCourierLocation, setCurrentCourierLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [isMoving, setIsMoving] = useState(false);
 
-  const deliveryLocation = order.deliveryCoordinates || getDeliveryCoordinates(order.address || '');
-  const courierLocation = order.courierLocation || { latitude: 43.2065, longitude: 76.8734 };
+  const deliveryLocation = order.deliveryCoordinates || 
+    (order.address?.point ? { latitude: order.address.point.lat, longitude: order.address.point.lon } : null) ||
+    getDeliveryCoordinates(order.address?.actual || order.address?.name || '');
+  
+  // Начальная позиция курьера (склад/база)
+  const initialCourierLocation = { latitude: 43.2220, longitude: 76.8512 };
+  // Используем только currentCourierLocation, если он установлен, иначе начальную позицию
+  const courierLocation = currentCourierLocation || initialCourierLocation;
 
   // Обновление информации о курьере при изменении его местоположения
   const handleCourierLocationUpdate = (newLocation: { latitude: number; longitude: number }) => {
@@ -70,26 +78,144 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
     return R * c;
   };
 
+  // Функция для вычисления следующей точки на пути к цели
+  const getNextLocation = (
+    current: { latitude: number; longitude: number },
+    target: { latitude: number; longitude: number },
+    distanceKm: number
+  ) => {
+    const distance = calculateDistance(current, target);
+    
+    // Если уже достигли цели или очень близко
+    if (distance <= 0.01) { // 10 метров
+      return target;
+    }
+
+    // Вычисляем направление
+    const bearing = Math.atan2(
+      Math.sin((target.longitude - current.longitude) * Math.PI / 180) * Math.cos(target.latitude * Math.PI / 180),
+      Math.cos(current.latitude * Math.PI / 180) * Math.sin(target.latitude * Math.PI / 180) - 
+      Math.sin(current.latitude * Math.PI / 180) * Math.cos(target.latitude * Math.PI / 180) * 
+      Math.cos((target.longitude - current.longitude) * Math.PI / 180)
+    );
+
+    // Вычисляем новую позицию
+    const R = 6371; // Радиус Земли в км
+    const lat1 = current.latitude * Math.PI / 180;
+    const lon1 = current.longitude * Math.PI / 180;
+    
+    const lat2 = Math.asin(
+      Math.sin(lat1) * Math.cos(distanceKm / R) +
+      Math.cos(lat1) * Math.sin(distanceKm / R) * Math.cos(bearing)
+    );
+    
+    const lon2 = lon1 + Math.atan2(
+      Math.sin(bearing) * Math.sin(distanceKm / R) * Math.cos(lat1),
+      Math.cos(distanceKm / R) - Math.sin(lat1) * Math.sin(lat2)
+    );
+
+    return {
+      latitude: lat2 * 180 / Math.PI,
+      longitude: lon2 * 180 / Math.PI
+    };
+  };
+
+  // Функция для движения курьера
+  const moveCourier = () => {
+    if (!deliveryLocation) {
+      console.log('Нет адреса доставки, движение невозможно');
+      return;
+    }
+
+    const currentLocation = currentCourierLocation || initialCourierLocation;
+    const distanceToTarget = calculateDistance(currentLocation, deliveryLocation);
+    
+    console.log(`Курьер на позиции: ${currentLocation.latitude}, ${currentLocation.longitude}`);
+    console.log(`Расстояние до цели: ${distanceToTarget.toFixed(2)} км`);
+    
+    // Если курьер уже достиг цели
+    if (distanceToTarget <= 0.01) { // 10 метров
+      console.log('Курьер достиг цели! Возвращаем на начальную позицию...');
+      setCurrentCourierLocation(initialCourierLocation);
+      // Не останавливаем движение, просто возвращаемся на старт
+      return;
+    }
+
+    // Двигаемся на 500 метров (0.5 км) каждые 15 секунд
+    const stepDistance = 0.5; // 500 метров в км
+    const nextLocation = getNextLocation(currentLocation, deliveryLocation, stepDistance);
+    
+    console.log(`Новая позиция курьера: ${nextLocation.latitude}, ${nextLocation.longitude}`);
+    
+    setCurrentCourierLocation(nextLocation);
+    console.log('setCurrentCourierLocation вызван с:', nextLocation);
+    
+    // Обновляем информацию о расстоянии и времени
+    const newDistance = calculateDistance(nextLocation, deliveryLocation);
+    setCourierDistance(`${newDistance.toFixed(1)} км`);
+    
+    const timeInMinutes = Math.round((newDistance / 3) * 60); // 3 км/час скорость
+    setEstimatedTime(`${timeInMinutes}-${timeInMinutes + 5} мин`);
+    
+    // Вызываем callback для обновления карты
+    handleCourierLocationUpdate(nextLocation);
+  };
+
+  // Запуск движения курьера
+  useEffect(() => {
+    console.log('Запуск движения курьера для заказа:', order._id);
+    setIsMoving(true);
+    // Устанавливаем начальную позицию курьера
+    setCurrentCourierLocation(initialCourierLocation);
+    
+    // Делаем первый шаг сразу
+    setTimeout(() => {
+      console.log('Первый шаг движения курьера');
+      moveCourier();
+    }, 2000); // 2 секунды задержка для инициализации
+    
+    // Запускаем интервал движения каждые 15 секунд
+    const interval = setInterval(() => {
+      console.log('Таймер сработал, вызываем moveCourier');
+      moveCourier();
+    }, 15000); // 15 секунд
+
+    return () => {
+      console.log('Очищаем интервал для заказа:', order._id);
+      clearInterval(interval);
+    };
+  }, [order._id]); // Перезапускаем только при смене заказа
+
+  // Отслеживаем изменения позиции курьера
+  useEffect(() => {
+    if (currentCourierLocation) {
+      console.log('Позиция курьера обновлена:', currentCourierLocation);
+      console.log('Передаем в MapProvider courierLocation:', currentCourierLocation);
+      // Уведомляем MapProvider об изменении позиции
+      handleCourierLocationUpdate(currentCourierLocation);
+    }
+  }, [currentCourierLocation]);
+
   return (
     <View style={styles.container}>
       {/* Информация о заказе */}
       <View style={styles.orderInfo}>
-        <Text style={styles.orderTitle}>Заказ #{order.id} в пути</Text>
+        <Text style={styles.orderTitle}>Заказ #{order._id} в пути</Text>
         <View style={styles.deliveryInfo}>
           <Text style={styles.deliveryText}>
             <Text style={styles.label}>Курьер: </Text>
-            {order.courier?.fullName || 'Неизвестно'}
-            {order.courier?.rating && (
+            {typeof order.courier === 'string' ? 'ID: ' + order.courier : (order.courier?.fullName || 'Неизвестно')}
+            {typeof order.courier === 'object' && order.courier && 'rating' in order.courier && order.courier.rating && (
               <Text style={styles.rating}> ⭐ {order.courier.rating}</Text>
             )}
           </Text>
-          {order.courier?.phone && (
+          {typeof order.courier === 'object' && order.courier && 'phone' in order.courier && order.courier.phone && (
             <Text style={styles.deliveryText}>
               <Text style={styles.label}>Телефон: </Text>
               {order.courier.phone}
             </Text>
           )}
-          {order.courier?.vehicleNumber && (
+          {typeof order.courier === 'object' && order.courier && 'vehicleNumber' in order.courier && order.courier.vehicleNumber && (
             <Text style={styles.deliveryText}>
               <Text style={styles.label}>Автомобиль: </Text>
               {order.courier.vehicleNumber}
@@ -97,37 +223,26 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
           )}
           <Text style={styles.deliveryText}>
             <Text style={styles.label}>Адрес: </Text>
-            {order.fullAddress || order.address}
+            {order.fullAddress || order.address?.actual || order.address?.name || 'Не указан'}
           </Text>
           <Text style={styles.deliveryText}>
             <Text style={styles.label}>Время доставки: </Text>
-            {order.deliveryTime}
+            {order.date?.d || order.deliveryTime || 'Не указано'}
           </Text>
-          {order.customerNotes && (
+          {(order.comment || order.customerNotes) && (
             <Text style={styles.deliveryText}>
               <Text style={styles.label}>Примечания: </Text>
-              {order.customerNotes}
+              {order.comment || order.customerNotes}
             </Text>
           )}
         </View>
       </View>
 
-      {/* Статистика доставки */}
-      {/* <View style={styles.deliveryStats}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{estimatedTime}</Text>
-          <Text style={styles.statLabel}>Осталось времени</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{courierDistance}</Text>
-          <Text style={styles.statLabel}>До вас</Text>
-        </View>
-      </View> */}
 
       {/* Карта с курьером */}
       <View style={styles.mapContainer}>
         <MapProvider
+          key={`courier-${currentCourierLocation?.latitude}-${currentCourierLocation?.longitude}`}
           courierLocation={courierLocation}
           deliveryLocation={deliveryLocation}
           showCourierRoute={true}
@@ -223,33 +338,6 @@ const styles = StyleSheet.create({
     color: '#FF8C00',
     fontSize: 14,
     fontWeight: '500',
-  },
-  deliveryStats: {
-    backgroundColor: 'white',
-    flexDirection: 'row',
-    padding: 16,
-    marginBottom: 8,
-    alignItems: 'center',
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#007AFF',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#545454',
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: '#E3E3E3',
-    marginHorizontal: 20,
   },
   mapContainer: {
     flex: 1,

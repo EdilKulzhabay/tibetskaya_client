@@ -10,7 +10,7 @@ export interface Location {
 }
 
 export interface Courier {
-  id: string;
+  _id: string;
   fullName: string;
   phone?: string;
   rating?: number;
@@ -20,40 +20,82 @@ export interface Courier {
   estimatedArrival?: string;
 }
 
+export interface CourierAggregator {
+  _id: string;
+  name: string;
+  phone?: string;
+  rating?: number;
+}
+
+export interface OrderAddress {
+  name: string;
+  actual: string;
+  link: string;
+  phone: string;
+  point: {
+    lat: number;
+    lon: number;
+  };
+}
+
+export interface OrderDate {
+  d: string;
+  time: string;
+}
+
+export type OrderStatus = 
+  | 'awaitingOrder' 
+  | 'confirmed' 
+  | 'preparing' 
+  | 'onTheWay' 
+  | 'completed' 
+  | 'cancelled';
+
 export interface OrderData {
-  id: string;
-  orderNumber?: string;
-  date: string;
-  createdAt?: string;
-  status: 'awaitingOrder' | 'confirmed' | 'preparing' | 'onTheWay' | 'completed' | 'cancelled';
+  _id: string;
+  franchisee?: string; // ObjectId reference to User
+  client?: string; // ObjectId reference to Client
+  address: OrderAddress;
   products: OrderProduct;
-  courier?: Courier | null;
+  date: OrderDate;
+  status: OrderStatus;
+  sum: number;
+  courier?: string | Courier; // ObjectId reference to Courier or populated Courier object
+  courierAggregator?: string; // ObjectId reference to CourierAggregator
+  history: string[];
+  transferred: boolean;
+  transferredFranchise?: string;
+  opForm?: string;
+  comment?: string;
+  clientReview: number;
+  clientNotes: string[];
+  income: number;
+  aquaMarketAddress: string;
+  reason: string;
+  forAggregator: boolean;
+  priority: number;
+  isUrgent: boolean;
+  clientPhone: string;
+  createdAt: string;
+  updatedAt: string;
   
-  // Адрес и местоположение
-  address: string;
+  // Дополнительные поля для совместимости с UI
+  orderNumber?: string;
   fullAddress?: string;
   deliveryCoordinates?: Location;
   courierLocation?: Location;
-  
-  // Оплата и стоимость
   paymentMethod?: string;
   subtotal?: number;
   deliveryFee?: number;
-  totalAmount: number;
+  totalAmount?: number;
   isPaid?: boolean;
-  
-  // Время доставки
   deliveryTime?: string;
   estimatedDeliveryTime?: string;
   actualDeliveryTime?: string;
-  
-  // Дополнительная информация
   customerNotes?: string;
   courierNotes?: string;
   deliveryInstructions?: string;
   contactPhone?: string;
-  
-  // Статус обновления
   lastUpdated?: string;
   trackingHistory?: {
     timestamp: string;

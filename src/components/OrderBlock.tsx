@@ -2,32 +2,47 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList, OrderData, OrderProduct, Courier } from '../types/navigation';
+import { RootStackParamList, OrderData, OrderProduct, Courier, OrderDate } from '../types/navigation';
+import { OrderAddress } from '../types/navigation';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 interface OrderBlockProps {
-    id: string;
-    date: string;
+    _id: string;
+    date: OrderDate;
     status: 'awaitingOrder' | 'confirmed' | 'preparing' | 'onTheWay' | 'completed' | 'cancelled';
     products: OrderProduct;
-    courier?: Courier | null;
-    address: string;
+    courier?: Courier | string;
+    address: OrderAddress;
     totalAmount: number;
 }
 
-const OrderBlock: React.FC<OrderBlockProps> = ({id, date, status, products, courier, address, totalAmount}) => {
+const OrderBlock: React.FC<OrderBlockProps> = ({_id, date, status, products, courier, address, totalAmount}) => {
     const navigation = useNavigation<NavigationProp>();
     
     // Создаем объект заказа для передачи
     const orderData: OrderData = {
-        id,
+        _id,
         date,
         status,
         products,
         courier,
         address,
-        totalAmount
+        sum: totalAmount,
+        totalAmount,
+        history: [],
+        transferred: false,
+        clientReview: 0,
+        clientNotes: [],
+        income: 0,
+        aquaMarketAddress: '',
+        reason: '',
+        forAggregator: false,
+        priority: 3,
+        isUrgent: false,
+        clientPhone: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
     };
 
     const handleOrderPress = () => {
@@ -37,7 +52,9 @@ const OrderBlock: React.FC<OrderBlockProps> = ({id, date, status, products, cour
     return (
         <TouchableOpacity style={styles.container} onPress={handleOrderPress}>
             <View style={styles.orderHeader}>
-                <Text># <Text style={{fontSize: 18, fontWeight: '600'}}>{date}</Text></Text>
+                <Text># <Text style={{fontSize: 18, fontWeight: '600'}}>
+                  {typeof date === 'string' ? date : date?.d || 'Не указана'}
+                </Text></Text>
                 <Text style={
                     [styles.orderStatus, 
                     status === "awaitingOrder" || status === "onTheWay" ? { color: "#EB7E00" } : 
@@ -55,7 +72,7 @@ const OrderBlock: React.FC<OrderBlockProps> = ({id, date, status, products, cour
                     )}
                 </View>
 
-                {courier && courier.fullName && status !== "awaitingOrder" && (
+                {courier && typeof courier === 'object' && courier.fullName && status !== "awaitingOrder" && (
                     <View style={styles.orderCourier}>
                         {status === "onTheWay" ? (
                             <Text>К вам едет: </Text>
