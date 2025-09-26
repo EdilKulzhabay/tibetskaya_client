@@ -7,13 +7,13 @@ const screenWidth = Dimensions.get('window').width
 
 const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const [form, setForm] = useState({
-        fullName: "edil",
-        mail: "edil.kulzhabay01@gmail.com",
-        phone: "+77777777777",
-        password: "123456",
-        confirmPassword: "123456",
-        termsAccepted: true,
-        privacyAccepted: true,
+        fullName: "",
+        mail: "",
+        phone: "",
+        password: "",
+        confirmPassword: "",
+        termsAccepted: false,
+        privacyAccepted: false,
     });
     const [loading, setLoading] = useState(false);
 

@@ -7,8 +7,8 @@ const screenWidth = Dimensions.get('window').width
 
 const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const { saveUserData } = useAuth();
-    const [mail, setMail] = useState("edil.kulzhabay01@gmail.com")
-    const [password, setPassword] = useState("123456")
+    const [mail, setMail] = useState("")
+    const [password, setPassword] = useState("")
     const [loading, setLoading] = useState(false);
 
 
