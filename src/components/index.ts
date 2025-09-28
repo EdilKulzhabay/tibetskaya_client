@@ -16,6 +16,8 @@ export {default as Back} from './Back';
 export {default as NavButton} from './NavButton';
 export {default as MySwitchToggle} from './MySwitchToggle';
 export {default as AuthWrapper} from './AuthWrapper';
+export {default as ImagePreloader} from './ImagePreloader';
+export {default as OptimizedImage} from './OptimizedImage';
 // Добавляйте новые компоненты здесь
 // export {default as Input} from './Input';
 // export {default as Card} from './Card';
