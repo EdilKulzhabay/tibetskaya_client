@@ -19,23 +19,26 @@ interface ProfileScreenProps {
 }
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, loadingState } = useAuth();
   const [notificationSwitchValue, setNotificationSwitchValue] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [language, setLanguage] = useState('Русский');
-  const [loading, setLoading] = useState(false);
 
-  // Если пользователь не авторизован, переходим на экран авторизации
+  // Проверяем авторизацию пользователя после загрузки
   useEffect(() => {
-    setLoading(true);
-    if (!user) {
+    if (loadingState === 'success' && !user) {
       navigation.navigate('Login');
     }
-    setLoading(false);
-  }, [user]);
+  }, [loadingState, user, navigation]);
 
-  if (loading) {
+  // Показываем загрузку пока данные пользователя загружаются
+  if (loadingState === 'loading') {
     return <ActivityIndicator size="large" color="#DC1818" style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }} />;
+  }
+
+  // Если пользователь не авторизован после загрузки, не рендерим компонент
+  if (!user) {
+    return null;
   }
 
   return (
@@ -44,7 +47,10 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       <View style={styles.header}>
         <View style={{width: 24}} />
         <Text style={styles.profileTitle}>Профиль</Text>
-        <TouchableOpacity style={styles.logInOutButton} onPress={() => logout()}>
+        <TouchableOpacity style={styles.logInOutButton} onPress={() => {
+          logout()
+          navigation.navigate('Home');
+        }}>
           <Image source={require('../assets/logInOut.png')} style={styles.logInOutIcon} />
         </TouchableOpacity>
       </View>

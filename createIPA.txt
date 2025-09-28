@@ -14,14 +14,35 @@ cd ..
 # Очистка React Native кэша
 npx react-native start --reset-cache
 
-нужно изменить версию в двух местах в файле 
-ios/tibetskayaClientApp.xcodeproj/project.pbxproj
-
-удалить старый ipa в 
-build/ipa
-
 # Очистка iOS кэша
 rm -rf ios/build
 rm -rf ~/Library/Developer/Xcode/DerivedData/tibetskayaClientApp-*
+```
 
+## 2. Обновление версии
+Нужно изменить версию в двух местах в файле:
+`ios/tibetskayaClientApp.xcodeproj/project.pbxproj`
+
+## 3. Создание архива
+```bash
+# Удалить старый ipa в build/ipa (если есть)
+rm -rf build/ipa/*
+
+# Создать архив
+xcodebuild -workspace ios/tibetskayaClientApp.xcworkspace -scheme tibetskayaClientApp -configuration Release -destination generic/platform=iOS -archivePath build/tibetskayaClientApp.xcarchive archive
+```
+
+## 4. Экспорт IPA
+```bash
+# Экспорт IPA файла
 xcodebuild -exportArchive -archivePath build/tibetskayaClientApp.xcarchive -exportPath build/ipa -exportOptionsPlist build/ipa/ExportOptions.plist
+```
+
+## 5. Проверка результата
+После успешного экспорта файл будет находиться в:
+`build/ipa/tibetskayaClientApp.ipa`
+
+## Важно!
+- Убедитесь, что в ExportOptions.plist указан правильный Team ID
+- Проверьте, что у вас есть действующий сертификат разработчика
+- Убедитесь, что Bundle ID соответствует настройкам в App Store Connect

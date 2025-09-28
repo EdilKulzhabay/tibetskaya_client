@@ -8,6 +8,7 @@ import {StatusBar, StyleSheet, useColorScheme, View} from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
+import AuthWrapper from './src/components/AuthWrapper';
 
 // Импорт наших экранов
 import {
@@ -45,13 +46,14 @@ function App() {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <NavigationContainer>
-        <Stack.Navigator 
-          initialRouteName="Home"
-          screenOptions={{
-            headerShown: false, // Скрываем стандартный заголовок
-          }}
-        >
+      <AuthWrapper>
+        <NavigationContainer>
+          <Stack.Navigator 
+            initialRouteName="Home"
+            screenOptions={{
+              headerShown: false, // Скрываем стандартный заголовок
+            }}
+          >
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="History" component={HistoryScreen} />
@@ -75,8 +77,9 @@ function App() {
           <Stack.Screen name="StartHydration" component={StartHydrationScreen} />
           <Stack.Screen name="StartHydration2" component={StartHydrationScreen2} />
           <Stack.Screen name="AddOrder" component={AddOrderScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
+          </Stack.Navigator>
+        </NavigationContainer>
+      </AuthWrapper>
     </SafeAreaProvider>
   );
 }

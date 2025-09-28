@@ -6,6 +6,7 @@ import {
   Dimensions,
   TouchableOpacity,
   Platform,
+  Alert,
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 
@@ -43,6 +44,8 @@ const MapProvider: React.FC<MapProviderProps> = ({
   const [currentCourierLocation, setCurrentCourierLocation] = useState<Location>(
     courierLocation || ALMATY_LOCATIONS.bostandyk
   );
+  const [mapReady, setMapReady] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
   
   // Маршрут курьера до точки доставки
   const [routeCoordinates, setRouteCoordinates] = useState<Location[]>([
@@ -127,9 +130,35 @@ const MapProvider: React.FC<MapProviderProps> = ({
   // Android: используем Google Maps
   const mapProvider = Platform.OS === 'ios' ? undefined : PROVIDER_GOOGLE;
 
+  // Обработчики событий карты
+  const handleMapReady = () => {
+    console.log('Карта готова к использованию');
+    setMapReady(true);
+    setMapError(null);
+  };
+
+  const handleMapError = (error: any) => {
+    console.error('Ошибка карты:', error);
+    setMapError('Ошибка загрузки карты');
+    setMapReady(false);
+  };
+
+  // Если карта не готова или есть ошибка, показываем fallback
+  if (mapError) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Карта временно недоступна</Text>
+          <Text style={styles.errorSubtext}>Проверьте подключение к интернету</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <MapView 
+        ref={mapRef}
         style={styles.map} 
         provider={mapProvider}
         initialRegion={{
@@ -138,10 +167,15 @@ const MapProvider: React.FC<MapProviderProps> = ({
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         }}
-        showsUserLocation={true}
+        showsUserLocation={Platform.OS === 'ios'}
         showsMyLocationButton={false}
         showsCompass={true}
         showsScale={true}
+        onMapReady={handleMapReady}
+        // onError={handleMapError}
+        loadingEnabled={true}
+        loadingIndicatorColor="#DC1818"
+        loadingBackgroundColor="#f6f6f6"
       >
         {/* Маркер места доставки */}
         {deliveryLocation && (
@@ -272,6 +306,25 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f6f6f6',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#DC1818',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  errorSubtext: {
+    fontSize: 14,
+    color: '#545454',
+    textAlign: 'center',
   },
   courierMarker: {
     backgroundColor: '#007AFF',
