@@ -1,7 +1,9 @@
 import { SafeAreaView, StyleSheet, View, Text, ScrollView, Image, TouchableOpacity } from 'react-native';
 import { Back } from '../components';
+import { useAuth } from '../hooks/useAuth';
 
 const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { user } = useAuth();
   return (
     <SafeAreaView style={styles.safeArea}>
       <Back navigation={navigation} title="Мой кошелек" />
@@ -10,7 +12,7 @@ const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         <View style={styles.balanceContainer}>
           <Text style={styles.balanceTitle}>Мой кошелек:</Text>
           <View style={styles.balanceContent}>
-            <Text style={styles.balanceCount}>1000</Text>
+            <Text style={styles.balanceCount}>{user?.balance || 0}</Text>
             <Text style={styles.balanceCountT}>₸</Text>
           </View>
         </View>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -57,6 +57,11 @@ const MapProvider: React.FC<MapProviderProps> = ({
 
   const mapRef = useRef<MapView>(null);
 
+  // Создаем стабильную ссылку на callback
+  const stableOnCourierLocationUpdate = useCallback((location: Location) => {
+    onCourierLocationUpdate?.(location);
+  }, [onCourierLocationUpdate]);
+
   // Симуляция движения курьера
   useEffect(() => {
     if (!showCourierRoute) return;
@@ -76,15 +81,17 @@ const MapProvider: React.FC<MapProviderProps> = ({
           longitude: prevLocation.longitude + (lngDiff * speed),
         };
 
-        // Уведомляем родительский компонент о новом местоположении
-        onCourierLocationUpdate?.(newLocation);
+        // Уведомляем родительский компонент о новом местоположении через setTimeout
+        setTimeout(() => {
+          stableOnCourierLocationUpdate(newLocation);
+        }, 0);
 
         return newLocation;
       });
     }, 1000); // Обновляем каждую секунду
 
     return () => clearInterval(moveInterval);
-  }, [deliveryLocation, showCourierRoute, onCourierLocationUpdate]);
+  }, [deliveryLocation, showCourierRoute, stableOnCourierLocationUpdate]);
 
   // Центрирование карты на области доставки
   const centerMapOnDelivery = () => {

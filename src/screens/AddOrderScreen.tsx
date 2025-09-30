@@ -1,7 +1,7 @@
 import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, Image, Modal, ActivityIndicator, Alert, ScrollView } from "react-native";
 import Back from "../components/Back";
 import { useAuth } from "../hooks";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { apiService } from "../api/services";
 
 const payments = [
@@ -12,7 +12,7 @@ const payments = [
 
 const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation, route }) => {
     const { products } = route.params;
-    const { user } = useAuth();
+    const { user, refreshUserData } = useAuth();
 
     const [price12, setPrice12] = useState(user?.price12 || 900);
     const [price19, setPrice19] = useState(user?.price19 || 1300);
@@ -26,6 +26,23 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
     const [selectedPayment, setSelectedPayment] = useState<any>(null);
 
     const [loading, setLoading] = useState(false);
+
+    // Обновляем данные пользователя при загрузке страницы
+    useEffect(() => {
+        const loadUserData = async () => {
+            try {
+                await refreshUserData();
+            } catch (error) {
+                console.error('Ошибка при обновлении данных пользователя:', error);
+            }
+        };
+
+        loadUserData();
+    }, []);
+
+    useEffect(() => {
+        console.log("user = ", user);
+    }, [user]);
 
     const handleOrder = async () => {
         setLoading(true);
@@ -51,8 +68,8 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
             name: selectedAddress.name,
             phone: user?.phone,
             point: {
-                lat: selectedAddress?.latitude || "",
-                lng: selectedAddress?.longitude || "",
+                lat: selectedAddress?.point?.lat || "",
+                lon: selectedAddress?.point?.lon || "",
             },
             link: selectedAddress?.link || "",
         }

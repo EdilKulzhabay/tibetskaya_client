@@ -167,7 +167,7 @@ const activeOrders = 3;
 //     orderNumber: 'TW-2024-312',
 //     date: '2024-12-30',
 //     createdAt: '2024-12-30T09:20:00Z',
-//     status: "completed" as const,
+//     status: "delivered" as const,
 //     products: [
 //       {
 //         b12: 2,
@@ -237,7 +237,7 @@ const activeOrders = 3;
 //       },
 //       {
 //         timestamp: '2024-12-30T13:25:00Z',
-//         status: 'completed',
+//         status: 'delivered',
 //         message: 'Заказ успешно доставлен',
 //         location: { latitude: 43.2418, longitude: 76.9562 }
 //       }
@@ -260,15 +260,16 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
 
   useFocusEffect(
     useCallback(() => {
-      // Ждем загрузки пользователя перед отправкой запроса
-      if (user?.mail && loadingState === 'success') {
+      // Запрашиваем активные заказы только один раз при загрузке экрана
+      if (user?.mail && loadingState === 'success' && orders.length === 0) {
+        console.log('Запрашиваем активные заказы для:', user.mail);
         apiService.getActiveOrders(user.mail).then((res: any) => {
           setOrders(res.orders);
         }).catch((error) => {
           console.error('Ошибка при получении активных заказов:', error);
         });
       }
-    }, [user?.mail, loadingState])
+    }, [user?.mail, loadingState, orders.length])
   );
 
 
@@ -300,13 +301,14 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                   // paymentMethod={order.paymentMethod}
                   // deliveryTime={order.deliveryTime}
                   totalAmount={order.totalAmount}
+                  courierAggregator={order.courierAggregator}
                   // courierLocation={order.courierLocation}
                 />
               ))}
             </View>
           )}
 
-          <MainPageWallet balance={2400} />
+          <MainPageWallet balance={user?.balance || 0} />
           <Products navigation={navigation} />
           <Marketplace />
           

@@ -1,8 +1,9 @@
-import { ActivityIndicator, Alert, Dimensions, Image, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useState, useEffect } from "react";
+import { ActivityIndicator, Alert, Dimensions, Image, StatusBar, StyleSheet, Text, TouchableOpacity, View, BackHandler } from "react-native";
 import OutlinedFilledLabelInput from "../components/OutlinedFilledLabelInput";
-import { useState } from "react";
 import { apiService } from "../api/services";
 import { useAuth } from "../hooks/useAuth";
+import { useFocusEffect } from '@react-navigation/native';
 const screenWidth = Dimensions.get('window').width
 
 const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
@@ -10,6 +11,20 @@ const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const [mail, setMail] = useState("")
     const [password, setPassword] = useState("")
     const [loading, setLoading] = useState(false);
+
+    // Обработка кнопки "Назад" на Android
+    useFocusEffect(
+        React.useCallback(() => {
+            const onBackPress = () => {
+                navigation.navigate('Home');
+                return true; // Предотвращаем стандартное поведение
+            };
+
+            const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+            return () => subscription.remove();
+        }, [navigation])
+    );
 
 
     const handleLogin = async () => {

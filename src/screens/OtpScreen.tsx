@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Dimensions, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, Keyboard } from 'react-native';
 import { apiService } from '../api/services';
 // import { registerForPushNotificationsAsync } from '../utils/registerForPushNotificationsAsync';
 // import { saveCourierData, saveTokenData } from '../utils/storage';
@@ -25,28 +25,47 @@ const OtpScreen: React.FC<OtpScreenProps> = ({ navigation, route }) => {
 
     const handleChange = async (text: string, index: number) => {
         const newCode = [...code];
+        
+        // Если текст пустой (удаление), очищаем текущий инпут и переходим к предыдущему
+        if (text === '') {
+            newCode[index] = '';
+            setCode(newCode);
+            if (index > 0) {
+                inputs.current[index - 1]?.focus();
+            }
+            return;
+        }
+        
+        // Если введен символ, сохраняем его
         newCode[index] = text;
         setCode(newCode);
 
+        // Переходим к следующему инпуту
         if (text && index < OTP_LENGTH - 1) {
             inputs.current[index + 1]?.focus();
         }
         
-        if (index === OTP_LENGTH - 1) {
-            const res = await apiService.codeConfirm(form.mail, newCode.join(''));
-            if (res.success) {
-                const registerRes = await apiService.clientRegister(form);
-                // Сохраняем данные пользователя и токены если они есть в ответе
-                if (registerRes.clientData && registerRes.accessToken) {
-                    await saveUserData(registerRes);
-                }
-                if (registerRes.success) {
-                    navigation.navigate("RegisterAccepted");
+        // Если код полностью введен, проверяем его
+        if (index === OTP_LENGTH - 1 && text) {
+            const fullCode = newCode.join('');
+            if (fullCode.length === OTP_LENGTH) {
+                Keyboard.dismiss(); // Скрываем клавиатуру
+                
+                const res = await apiService.codeConfirm(form.mail, fullCode);
+                if (res.success) {
+                    const registerRes = await apiService.clientRegister(form);
+                    // Сохраняем данные пользователя и токены если они есть в ответе
+                    if (registerRes.clientData && registerRes.accessToken) {
+                        await saveUserData(registerRes);
+                    }
+                    if (registerRes.success) {
+                        navigation.navigate("RegisterAccepted");
+                    } else {
+                        Alert.alert("Ошибка", registerRes.message);
+                    }
                 } else {
-                    Alert.alert("Ошибка", registerRes.message);
+                    Alert.alert("Ошибка", res.message);
                 }
-            } else {
-                Alert.alert("Ошибка", res.message);
             }
         }
 
@@ -90,7 +109,15 @@ const OtpScreen: React.FC<OtpScreenProps> = ({ navigation, route }) => {
         if (response.success) {
             console.log("response in otp = ", response);
             setTimer(59);
+            // Очищаем все поля при повторной отправке кода
+            setCode(Array(OTP_LENGTH).fill(''));
+            inputs.current[0]?.focus();
         }
+    }
+
+    const clearAllFields = () => {
+        setCode(Array(OTP_LENGTH).fill(''));
+        inputs.current[0]?.focus();
     }
 
     useEffect(() => {
@@ -132,6 +159,12 @@ const OtpScreen: React.FC<OtpScreenProps> = ({ navigation, route }) => {
                         maxLength={1}
                         value={digit}
                         onChangeText={(text) => handleChange(text, index)}
+                        onKeyPress={({ nativeEvent }) => {
+                            // Обработка нажатия клавиши "Назад"
+                            if (nativeEvent.key === 'Backspace' && !digit && index > 0) {
+                                inputs.current[index - 1]?.focus();
+                            }
+                        }}
                         ref={(ref) => {
                             if (ref) {
                                 inputs.current[index] = ref;
@@ -146,16 +179,27 @@ const OtpScreen: React.FC<OtpScreenProps> = ({ navigation, route }) => {
                     <Text style={styles.timerHighlight}>{timer} сек</Text>
                 </Text>
 
-                <TouchableOpacity
-                    disabled={timer > 0}
-                    onPress={handleResendCode}
-                >
-                    {timer === 0 && (
-                        <Text style={styles.resendText}>
-                        Отправить код повторно
+                <View style={styles.buttonContainer}>
+                    <TouchableOpacity
+                        disabled={timer > 0}
+                        onPress={handleResendCode}
+                    >
+                        {timer === 0 && (
+                            <Text style={styles.resendText}>
+                            Отправить код повторно
+                            </Text>
+                        )}
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                        onPress={clearAllFields}
+                        style={styles.clearButton}
+                    >
+                        <Text style={styles.clearButtonText}>
+                            Очистить
                         </Text>
-                    )}
-                </TouchableOpacity>
+                    </TouchableOpacity>
+                </View>
             </View>
         </KeyboardAvoidingView>
     );
@@ -211,6 +255,22 @@ const styles = StyleSheet.create({
     resendText: {
         color: '#0066cc',
         marginTop: 12,
+        fontWeight: '500'
+    },
+    buttonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        width: '100%',
+        marginTop: 20
+    },
+    clearButton: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: '#f0f0f0',
+        borderRadius: 6
+    },
+    clearButtonText: {
+        color: '#666',
         fontWeight: '500'
     }
 });

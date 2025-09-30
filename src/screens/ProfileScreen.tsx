@@ -71,7 +71,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         
         <NavButton title="Бонусы" onPress={() => navigation.navigate('Bonus')} icon={require('../assets/star.png')} />
         
-        <NavButton title="Мой кошелек" onPress={() => navigation.navigate('Bonus')} icon={require('../assets/wallet.png')} />
+        <NavButton title="Мой кошелек" onPress={() => navigation.navigate('Wallet')} icon={require('../assets/wallet.png')} />
 
         <NavButton title="Аналитика" onPress={() => navigation.navigate('Bonus')} icon={require('../assets/analytics.png')} />
 

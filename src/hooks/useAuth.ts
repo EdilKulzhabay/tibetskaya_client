@@ -16,6 +16,7 @@ interface AuthActions {
   logout: () => Promise<void>;
   clearError: () => void;
   refreshUser: () => Promise<void>;
+  refreshUserData: () => Promise<void>;
   updateUser: (field: string, value: any) => Promise<void>;
 }
 
@@ -190,6 +191,32 @@ export const useAuth = (): UseAuthReturn => {
   }, [isAuthenticated, loadUserFromStorage]);
 
   /**
+   * Получение свежих данных пользователя с сервера
+   */
+  const refreshUserData = useCallback(async () => {
+    if (!user?.mail) return;
+    
+    try {
+      setLoadingState('loading');
+      const response = await apiService.getData(user.mail);
+      
+      if (response.success && response.clientData) {
+        // Обновляем локальное состояние
+        await userStorage.save(response.clientData);
+        setUser(response.clientData);
+        setLoadingState('success');
+        console.log('Данные пользователя обновлены с сервера:', response.clientData.mail);
+      } else {
+        throw new Error(response.message || 'Не удалось получить данные пользователя');
+      }
+    } catch (error) {
+      console.error('Ошибка при получении данных пользователя:', error);
+      setError('Не удалось обновить данные пользователя');
+      setLoadingState('error');
+    }
+  }, [user?.mail]);
+
+  /**
    * Обновление данных пользователя
    */
   const updateUser = useCallback(async (field: string, value: any) => {
@@ -233,6 +260,7 @@ export const useAuth = (): UseAuthReturn => {
     logout,
     clearError,
     refreshUser,
+    refreshUserData,
     updateUser,
   };
 };

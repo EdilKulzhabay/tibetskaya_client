@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { OrderData } from '../types/navigation';
 import MapProvider from './MapProvider';
+import { apiService } from '../api/services';
 
 interface OnTheWayViewProps {
   order: OrderData;
@@ -40,18 +41,64 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
   const [courierDistance, setCourierDistance] = useState('1.2 км');
   const [currentCourierLocation, setCurrentCourierLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isMoving, setIsMoving] = useState(false);
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
 
   const deliveryLocation = order.deliveryCoordinates || 
     (order.address?.point ? { latitude: order.address.point.lat, longitude: order.address.point.lon } : null) ||
     getDeliveryCoordinates(order.address?.actual || order.address?.name || '');
   
-  // Начальная позиция курьера (склад/база)
+  // Получаем координаты курьера из courierAggregator.point
+  // Проверяем, что courierAggregator существует и является объектом с координатами
+  const courierAggregatorLocation = order.courierAggregator && 
+    typeof order.courierAggregator === 'object' && 
+    'point' in order.courierAggregator && 
+    order.courierAggregator.point &&
+    typeof order.courierAggregator.point.lat === 'number' &&
+    typeof order.courierAggregator.point.lon === 'number'
+    ? { latitude: order.courierAggregator.point.lat, longitude: order.courierAggregator.point.lon }
+    : null;
+  
+  // Начальная позиция курьера (склад/база) - fallback
   const initialCourierLocation = { latitude: 43.2220, longitude: 76.8512 };
-  // Используем только currentCourierLocation, если он установлен, иначе начальную позицию
-  const courierLocation = currentCourierLocation || initialCourierLocation;
+  // Используем currentCourierLocation, затем реальные координаты курьера, затем начальную позицию
+  const courierLocation = currentCourierLocation || courierAggregatorLocation || initialCourierLocation;
+
+  // Функция для получения реального местоположения курьера с сервера
+  const fetchCourierLocation = async (forceUpdate = false) => {
+    if (!order.courierAggregator || typeof order.courierAggregator === 'string') {
+      return;
+    }
+
+    // Дебаунсинг - не делаем запрос чаще чем раз в 10 секунд
+    const now = Date.now();
+    if (!forceUpdate && (now - lastFetchTime) < 10000) {
+      console.log('Пропускаем запрос - слишком рано после последнего');
+      return;
+    }
+
+    try {
+      const courierId = order.courierAggregator._id;
+      console.log('Запрашиваем местоположение курьера:', courierId);
+      const response = await apiService.getCourierLocation(courierId);
+      
+      if (response.point && response.point.lat && response.point.lon) {
+        const newLocation = {
+          latitude: response.point.lat,
+          longitude: response.point.lon
+        };
+        
+        console.log('Получено новое местоположение курьера:', newLocation);
+        setCurrentCourierLocation(newLocation);
+        setLastFetchTime(now);
+        handleCourierLocationUpdate(newLocation);
+      }
+    } catch (error) {
+      console.error('Ошибка при получении местоположения курьера:', error);
+    }
+  };
 
   // Обновление информации о курьере при изменении его местоположения
-  const handleCourierLocationUpdate = (newLocation: { latitude: number; longitude: number }) => {
+  const handleCourierLocationUpdate = useCallback((newLocation: { latitude: number; longitude: number }) => {
     // Здесь можно вычислить расстояние и время доставки
     const distance = calculateDistance(newLocation, deliveryLocation);
     setCourierDistance(`${distance.toFixed(1)} км`);
@@ -59,7 +106,7 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
     // Простая оценка времени (примерно 3 км/час скорость курьера)
     const timeInMinutes = Math.round((distance / 3) * 60);
     setEstimatedTime(`${timeInMinutes}-${timeInMinutes + 5} мин`);
-  };
+  }, [deliveryLocation]);
 
   // Простая функция расчета расстояния между двумя точками
   const calculateDistance = (
@@ -78,113 +125,55 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
     return R * c;
   };
 
-  // Функция для вычисления следующей точки на пути к цели
-  const getNextLocation = (
-    current: { latitude: number; longitude: number },
-    target: { latitude: number; longitude: number },
-    distanceKm: number
-  ) => {
-    const distance = calculateDistance(current, target);
-    
-    // Если уже достигли цели или очень близко
-    if (distance <= 0.01) { // 10 метров
-      return target;
-    }
 
-    // Вычисляем направление
-    const bearing = Math.atan2(
-      Math.sin((target.longitude - current.longitude) * Math.PI / 180) * Math.cos(target.latitude * Math.PI / 180),
-      Math.cos(current.latitude * Math.PI / 180) * Math.sin(target.latitude * Math.PI / 180) - 
-      Math.sin(current.latitude * Math.PI / 180) * Math.cos(target.latitude * Math.PI / 180) * 
-      Math.cos((target.longitude - current.longitude) * Math.PI / 180)
-    );
-
-    // Вычисляем новую позицию
-    const R = 6371; // Радиус Земли в км
-    const lat1 = current.latitude * Math.PI / 180;
-    const lon1 = current.longitude * Math.PI / 180;
-    
-    const lat2 = Math.asin(
-      Math.sin(lat1) * Math.cos(distanceKm / R) +
-      Math.cos(lat1) * Math.sin(distanceKm / R) * Math.cos(bearing)
-    );
-    
-    const lon2 = lon1 + Math.atan2(
-      Math.sin(bearing) * Math.sin(distanceKm / R) * Math.cos(lat1),
-      Math.cos(distanceKm / R) - Math.sin(lat1) * Math.sin(lat2)
-    );
-
-    return {
-      latitude: lat2 * 180 / Math.PI,
-      longitude: lon2 * 180 / Math.PI
-    };
-  };
-
-  // Функция для движения курьера
-  const moveCourier = () => {
-    if (!deliveryLocation) {
-      console.log('Нет адреса доставки, движение невозможно');
-      return;
-    }
-
-    const currentLocation = currentCourierLocation || initialCourierLocation;
-    const distanceToTarget = calculateDistance(currentLocation, deliveryLocation);
-    
-    console.log(`Курьер на позиции: ${currentLocation.latitude}, ${currentLocation.longitude}`);
-    console.log(`Расстояние до цели: ${distanceToTarget.toFixed(2)} км`);
-    
-    // Если курьер уже достиг цели
-    if (distanceToTarget <= 0.01) { // 10 метров
-      console.log('Курьер достиг цели! Возвращаем на начальную позицию...');
-      setCurrentCourierLocation(initialCourierLocation);
-      // Не останавливаем движение, просто возвращаемся на старт
-      return;
-    }
-
-    // Двигаемся на 500 метров (0.5 км) каждые 15 секунд
-    const stepDistance = 0.5; // 500 метров в км
-    const nextLocation = getNextLocation(currentLocation, deliveryLocation, stepDistance);
-    
-    console.log(`Новая позиция курьера: ${nextLocation.latitude}, ${nextLocation.longitude}`);
-    
-    setCurrentCourierLocation(nextLocation);
-    console.log('setCurrentCourierLocation вызван с:', nextLocation);
-    
-    // Обновляем информацию о расстоянии и времени
-    const newDistance = calculateDistance(nextLocation, deliveryLocation);
-    setCourierDistance(`${newDistance.toFixed(1)} км`);
-    
-    const timeInMinutes = Math.round((newDistance / 3) * 60); // 3 км/час скорость
-    setEstimatedTime(`${timeInMinutes}-${timeInMinutes + 5} мин`);
-    
-    // Вызываем callback для обновления карты
-    handleCourierLocationUpdate(nextLocation);
-  };
-
-  // Запуск движения курьера
+  // Запуск отслеживания курьера
   useEffect(() => {
-    console.log('Запуск движения курьера для заказа:', order._id);
-    setIsMoving(true);
-    // Устанавливаем начальную позицию курьера
-    setCurrentCourierLocation(initialCourierLocation);
+    console.log('Запуск отслеживания курьера для заказа:', order._id, 'статус:', order.status);
     
-    // Делаем первый шаг сразу
+    // Запрашиваем местоположение курьера только для заказов в статусе "onTheWay"
+    if (order.status !== 'onTheWay') {
+      console.log('Заказ не в статусе onTheWay, отслеживание не запускается');
+      setIsMoving(false);
+      setCurrentCourierLocation(null);
+      return;
+    }
+    
+    // Если курьер не назначен, не запускаем отслеживание
+    if (!order.courierAggregator) {
+      console.log('Курьер не назначен, отслеживание не запускается');
+      setIsMoving(false);
+      setCurrentCourierLocation(null);
+      return;
+    }
+    
+    setIsMoving(true);
+    
+    // Если есть реальные координаты курьера, используем их
+    if (courierAggregatorLocation) {
+      console.log('Используем реальные координаты курьера:', courierAggregatorLocation);
+      setCurrentCourierLocation(courierAggregatorLocation);
+    } else {
+      // Иначе используем начальную позицию
+      setCurrentCourierLocation(initialCourierLocation);
+    }
+    
+    // Получаем первое обновление местоположения сразу
     setTimeout(() => {
-      console.log('Первый шаг движения курьера');
-      moveCourier();
+      console.log('Первое обновление местоположения курьера');
+      fetchCourierLocation();
     }, 2000); // 2 секунды задержка для инициализации
     
-    // Запускаем интервал движения каждые 15 секунд
+    // Запускаем интервал обновления местоположения каждые 60 секунд
     const interval = setInterval(() => {
-      console.log('Таймер сработал, вызываем moveCourier');
-      moveCourier();
-    }, 15000); // 15 секунд
+      console.log('Обновляем местоположение курьера');
+      fetchCourierLocation();
+    }, 60000); // 60 секунд
 
     return () => {
       console.log('Очищаем интервал для заказа:', order._id);
       clearInterval(interval);
     };
-  }, [order._id]); // Перезапускаем только при смене заказа
+  }, [order._id, order.status, typeof order.courierAggregator === 'object' ? order.courierAggregator?._id : order.courierAggregator]); // Перезапускаем при смене заказа, статуса или ID курьера
 
   // Отслеживаем изменения позиции курьера
   useEffect(() => {
@@ -200,25 +189,32 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
     <View style={styles.container}>
       {/* Информация о заказе */}
       <View style={styles.orderInfo}>
-        <Text style={styles.orderTitle}>Заказ #{order._id} в пути</Text>
+        <Text style={styles.orderTitle}>
+          Заказ #{order._id} {order.status === 'onTheWay' ? 'в пути' : order.status === 'preparing' ? 'готовится' : 'ожидает'}
+        </Text>
         <View style={styles.deliveryInfo}>
           <Text style={styles.deliveryText}>
             <Text style={styles.label}>Курьер: </Text>
-            {typeof order.courier === 'string' ? 'ID: ' + order.courier : (order.courier?.fullName || 'Неизвестно')}
-            {typeof order.courier === 'object' && order.courier && 'rating' in order.courier && order.courier.rating && (
-              <Text style={styles.rating}> ⭐ {order.courier.rating}</Text>
+            {!order.courierAggregator 
+              ? 'Ожидается назначение курьера'
+              : typeof order.courierAggregator === 'string' 
+                ? 'ID: ' + order.courierAggregator 
+                : (order.courierAggregator?.fullName || 'Неизвестно')
+            }
+            {order.courierAggregator && typeof order.courierAggregator === 'object' && 'raiting' in order.courierAggregator && order.courierAggregator.raiting && (
+              <Text style={styles.rating}> ⭐ {order.courierAggregator.raiting}</Text>
             )}
           </Text>
-          {typeof order.courier === 'object' && order.courier && 'phone' in order.courier && order.courier.phone && (
+          {order.courierAggregator && typeof order.courierAggregator === 'object' && 'phone' in order.courierAggregator && order.courierAggregator.phone && (
             <Text style={styles.deliveryText}>
               <Text style={styles.label}>Телефон: </Text>
-              {order.courier.phone}
+              {order.courierAggregator.phone}
             </Text>
           )}
-          {typeof order.courier === 'object' && order.courier && 'vehicleNumber' in order.courier && order.courier.vehicleNumber && (
+          {order.courierAggregator && typeof order.courierAggregator === 'object' && 'carNumber' in order.courierAggregator && order.courierAggregator.carNumber && (
             <Text style={styles.deliveryText}>
               <Text style={styles.label}>Автомобиль: </Text>
-              {order.courier.vehicleNumber}
+              {order.courierAggregator.carNumber}
             </Text>
           )}
           <Text style={styles.deliveryText}>
@@ -239,26 +235,42 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
       </View>
 
 
-      {/* Карта с курьером */}
-      <View style={styles.mapContainer}>
-        <MapProvider
-          key={`courier-${currentCourierLocation?.latitude}-${currentCourierLocation?.longitude}`}
-          courierLocation={courierLocation}
-          deliveryLocation={deliveryLocation}
-          showCourierRoute={true}
-          onCourierLocationUpdate={handleCourierLocationUpdate}
-        />
-      </View>
+      {/* Карта с курьером - показываем только для заказов в пути */}
+      {order.status === 'onTheWay' && (
+        <View style={styles.mapContainer}>
+          <MapProvider
+            key={`courier-${currentCourierLocation?.latitude}-${currentCourierLocation?.longitude}-${order.courierAggregator ? 'assigned' : 'not-assigned'}`}
+            courierLocation={order.courierAggregator ? courierLocation : undefined}
+            deliveryLocation={deliveryLocation}
+            showCourierRoute={!!order.courierAggregator}
+            onCourierLocationUpdate={handleCourierLocationUpdate}
+          />
+        </View>
+      )}
 
-      {/* Кнопки действий */}
-      <View style={styles.actions}>
-        <TouchableOpacity 
-          style={styles.button} 
-          onPress={onCallCourier}
-        >
-          <Text style={styles.buttonText}>📞 Позвонить курьеру</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Кнопки действий - показываем только для заказов в пути */}
+      {order.status === 'onTheWay' && (
+        <View style={styles.actions}>
+          <TouchableOpacity 
+            style={[styles.button, !order.courierAggregator && styles.buttonDisabled]} 
+            onPress={order.courierAggregator ? onCallCourier : undefined}
+            disabled={!order.courierAggregator}
+          >
+            <Text style={[styles.buttonText, !order.courierAggregator && styles.buttonTextDisabled]}>
+              {order.courierAggregator ? '📞 Позвонить курьеру' : '⏳ Ожидается назначение курьера'}
+            </Text>
+          </TouchableOpacity>
+          
+          {order.courierAggregator && (
+            <TouchableOpacity 
+              style={[styles.button, styles.refreshButton]} 
+              onPress={() => fetchCourierLocation(true)}
+            >
+              <Text style={styles.buttonText}>🔄 Обновить местоположение</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* Информация о товарах */}
       {/* <View style={styles.productsInfo}>
@@ -348,6 +360,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     padding: 24,
     marginBottom: 30,
+    gap: 12,
   },
   button: {
     backgroundColor: '#DC1818',
@@ -359,6 +372,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  buttonDisabled: {
+    backgroundColor: '#CCCCCC',
+  },
+  buttonTextDisabled: {
+    color: '#666666',
+  },
+  refreshButton: {
+    backgroundColor: '#007AFF',
   },
   productsInfo: {
     backgroundColor: 'white',

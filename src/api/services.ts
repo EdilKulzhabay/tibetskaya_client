@@ -4,9 +4,9 @@ import { RegisterData } from '../types';
 
 // Примеры API-сервисов
 export const apiService = {
-    getData: async () => {
+    getData: async (mail: string) => {
         try {
-            const response = await api.get('/getCourierAggregatorData');
+            const response = await api.post('/getClientDataMobile', {mail});
             return response.data;
         } catch (error) {
             throw error;
@@ -79,6 +79,15 @@ export const apiService = {
     getOrders: async (mail: string) => {
         try {
             const response = await api.post('/getClientOrdersMobile', {mail});
+            return response.data;
+        } catch (error) {
+            throw error;
+        }
+    },
+
+    getCourierLocation: async (courierId: string) => {
+        try {
+            const response = await api.post('/getCourierLocation', {courierId});
             return response.data;
         } catch (error) {
             throw error;

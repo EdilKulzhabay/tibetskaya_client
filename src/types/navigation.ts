@@ -22,9 +22,26 @@ export interface Courier {
 
 export interface CourierAggregator {
   _id: string;
-  name: string;
+  fullName: string;
+  email?: string;
   phone?: string;
-  rating?: number;
+  raiting?: number;
+  carNumber?: string;
+  carType?: 'A' | 'B' | 'C';
+  transport?: 'A' | 'B' | 'C';
+  onTheLine?: boolean;
+  status?: 'awaitingVerfication' | 'active' | 'inActive' | 'deleted';
+  point?: {
+    lat: number;
+    lon: number;
+    timestamp?: Date;
+  };
+  balance?: number;
+  income?: number;
+  capacity12?: number;
+  capacity19?: number;
+  capacity?: number;
+  completeFirstOrder?: boolean;
 }
 
 export interface OrderAddress {
@@ -48,7 +65,7 @@ export type OrderStatus =
   | 'confirmed' 
   | 'preparing' 
   | 'onTheWay' 
-  | 'completed' 
+  | 'delivered' 
   | 'cancelled';
 
 export interface OrderData {
@@ -61,7 +78,7 @@ export interface OrderData {
   status: OrderStatus;
   sum: number;
   courier?: string | Courier; // ObjectId reference to Courier or populated Courier object
-  courierAggregator?: string; // ObjectId reference to CourierAggregator
+  courierAggregator?: string | CourierAggregator; // ObjectId reference to CourierAggregator or populated CourierAggregator object
   history: string[];
   transferred: boolean;
   transferredFranchise?: string;

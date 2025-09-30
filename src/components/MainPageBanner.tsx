@@ -33,7 +33,7 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
       >
         <Image source={require('../assets/bannerBottle.png')} style={firstBannerStyles.image} />
         <View style={firstBannerStyles.content}>
-          <Text style={firstBannerStyles.title}>Скидки для{"\n"}парнеров</Text>
+          <Text style={firstBannerStyles.title}>Скидки для{"\n"}партнеров</Text>
           <TouchableOpacity style={firstBannerStyles.button} onPress={() => navigation.navigate('TakePartInvite')}>
             <Text style={firstBannerStyles.buttonText}>Подробнее</Text>
           </TouchableOpacity>

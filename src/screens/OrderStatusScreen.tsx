@@ -34,7 +34,7 @@ const OrderStatusScreen: React.FC = () => {
         return "Ожидает заказа";
       case "onTheWay":
         return "В пути";
-      case "completed":
+      case "delivered":
         return "Принято";
       default:
         return "Отменено";
@@ -46,7 +46,7 @@ const OrderStatusScreen: React.FC = () => {
       case "awaitingOrder":
       case "onTheWay":
         return "#EB7E00";
-      case "completed":
+      case "delivered":
         return "#00B01A";
       default:
         return "#DC1818";

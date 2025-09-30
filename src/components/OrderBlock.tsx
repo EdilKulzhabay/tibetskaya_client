@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList, OrderData, OrderProduct, Courier, OrderDate } from '../types/navigation';
+import { RootStackParamList, OrderData, OrderProduct, Courier, OrderDate, CourierAggregator } from '../types/navigation';
 import { OrderAddress } from '../types/navigation';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -10,14 +10,15 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 interface OrderBlockProps {
     _id: string;
     date: OrderDate;
-    status: 'awaitingOrder' | 'confirmed' | 'preparing' | 'onTheWay' | 'completed' | 'cancelled';
+    status: 'awaitingOrder' | 'confirmed' | 'preparing' | 'onTheWay' | 'delivered' | 'cancelled';
     products: OrderProduct;
     courier?: Courier | string;
     address: OrderAddress;
     totalAmount: number;
+    courierAggregator?: CourierAggregator | string;
 }
 
-const OrderBlock: React.FC<OrderBlockProps> = ({_id, date, status, products, courier, address, totalAmount}) => {
+const OrderBlock: React.FC<OrderBlockProps> = ({_id, date, status, products, courier, address, totalAmount, courierAggregator}) => {
     const navigation = useNavigation<NavigationProp>();
     
     // Создаем объект заказа для передачи
@@ -29,6 +30,7 @@ const OrderBlock: React.FC<OrderBlockProps> = ({_id, date, status, products, cou
         courier,
         address,
         sum: totalAmount,
+        courierAggregator,
         totalAmount,
         history: [],
         transferred: false,
@@ -58,8 +60,8 @@ const OrderBlock: React.FC<OrderBlockProps> = ({_id, date, status, products, cou
                 <Text style={
                     [styles.orderStatus, 
                     status === "awaitingOrder" || status === "onTheWay" ? { color: "#EB7E00" } : 
-                    status === "completed" ? { color: "#00B01A" } : { color: "#DC1818" }]
-                }>{status === "awaitingOrder" ? "Ожидает заказа" : status === "onTheWay" ? "В пути" : status === "completed" ? "Принято" : "Отменено"}</Text>
+                    status === "delivered" ? { color: "#00B01A" } : { color: "#DC1818" }]
+                }>{status === "awaitingOrder" ? "Ожидает заказа" : status === "onTheWay" ? "В пути" : status === "delivered" ? "Принято" : "Отменено"}</Text>
             </View>
             <View style={{height: 1, backgroundColor: '#E3E3E3', marginVertical: 12, width: '100%' }} />
             <View style={styles.orderBody}>
@@ -72,14 +74,14 @@ const OrderBlock: React.FC<OrderBlockProps> = ({_id, date, status, products, cou
                     )}
                 </View>
 
-                {courier && typeof courier === 'object' && courier.fullName && status !== "awaitingOrder" && (
+                {courierAggregator && typeof courierAggregator === 'object' && courierAggregator.fullName && status !== "awaitingOrder" && (
                     <View style={styles.orderCourier}>
                         {status === "onTheWay" ? (
                             <Text>К вам едет: </Text>
                         ) : (
                             <Text>Доставил курьер: </Text>
                         )}
-                        <Text style={styles.orderCourierName}>{courier.fullName}</Text>
+                        <Text style={styles.orderCourierName}>{courierAggregator.fullName}</Text>
                     </View>
                 )}
             </View>

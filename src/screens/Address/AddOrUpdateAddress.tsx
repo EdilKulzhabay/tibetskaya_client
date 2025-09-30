@@ -17,6 +17,20 @@ const cities = [
     { label: 'Шымкент', value: 'Шымкент' },
 ];
 
+// Функция для генерации ObjectId в стиле MongoDB
+const generateObjectId = (): string => {
+    // 4 байта - временная метка (в секундах)
+    const timestamp = Math.floor(Date.now() / 1000).toString(16).padStart(8, '0');
+    
+    // 5 байт - случайные данные (10 символов)
+    const randomPart = Math.random().toString(16).substring(2, 12);
+    
+    // 3 байта - счетчик (6 символов)
+    const counter = Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0');
+    
+    return timestamp + randomPart + counter;
+};
+
 const AddOrUpdateAddress: React.FC<Props> = ({ navigation, route }) => {
     const { address } = route.params;
     const { user, updateUser, loadingState } = useAuth()
@@ -34,7 +48,7 @@ const AddOrUpdateAddress: React.FC<Props> = ({ navigation, route }) => {
         
         try {
             const newAddress = {
-                _id: Date.now().toString(), // Генерируем временный ID
+                _id: generateObjectId(), // Генерируем ObjectId в стиле MongoDB
                 name: form.name,
                 city: form.city,
                 street: form.street,

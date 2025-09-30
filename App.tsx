@@ -66,7 +66,14 @@ function App() {
             <Stack.Screen name="Chat" component={ChatScreen} />
             <Stack.Screen name="Address" component={AddressScreen} />
             <Stack.Screen name="AddOrUpdateAddress" component={AddOrUpdateAddress} />
-            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen 
+            name="Login" 
+            component={LoginScreen}
+            options={{
+              gestureEnabled: false, // Отключаем смахивание
+              headerLeft: () => null, // Убираем кнопку назад в заголовке
+            }}
+          />
             <Stack.Screen name="Register" component={RegisterScreen} />
             <Stack.Screen name="Otp" component={OtpScreen} />
             <Stack.Screen name="RegisterAccepted" component={RegisterAcceptedScreen} />
