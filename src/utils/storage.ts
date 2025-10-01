@@ -8,6 +8,7 @@ export const STORAGE_KEYS = {
   AUTH_TOKEN: 'auth_token',
   REFRESH_TOKEN: 'refresh_token',
   APP_SETTINGS: 'app_settings',
+  PROFILE_IMAGE: 'profile_image',
 } as const;
 
 /**
@@ -140,5 +141,29 @@ export const tokenStorage = {
       removeData(STORAGE_KEYS.AUTH_TOKEN),
       removeData(STORAGE_KEYS.REFRESH_TOKEN),
     ]);
+  },
+};
+
+// Функции для работы с фото профиля
+export const profileImageStorage = {
+  /**
+   * Сохранить URI фото профиля
+   */
+  save: async (imageUri: string): Promise<void> => {
+    return saveData(STORAGE_KEYS.PROFILE_IMAGE, imageUri);
+  },
+
+  /**
+   * Получить URI фото профиля
+   */
+  get: async (): Promise<string | null> => {
+    return getData(STORAGE_KEYS.PROFILE_IMAGE);
+  },
+
+  /**
+   * Удалить фото профиля
+   */
+  remove: async (): Promise<void> => {
+    return removeData(STORAGE_KEYS.PROFILE_IMAGE);
   },
 };

@@ -117,7 +117,7 @@ const Products: React.FC<{ navigation: any }> = ({ navigation }) => {
                 </View>
             </View>
 
-            {(count12 > 0 || count19 > 0) && (
+            {(count12 > 1 || count19 > 1 || (count12 > 0 && count19 > 0)) && (
                 <View style={styles.order}>
                     <TouchableOpacity style={styles.orderButton} onPress={handleOrder}>
                         <Text style={styles.orderButtonText}>Заказать</Text>

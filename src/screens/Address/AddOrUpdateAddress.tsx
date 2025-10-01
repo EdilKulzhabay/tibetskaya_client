@@ -42,9 +42,16 @@ const AddOrUpdateAddress: React.FC<Props> = ({ navigation, route }) => {
         setForm({ ...form, [key]: value });
     }
 
+    const generate2GISLink = (address: string) => {
+        const encodedAddress = encodeURIComponent(address);
+        return `https://2gis.kz/almaty/search/${encodedAddress}`;
+    };
+
     // Функция для добавления нового адреса
     const handleAddAddress = async () => {
         if (!user || !form) return;
+
+        const link = generate2GISLink(form.street);
         
         try {
             const newAddress = {
@@ -53,7 +60,9 @@ const AddOrUpdateAddress: React.FC<Props> = ({ navigation, route }) => {
                 city: form.city,
                 street: form.street,
                 floor: form.floor || '',
+                link: link,
                 apartment: form.apartment || '',
+                phone: user?.phone || '',
             };
 
             // Добавляем новый адрес к существующему массиву
@@ -71,16 +80,24 @@ const AddOrUpdateAddress: React.FC<Props> = ({ navigation, route }) => {
     // Функция для обновления существующего адреса
     const handleUpdateAddress = async () => {
         if (!user || !form || !address) return;
+
+        const link = generate2GISLink(form.street);
+
+        const newAddress = {
+            ...form,
+            link: link,
+            phone: user?.phone || '',
+        };
         
         try {
             // Находим и обновляем существующий адрес
             const updatedAddresses = (user.addresses || []).map(addr => 
-                addr._id === (address as any)._id ? { ...addr, ...form } : addr
+                addr._id === (address as any)._id ? { ...addr, ...newAddress } : addr
             );
             
             await updateUser('addresses', updatedAddresses);
             
-            console.log('Адрес обновлен:', form);
+            console.log('Адрес обновлен:', newAddress);
             navigation.goBack();
         } catch (error) {
             console.error('Ошибка при обновлении адреса:', error);

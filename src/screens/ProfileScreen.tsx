@@ -9,10 +9,14 @@ import {
   Image,
   Modal,
   ActivityIndicator,
+  Alert,
+  Platform,
 } from 'react-native';
+import { launchImageLibrary, ImagePickerResponse } from 'react-native-image-picker';
 import { NavButton, Navigation } from '../components';
 import ButtonWithSwitch from '../components/ButtonWithSwitch';
 import { useAuth } from '../hooks';
+import { profileImageStorage } from '../utils/storage';
 
 interface ProfileScreenProps {
   navigation: any;
@@ -23,6 +27,22 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const [notificationSwitchValue, setNotificationSwitchValue] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [language, setLanguage] = useState('Русский');
+  const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
+
+  // Загружаем сохраненное фото профиля при монтировании компонента
+  useEffect(() => {
+    const loadProfileImage = async () => {
+      try {
+        const savedImageUri = await profileImageStorage.get();
+        if (savedImageUri) {
+          setProfileImageUri(savedImageUri);
+        }
+      } catch (error) {
+        console.error('Ошибка при загрузке фото профиля:', error);
+      }
+    };
+    loadProfileImage();
+  }, []);
 
   // Проверяем авторизацию пользователя после загрузки
   useEffect(() => {
@@ -30,6 +50,39 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       navigation.navigate('Login');
     }
   }, [loadingState, user, navigation]);
+
+  // Функция для выбора фото
+  const handleSelectPhoto = () => {
+    launchImageLibrary(
+      {
+        mediaType: 'photo',
+        quality: 0.8,
+        maxWidth: 500,
+        maxHeight: 500,
+      },
+      async (response: ImagePickerResponse) => {
+        if (response.didCancel) {
+          console.log('Пользователь отменил выбор фото');
+        } else if (response.errorCode) {
+          console.error('Ошибка ImagePicker:', response.errorMessage);
+          Alert.alert('Ошибка', 'Не удалось загрузить фото');
+        } else if (response.assets && response.assets[0]) {
+          const imageUri = response.assets[0].uri;
+          if (imageUri) {
+            try {
+              // Сохраняем URI изображения локально
+              await profileImageStorage.save(imageUri);
+              setProfileImageUri(imageUri);
+              console.log('Фото профиля успешно сохранено');
+            } catch (error) {
+              console.error('Ошибка при сохранении фото:', error);
+              Alert.alert('Ошибка', 'Не удалось сохранить фото');
+            }
+          }
+        }
+      }
+    );
+  };
 
   // Показываем загрузку пока данные пользователя загружаются
   if (loadingState === 'loading') {
@@ -57,9 +110,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.profileContainer}>
           <View style={styles.profileImageContainer}>
-            <Image source={require('../assets/profileEmptyImage.png')} style={styles.profileImage} />
+            {profileImageUri ? (
+              <Image source={{ uri: profileImageUri }} style={styles.profileImageCustom} />
+            ) : (
+              <Image source={require('../assets/profileEmptyImage.png')} style={styles.profileImage} />
+            )}
           </View>
-          <TouchableOpacity style={styles.profileImageButton}>
+          <TouchableOpacity style={styles.profileImageButton} onPress={handleSelectPhoto}>
             <Text style={styles.profileImageButtonText}>Изменить{'\n'}фото</Text>
           </TouchableOpacity>
           <Text style={styles.profileName}>{user?.fullName}</Text>
@@ -69,13 +126,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
         <NavButton title="Настройки" onPress={() => navigation.navigate('History')} icon={require('../assets/setting.png')} />
         
-        <NavButton title="Бонусы" onPress={() => navigation.navigate('Bonus')} icon={require('../assets/star.png')} />
+        {/* <NavButton title="Бонусы" onPress={() => navigation.navigate('Bonus')} icon={require('../assets/star.png')} /> */}
         
         <NavButton title="Мой кошелек" onPress={() => navigation.navigate('Wallet')} icon={require('../assets/wallet.png')} />
 
-        <NavButton title="Аналитика" onPress={() => navigation.navigate('Bonus')} icon={require('../assets/analytics.png')} />
+        {/* <NavButton title="Аналитика" onPress={() => navigation.navigate('Bonus')} icon={require('../assets/analytics.png')} /> */}
 
-        <NavButton title="Тарифы" onPress={() => navigation.navigate('Tarrifs')} icon={require('../assets/tarifs.png')} additioinalText="Standard" />
+        {/* <NavButton title="Тарифы" onPress={() => navigation.navigate('Tarrifs')} icon={require('../assets/tarifs.png')} additioinalText="Standard" /> */}
 
         <View style={{width: '100%', height: 1, backgroundColor: '#ECECEC', marginVertical: 12}} />
 
@@ -187,6 +244,11 @@ const styles = StyleSheet.create({
   profileImage: {
     width: 45,
     height: 45,
+  },
+  profileImageCustom: {
+    width: 95,
+    height: 95,
+    borderRadius: 100,
   },
   profileName: {
     fontSize: 18,

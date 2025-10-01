@@ -205,12 +205,12 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
               <Text style={styles.rating}> ⭐ {order.courierAggregator.raiting}</Text>
             )}
           </Text>
-          {order.courierAggregator && typeof order.courierAggregator === 'object' && 'phone' in order.courierAggregator && order.courierAggregator.phone && (
+          {/* {order.courierAggregator && typeof order.courierAggregator === 'object' && 'phone' in order.courierAggregator && order.courierAggregator.phone && (
             <Text style={styles.deliveryText}>
               <Text style={styles.label}>Телефон: </Text>
               {order.courierAggregator.phone}
             </Text>
-          )}
+          )} */}
           {order.courierAggregator && typeof order.courierAggregator === 'object' && 'carNumber' in order.courierAggregator && order.courierAggregator.carNumber && (
             <Text style={styles.deliveryText}>
               <Text style={styles.label}>Автомобиль: </Text>
