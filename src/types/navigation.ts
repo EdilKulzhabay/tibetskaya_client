@@ -170,6 +170,9 @@ export type RootStackParamList = {
   StartHydration: undefined;
   StartHydration2: undefined;
   AddOrder: undefined;
+  Settings: undefined;
+  WhatIsMyBalance: undefined;
+  HowToTopUp: undefined;
 };
 
 export type TabParamList = {

@@ -38,7 +38,7 @@ const Header: React.FC<HeaderProps> = ({
           />
         </View>
 
-        <TouchableOpacity style={styles.bonusContainer} onPress={onBonusPress}>
+        {/* <TouchableOpacity style={styles.bonusContainer} onPress={onBonusPress}>
           <Text style={styles.bonusText}>
             {bonus}
           </Text>
@@ -46,7 +46,7 @@ const Header: React.FC<HeaderProps> = ({
             source={require('../assets/bonusIcon.png')}
             style={styles.bonusIcon}
           />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
     </View>
   );

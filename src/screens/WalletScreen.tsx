@@ -22,15 +22,15 @@ const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         </TouchableOpacity>
 
         <View style={styles.FAQButtonsContainer}>
-            <TouchableOpacity style={styles.FAQButton}>
+            <TouchableOpacity style={styles.FAQButton} onPress={() => navigation.navigate('WhatIsMyBalance')}>
                 <Image source={require('../assets/star.png')} style={styles.FAQImage} />
                 <Text style={styles.FAQButtonText}>Что такое{'\n'}мой баланс?</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.FAQButton}>
+            <TouchableOpacity style={styles.FAQButton} onPress={() => navigation.navigate('HowToTopUp')}>
                 <Image source={require('../assets/star2.png')} style={styles.FAQImage} />
                 <Text style={styles.FAQButtonText}>Как{'\n'}пополнить?</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.FAQButton}>
+            <TouchableOpacity style={styles.FAQButton} onPress={() => navigation.navigate('FAQ')}>
                 <Image source={require('../assets/faq.png')} style={styles.FAQImage} />
                 <Text style={styles.FAQButtonText}>Вопросы{'\n'}и ответы</Text>
             </TouchableOpacity>

@@ -25,52 +25,182 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
 
   const firstBanner = () => {
     return (
-      <LinearGradient
-        colors={['#CB5D5D', '#C0DDFE']}
-        start={{ x: 0, y: 0 }}            
-        end={{ x: 0, y: 1 }}             
-        style={firstBannerStyles.container}
-      >
-        <Image source={require('../assets/bannerBottle.png')} style={firstBannerStyles.image} />
-        <View style={firstBannerStyles.content}>
-          <Text style={firstBannerStyles.title}>Скидки для{"\n"}партнеров</Text>
-          <TouchableOpacity style={firstBannerStyles.button} onPress={() => navigation.navigate('TakePartInvite')}>
-            <Text style={firstBannerStyles.buttonText}>Подробнее</Text>
-          </TouchableOpacity>
+      <View style={{
+        backgroundColor: '#DC3F34',
+        borderRadius: 8,
+        height: 180,
+        overflow: 'hidden',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 12,
+        paddingLeft: 16,
+        paddingRight: 45,
+      }}>
+        <View style={{ flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <Image source={require('../assets/banner4_2.png')} style={{ width: 200, height: 70, resizeMode: 'contain' }} />
+          <Text style={{ fontSize: 16, fontWeight: '500', color: '#fff' }}>“Чистая, полезная вода{"\n"}— прямо к вашей двери”</Text>
         </View>
-      </LinearGradient>
+        <View>
+          <Image source={require('../assets/banner4.png')} style={{ width: 106, height: 117, resizeMode: 'contain' }} />
+        </View>
+      </View>
+      // <LinearGradient
+      //   colors={['#CB5D5D', '#C0DDFE']}
+      //   start={{ x: 0, y: 0 }}            
+      //   end={{ x: 0, y: 1 }}             
+      //   style={firstBannerStyles.container}
+      // >
+      //   <Image source={require('../assets/bannerBottle.png')} style={firstBannerStyles.image} />
+      //   <View style={firstBannerStyles.content}>
+      //     <Text style={firstBannerStyles.title}>Скидки для{"\n"}партнеров</Text>
+      //     <TouchableOpacity style={firstBannerStyles.button} onPress={() => navigation.navigate('TakePartInvite')}>
+      //       <Text style={firstBannerStyles.buttonText}>Подробнее</Text>
+      //     </TouchableOpacity>
+      //   </View>
+      // </LinearGradient>
     )
   }
 
   const secondBanner = () => {
     return (
-      <View style={secondBannerStyles.container}>
-        <View style={secondBannerStyles.content}> 
-          <Text style={secondBannerStyles.title}>Выпей 3{"\n"}бутылки воды</Text>
-          <TouchableOpacity style={secondBannerStyles.button} onPress={() => navigation.navigate(takePartHydrationLink)}>
-            <Text style={secondBannerStyles.buttonText}>Подробнее</Text>
+      <View style={{
+        backgroundColor: '#1FABEE',
+        borderRadius: 8,
+        height: 180,
+        overflow: 'hidden',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 12,
+        paddingLeft: 16,
+        paddingRight: 16,
+        position: 'relative',
+      }}>
+        <View 
+          style={{
+            position: 'absolute',
+            width: 270,
+            height: 270,
+            backgroundColor: '#fff',
+            borderRadius: 135,
+            top: 90,
+            right: 0,
+            transform: [{ translateX: "38%" }, { translateY: "-50%" }],
+          }}
+        />
+        <View>
+          <Text style={{ fontSize: 18, fontWeight: '600', color: '#fff' }}>Новый удобный формат{"\n"}— 12,5 литров!</Text>
+          <Text style={{ marginTop: 4, fontSize: 14, fontWeight: '500', color: '#fff' }}>Попробуйте уже сегодня</Text>
+          <TouchableOpacity style={{ marginTop: 24, backgroundColor: '#DC1818', borderRadius: 8, paddingHorizontal: 20, paddingVertical: 8, alignSelf: 'flex-start' }} onPress={() => {}}>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>Купить сейчас</Text>
           </TouchableOpacity>
         </View>
-        <View style={secondBannerStyles.imageContainer}>
-          <Image source={require('../assets/bannerBottle2.png')} style={secondBannerStyles.image} />
-        </View>
+
+        <Image source={require('../assets/banner5.png')} style={{ width: 190, height: 190, resizeMode: 'contain', marginLeft: -10 }} />
       </View>
+      // <View style={secondBannerStyles.container}>
+      //   <View style={secondBannerStyles.content}> 
+      //     <Text style={secondBannerStyles.title}>Выпей 3{"\n"}бутылки воды</Text>
+      //     <TouchableOpacity style={secondBannerStyles.button} onPress={() => navigation.navigate(takePartHydrationLink)}>
+      //       <Text style={secondBannerStyles.buttonText}>Подробнее</Text>
+      //     </TouchableOpacity>
+      //   </View>
+      //   <View style={secondBannerStyles.imageContainer}>
+      //     <Image source={require('../assets/bannerBottle2.png')} style={secondBannerStyles.image} />
+      //   </View>
+      // </View>
     )
   }
 
   const thirdBanner = () => {
     return (
-      <ImageBackground 
-        source={require('../assets/banner3.png')} 
-        style={thirdBannerStyles.container}
-        imageStyle={thirdBannerStyles.bgImage}
+      <View
+        style={{
+          backgroundColor: '#1488E8',
+          borderRadius: 8,
+          height: 180,
+          overflow: 'hidden',
+          padding: 24,
+          position: 'relative',
+        }}
       >
-        <Text style={thirdBannerStyles.title}>Вызови мастера на дом</Text>
-        <Text style={thirdBannerStyles.subtitle}>Наша новая услуга по{"\n"}устранению ваших проблем</Text>
-        <TouchableOpacity style={thirdBannerStyles.button} onPress={() => setIsModalVisible(true)}>
-          <Text style={thirdBannerStyles.buttonText}>Вызвать</Text>
-        </TouchableOpacity>
-      </ImageBackground>
+        <View>
+          <Text style={{ fontSize: 18, fontWeight: '600', color: '#fff' }}>Скоро вместе с Alma TV!</Text>
+          <Text style={{ marginTop: 4, fontSize: 14, fontWeight: '500', color: '#fff' }}>
+            Эксклюзивные бонусы и скидки{"\n"}для абонентов Alma TV на воду{"\n"}Тибетская.
+          </Text>
+          <TouchableOpacity style={{ marginTop: 24, backgroundColor: '#DC1818', borderRadius: 8, paddingHorizontal: 20, paddingVertical: 8, alignSelf: 'flex-start' }} onPress={() => setIsModalVisible(true)}>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>Отслеживать</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ 
+          position: 'absolute', 
+          right: 45, 
+          top: 24,
+          width: 60,
+          height: 60,
+          backgroundColor: '#DC1818',
+          borderRadius: 30,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <Image source={require('../assets/banner4.png')} style={{ width: 30, height: 30, resizeMode: 'contain' }} />
+        </View>
+        <View style={{ 
+          position: 'absolute', 
+          right: 45, 
+          bottom: 0,
+          transform: [{ translateY: "30%" }],
+          width: 106,
+          height: 106,
+          borderRadius: 53,
+          backgroundColor: '#fff',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <Image source={require('../assets/banner6.png')} style={{ width: 80, height: 30, resizeMode: 'contain', marginTop: -10, marginLeft: 5 }} />
+        </View>
+        <View style={{ 
+          position: 'absolute', 
+          right: 110, 
+          top: 70,
+          width: 6,
+          height: 6,
+          borderRadius: 3,
+          backgroundColor: '#fff',
+        }}/>
+        <View style={{ 
+          position: 'absolute', 
+          right: 115, 
+          top: 90,
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          backgroundColor: '#DC1818',
+        }}/>
+        <View style={{ 
+          position: 'absolute', 
+          right: 45, 
+          top: 110,
+          width: 6,
+          height: 6,
+          borderRadius: 3,
+          backgroundColor: '#fff',
+        }}/>
+      </View>
+      // <ImageBackground 
+      //   source={require('../assets/banner3.png')} 
+      //   style={thirdBannerStyles.container}
+      //   imageStyle={thirdBannerStyles.bgImage}
+      // >
+      //   <Text style={thirdBannerStyles.title}>Вызови мастера на дом</Text>
+      //   <Text style={thirdBannerStyles.subtitle}>Наша новая услуга по{"\n"}устранению ваших проблем</Text>
+      //   <TouchableOpacity style={thirdBannerStyles.button} onPress={() => setIsModalVisible(true)}>
+      //     <Text style={thirdBannerStyles.buttonText}>Вызвать</Text>
+      //   </TouchableOpacity>
+      // </ImageBackground>
     )
   }
 

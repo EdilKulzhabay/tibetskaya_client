@@ -113,7 +113,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             {profileImageUri ? (
               <Image source={{ uri: profileImageUri }} style={styles.profileImageCustom} />
             ) : (
-              <Image source={require('../assets/profileEmptyImage.png')} style={styles.profileImage} />
+              <View style={{padding: 25}}>
+                <Image source={require('../assets/profileEmptyImage.png')} style={styles.profileImage} />
+              </View>
             )}
           </View>
           <TouchableOpacity style={styles.profileImageButton} onPress={handleSelectPhoto}>
@@ -124,7 +126,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
         <NavButton title="Изменить данные" onPress={() => navigation.navigate('ChangeData')} icon={require('../assets/edit.png')} />
 
-        <NavButton title="Настройки" onPress={() => navigation.navigate('History')} icon={require('../assets/setting.png')} />
+        {/* <NavButton title="Настройки" onPress={() => navigation.navigate('Settings')} icon={require('../assets/setting.png')} /> */}
         
         {/* <NavButton title="Бонусы" onPress={() => navigation.navigate('Bonus')} icon={require('../assets/star.png')} /> */}
         
@@ -237,7 +239,6 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   profileImageContainer: {
-    padding: 25,
     backgroundColor: 'white',
     borderRadius: 100,
   },
@@ -288,6 +289,25 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#101010',
+  },
+  debugContainer: {
+    backgroundColor: '#f0f0f0',
+    padding: 16,
+    marginVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  debugTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 8,
+  },
+  debugToken: {
+    fontSize: 12,
+    color: '#333',
+    fontFamily: 'monospace',
   },
 });
 

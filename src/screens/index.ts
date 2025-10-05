@@ -22,6 +22,9 @@ export {default as TakePartInviteScreen} from './TakePartInviteScreen';
 export {default as StartHydrationScreen} from './Hydration/StartHydrationScreen';
 export {default as StartHydrationScreen2} from './Hydration/StartHydrationScreen2';
 export {default as AddOrderScreen} from './AddOrderScreen';
+export {default as SettingsScreen} from './SettingsScreen';
+export {default as WhatIsMyBalanceScreen} from './WhatIsMyBalanceScreen';
+export {default as HowToTopUpScreen} from './HowToTopUpScreen';
 
 // Добавляйте новые экраны здесь
 // export {default as SettingsScreen} from './SettingsScreen';

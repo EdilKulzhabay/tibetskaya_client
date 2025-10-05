@@ -35,7 +35,10 @@ import {
   TakePartInviteScreen,
   StartHydrationScreen,
   StartHydrationScreen2,
-  AddOrderScreen
+  AddOrderScreen,
+  SettingsScreen,
+  WhatIsMyBalanceScreen,
+  HowToTopUpScreen
 } from './src/screens';
 import { RootStackParamList } from './src/types/navigation';
 
@@ -86,6 +89,9 @@ function App() {
             <Stack.Screen name="StartHydration" component={StartHydrationScreen} />
             <Stack.Screen name="StartHydration2" component={StartHydrationScreen2} />
             <Stack.Screen name="AddOrder" component={AddOrderScreen} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen name="WhatIsMyBalance" component={WhatIsMyBalanceScreen} />
+            <Stack.Screen name="HowToTopUp" component={HowToTopUpScreen} />
             </Stack.Navigator>
           </NavigationContainer>
         </AuthWrapper>
