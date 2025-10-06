@@ -23,6 +23,12 @@ const criticalImages = [
   require('../assets/marketplace1.png'),
   require('../assets/marketplace2.png'),
   require('../assets/bottleProduct.png'),
+  require('../assets/whatIsMyBalance.png'),
+  require('../assets/howToTopUp.png'),
+  require('../assets/banner3.png'),
+  require('../assets/banner4.png'),
+  require('../assets/banner5.png'),
+  require('../assets/banner4_2.png'),
 ];
 
 const ImagePreloader: React.FC<ImagePreloaderProps> = ({ children }) => {

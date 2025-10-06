@@ -1,10 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
   ScrollView,
+  DeviceEventEmitter,
 } from 'react-native';
 import { Header, Navigation, OrderBlock } from '../components';
 import { useFocusEffect } from '@react-navigation/native';
@@ -320,6 +321,37 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
       }
     }, [user?.mail, loadingState])
   );
+
+  // Подписка на обновления статусов заказов
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(
+      'orderStatusUpdated',
+      ({ orderId, newStatus, orderData }) => {
+        console.log('🔄 HistoryScreen: Получено обновление заказа:', orderId, newStatus);
+        
+        // Обновляем состояние заказов
+        setOrders(prevOrders => {
+          const orderExists = prevOrders.some(order => order._id === orderId);
+          
+          if (orderExists) {
+            // Обновляем существующий заказ
+            return prevOrders.map(order =>
+              order._id === orderId
+                ? { ...order, status: newStatus, updatedAt: orderData.updatedAt }
+                : order
+            );
+          } else {
+            // Добавляем новый заказ в начало списка
+            return [orderData, ...prevOrders];
+          }
+        });
+      }
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   return (
     <SafeAreaView style={styles.safeArea}>

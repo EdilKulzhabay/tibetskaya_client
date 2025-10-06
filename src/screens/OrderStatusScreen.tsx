@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  DeviceEventEmitter,
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -21,12 +22,43 @@ const OrderStatusScreen: React.FC = () => {
   const route = useRoute<OrderStatusRouteProp>();
   const navigation = useNavigation<OrderStatusNavigationProp>();
   
-  // Получаем данные заказа из параметров
-  const { order } = route.params;
+  // Получаем данные заказа из параметров и храним в state
+  const [order, setOrder] = useState(route.params.order);
 
   useEffect(() => {
     console.log(order);
   }, [order]);
+
+  // Подписка на обновления статуса текущего заказа
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(
+      'orderStatusUpdated',
+      ({ orderId, newStatus, orderData }) => {
+        // Проверяем, это обновление для текущего заказа?
+        if (orderId === order._id) {
+          console.log('🔄 OrderStatusScreen: Статус заказа обновлен:', newStatus);
+          
+          // Обновляем состояние заказа
+          setOrder((prevOrder: any) => ({
+            ...prevOrder,
+            ...orderData,
+            status: newStatus,
+          }));
+          
+          // Показываем уведомление пользователю
+          Alert.alert(
+            'Статус обновлен',
+            `Ваш заказ теперь: ${getStatusText(newStatus)}`,
+            [{ text: 'OK' }]
+          );
+        }
+      }
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, [order._id]);
 
   const getStatusText = (status: string) => {
     switch (status) {

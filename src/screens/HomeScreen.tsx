@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   ScrollView,
   Modal,
+  DeviceEventEmitter,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -271,6 +272,37 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
       }
     }, [user?.mail, loadingState, orders.length])
   );
+
+  // Подписка на обновления статусов заказов
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(
+      'orderStatusUpdated',
+      ({ orderId, newStatus, orderData }) => {
+        console.log('🔄 HomeScreen: Получено обновление заказа:', orderId, newStatus);
+        
+        // Обновляем состояние заказов
+        setOrders(prevOrders => {
+          const orderExists = prevOrders.some(order => order._id === orderId);
+          
+          if (orderExists) {
+            // Обновляем существующий заказ
+            return prevOrders.map(order =>
+              order._id === orderId
+                ? { ...order, status: newStatus, updatedAt: orderData.updatedAt }
+                : order
+            );
+          } else {
+            // Добавляем новый заказ в начало списка
+            return [orderData, ...prevOrders];
+          }
+        });
+      }
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
 
   return (
