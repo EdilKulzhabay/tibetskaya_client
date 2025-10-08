@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Platform,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 
@@ -137,19 +138,6 @@ const MapProvider: React.FC<MapProviderProps> = ({
   // Android: используем Google Maps
   const mapProvider = Platform.OS === 'ios' ? undefined : PROVIDER_GOOGLE;
 
-  // Обработчики событий карты
-  const handleMapReady = () => {
-    console.log('Карта готова к использованию');
-    setMapReady(true);
-    setMapError(null);
-  };
-
-  const handleMapError = (error: any) => {
-    console.error('Ошибка карты:', error);
-    setMapError('Ошибка загрузки карты');
-    setMapReady(false);
-  };
-
   // Если карта не готова или есть ошибка, показываем fallback
   if (mapError) {
     return (
@@ -158,6 +146,24 @@ const MapProvider: React.FC<MapProviderProps> = ({
           <Text style={styles.errorText}>Карта временно недоступна</Text>
           <Text style={styles.errorSubtext}>Проверьте подключение к интернету</Text>
         </View>
+      </View>
+    );
+  }
+
+  useEffect(() => {
+    // Задержка перед показом карты для стабильности на Android
+    const timer = setTimeout(() => {
+      setMapReady(true);
+    }, 5000);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!mapReady) {
+    return (
+      <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white'}}>
+        <ActivityIndicator size="large" color="#DC1818" />
+        <Text style={{fontSize: 16, color: '#545454'}}>Загрузка карты...</Text>
       </View>
     );
   }
@@ -178,11 +184,11 @@ const MapProvider: React.FC<MapProviderProps> = ({
         showsMyLocationButton={false}
         showsCompass={true}
         showsScale={true}
-        onMapReady={handleMapReady}
-        // onError={handleMapError}
-        loadingEnabled={true}
-        loadingIndicatorColor="#DC1818"
-        loadingBackgroundColor="#f6f6f6"
+        // onMapReady={handleMapReady}
+        // // onError={handleMapError}
+        // loadingEnabled={true}
+        // loadingIndicatorColor="#DC1818"
+        // loadingBackgroundColor="#f6f6f6"
       >
         {/* Маркер места доставки */}
         {deliveryLocation && (

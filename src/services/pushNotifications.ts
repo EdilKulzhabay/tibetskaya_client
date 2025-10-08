@@ -8,12 +8,14 @@ const API_URL = 'https://api.tibetskayacrm.kz';
 class PushNotificationService {
   private userId: string | null = null;
   private fcmToken: string | null = null;
+  private isInitialized: boolean = false;
 
   // Инициализация сервиса
   async initialize(userId?: string) {
     console.log('🔔 Инициализация push-уведомлений...');
     
     if (userId) {
+      console.log('📝 Установка userId:', userId);
       this.userId = userId;
     }
 
@@ -24,8 +26,14 @@ class PushNotificationService {
       // Получение FCM токена
       await this.getFCMToken();
       
-      // Настройка обработчиков
-      this.setupNotificationHandlers();
+      // Настройка обработчиков (только один раз)
+      if (!this.isInitialized) {
+        console.log('⚙️ Настройка обработчиков уведомлений (первый раз)');
+        this.setupNotificationHandlers();
+        this.isInitialized = true;
+      } else {
+        console.log('ℹ️ Обработчики уведомлений уже настроены, пропускаем');
+      }
     }
   }
 
@@ -60,14 +68,17 @@ class PushNotificationService {
       // Сохраняем токен локально
       await AsyncStorage.setItem('fcmToken', token);
       
-      // Отправляем токен на сервер
+      // Отправляем токен на сервер, если есть userId
       if (this.userId) {
+        console.log('📤 userId найден, отправляем токен на сервер');
         await this.sendTokenToServer(token);
+      } else {
+        console.log('⚠️ userId не установлен, токен НЕ отправлен на сервер');
       }
       
       return token;
     } catch (error) {
-      console.error('Ошибка при получении FCM токена:', error);
+      console.error('❌ Ошибка при получении FCM токена:', error);
       return null;
     }
   }
@@ -77,15 +88,20 @@ class PushNotificationService {
     try {
       // Получаем email пользователя из AsyncStorage
       const userMail = await AsyncStorage.getItem('userMail');
+      console.log('📧 Проверка userMail в AsyncStorage:', userMail ? userMail : 'не найден');
       
       if (!userMail) {
-        console.log('⚠️ Email пользователя не найден, токен не отправлен');
+        console.log('⚠️ Email пользователя не найден в AsyncStorage, токен не отправлен');
         return;
       }
 
-      console.log('📤 Отправка FCM токена на сервер для:', userMail);
+      console.log('📤 Отправка FCM токена на сервер...');
+      console.log('   URL:', `${API_URL}/saveFcmToken`);
+      console.log('   Email:', userMail);
+      console.log('   Platform:', Platform.OS);
+      console.log('   Token (первые 20 символов):', token.substring(0, 20) + '...');
       
-      await axios.post(
+      const response = await axios.post(
         `${API_URL}/saveFcmToken`,
         {
           mail: userMail,
@@ -94,9 +110,18 @@ class PushNotificationService {
         }
       );
       
-      console.log('✅ FCM токен отправлен на сервер');
-    } catch (error) {
-      console.error('Ошибка при отправке токена на сервер:', error);
+      console.log('✅ FCM токен отправлен на сервер успешно');
+      console.log('   Ответ сервера:', response.data);
+    } catch (error: any) {
+      console.error('❌ Ошибка при отправке токена на сервер:');
+      if (error.response) {
+        console.error('   Статус:', error.response.status);
+        console.error('   Данные:', error.response.data);
+      } else if (error.request) {
+        console.error('   Запрос был отправлен, но ответ не получен');
+      } else {
+        console.error('   Ошибка:', error.message);
+      }
     }
   }
 

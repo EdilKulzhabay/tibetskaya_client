@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { User, RegisterData, LoadingState } from '../types';
 import { userStorage, tokenStorage } from '../utils/storage';
 import { apiService } from '../api/services';
+import pushNotificationService from '../services/pushNotifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface AuthState {
   user: User | null;
@@ -43,6 +45,19 @@ export const useAuth = (): UseAuthReturn => {
       if (savedUser) {
         setUser(savedUser);
         console.log('Пользователь загружен из локального хранилища:', savedUser.mail);
+        
+        // Сохраняем email для push notifications и получаем токен
+        await AsyncStorage.setItem('userMail', savedUser.mail);
+        console.log('✅ Email сохранён в AsyncStorage для push notifications');
+        
+        // Инициализируем push notifications с userId и получаем токен
+        try {
+          console.log('⏳ Начинаем инициализацию push notifications с userId:', savedUser._id);
+          await pushNotificationService.initialize(savedUser._id);
+          console.log('✅ Push notifications инициализированы успешно');
+        } catch (pushError) {
+          console.error('❌ Ошибка при инициализации push notifications:', pushError);
+        }
       }
       
       setLoadingState('success');
@@ -74,7 +89,8 @@ export const useAuth = (): UseAuthReturn => {
         avatar: '',
         phone: clientData.phone,
         notificationPushToken: clientData.expoPushToken || "",
-        balance: clientData.bonus || 0,
+        balance: clientData.balance || 0,
+        bonus: clientData.bonus || 0,
         price12: clientData.price12 || 0,
         price19: clientData.price19 || 0,
         status: clientData.status,
@@ -89,11 +105,21 @@ export const useAuth = (): UseAuthReturn => {
         userStorage.save(userData),
         tokenStorage.saveAuthToken(accessToken),
         tokenStorage.saveRefreshToken(refreshToken),
+        AsyncStorage.setItem('userMail', userData.mail),
       ]);
 
       setUser(userData);
       setLoadingState('success');
       console.log('Пользователь и токены сохранены:', userData.mail);
+      
+      // Инициализируем push notifications и получаем токен для отправки на сервер
+      try {
+        console.log('⏳ Начинаем инициализацию push notifications после логина/регистрации с userId:', userData._id);
+        await pushNotificationService.initialize(userData._id);
+        console.log('✅ Push notifications инициализированы успешно после логина/регистрации');
+      } catch (pushError) {
+        console.error('❌ Ошибка при инициализации push notifications после логина/регистрации:', pushError);
+      }
     } catch (error) {
       console.error('Ошибка при входе:', error);
       setError(error instanceof Error ? error.message : 'Ошибка при входе в систему');
@@ -148,10 +174,14 @@ export const useAuth = (): UseAuthReturn => {
     try {
       setLoadingState('loading');
 
+      // Очищаем push notification токен
+      await pushNotificationService.clearToken();
+
       // Удаляем данные из локального хранилища
       await Promise.all([
         userStorage.remove(),
         tokenStorage.removeTokens(),
+        AsyncStorage.removeItem('userMail'),
       ]);
 
       setUser(null);

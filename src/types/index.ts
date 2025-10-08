@@ -9,6 +9,7 @@ export interface User {
   password?: string;
   notificationPushToken?: string;
   balance?: number;
+  bonus?: number;
   price12?: number;
   price19?: number;
   status?: string;

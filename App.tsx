@@ -3,14 +3,13 @@
  * @format
  */
 
-import React, {useEffect} from 'react';
+import React from 'react';
 import {StatusBar, StyleSheet, useColorScheme, View} from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import AuthWrapper from './src/components/AuthWrapper';
 import ImagePreloader from './src/components/ImagePreloader';
-import pushNotificationService from './src/services/pushNotifications';
 
 // Импорт наших экранов
 import {
@@ -48,10 +47,8 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 function App() {
   const isDarkMode = useColorScheme() === 'light';
   
-  // Инициализация push-уведомлений
-  useEffect(() => {
-    pushNotificationService.initialize();
-  }, []);
+  // Инициализация push-уведомлений перенесена в useAuth хук
+  // Она будет вызываться автоматически при загрузке пользователя или после логина/регистрации
   
   return (
     <SafeAreaProvider>
