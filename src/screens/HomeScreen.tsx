@@ -138,7 +138,7 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
           <SpecialOffer navigation={navigation} />
         </View>
       </ScrollView>
-      <Navigation />
+      {/* <Navigation /> */}
       <Modal
         visible={isModalVisible}
         onRequestClose={() => setIsModalVisible(false)}

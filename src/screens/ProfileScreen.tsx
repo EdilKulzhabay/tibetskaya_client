@@ -146,7 +146,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
         <View style={{height: 120}} />
       </ScrollView>
-      <Navigation />
+      {/* <Navigation /> */}
 
       <Modal
         visible={languageModalVisible}

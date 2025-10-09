@@ -92,7 +92,7 @@ const SupportScreen: React.FC<SupportScreenProps> = ({ navigation }) => {
 
       </ScrollView>
 
-      <Navigation />
+      {/* <Navigation /> */}
 
       <Modal
         visible={isModalVisible}

@@ -1,6 +1,9 @@
 package com.tibetskayaclientapp
 
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.os.Build
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
@@ -39,6 +42,28 @@ class MainApplication : Application(), ReactApplication {
     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
       // If you opted-in for the New Architecture, we load the native entry point for this app.
       load()
+    }
+    
+    // Создаем канал уведомлений для Android 8.0+
+    createNotificationChannel()
+  }
+  
+  private fun createNotificationChannel() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      val channelId = "orders_v2"
+      val channelName = "Уведомления о заказах"
+      val channelDescription = "Уведомления о новых заказах и их статусе"
+      val importance = NotificationManager.IMPORTANCE_HIGH
+      
+      val channel = NotificationChannel(channelId, channelName, importance).apply {
+        description = channelDescription
+        enableLights(true)
+        enableVibration(true)
+        setShowBadge(true)
+      }
+      
+      val notificationManager = getSystemService(NotificationManager::class.java)
+      notificationManager?.createNotificationChannel(channel)
     }
   }
 }

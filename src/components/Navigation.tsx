@@ -1,16 +1,21 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useNavigationState } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
+import { useAuth } from '../hooks';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const Navigation: React.FC = () => {
     const navigation = useNavigation<NavigationProp>();
-    const route = useRoute();
+    const user = useAuth()
     
-    const currentScreen = route.name;
+    // Получаем текущий маршрут из состояния навигации
+    const currentScreen = useNavigationState(state => {
+        const route = state?.routes[state.index];
+        return route?.name;
+    });
     
     const navigateToScreen = (screenName: keyof RootStackParamList) => {
         if (currentScreen !== screenName) {
@@ -40,7 +45,13 @@ const Navigation: React.FC = () => {
             
             <TouchableOpacity 
                 style={styles.navBlock} 
-                onPress={() => navigateToScreen('Profile')}
+                onPress={() => {
+                    if (user) {
+                        navigateToScreen('Profile')
+                    } else {
+                        navigation.navigate('Login')
+                    }
+                }}
                 activeOpacity={0.7}
             >
                 {currentScreen === 'Profile' ? (

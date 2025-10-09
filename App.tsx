@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import {StatusBar, StyleSheet, useColorScheme, View} from 'react-native';
+import {StatusBar, useColorScheme} from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
@@ -41,8 +41,18 @@ import {
   HowToTopUpScreen
 } from './src/screens';
 import { RootStackParamList } from './src/types/navigation';
+import { ScreenLayout } from './src/components';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+// Функция-обертка для экранов с навигацией
+const withLayout = (Component: React.ComponentType<any>, showNavigation: boolean = true) => {
+  return (props: any) => (
+    <ScreenLayout showNavigation={showNavigation}>
+      <Component {...props} />
+    </ScreenLayout>
+  );
+};
 
 function App() {
   const isDarkMode = useColorScheme() === 'light';
@@ -62,39 +72,40 @@ function App() {
                 headerShown: false, // Скрываем стандартный заголовок
               }}
             >
-            <Stack.Screen name="Home" component={HomeScreen} />
-            <Stack.Screen name="Profile" component={ProfileScreen} />
-            <Stack.Screen name="History" component={HistoryScreen} />
-            <Stack.Screen name="Support" component={SupportScreen} />
-            <Stack.Screen name="OrderStatus" component={OrderStatusScreen} />
-            <Stack.Screen name="Bonus" component={BonusScreen} />
-            <Stack.Screen name="Wallet" component={WalletScreen} />
-            <Stack.Screen name="Chat" component={ChatScreen} />
-            <Stack.Screen name="Address" component={AddressScreen} />
-            <Stack.Screen name="AddOrUpdateAddress" component={AddOrUpdateAddress} />
-            <Stack.Screen 
-            name="Login" 
-            component={LoginScreen}
-            options={{
-              gestureEnabled: false, // Отключаем смахивание
-              headerLeft: () => null, // Убираем кнопку назад в заголовке
-            }}
-          />
-            <Stack.Screen name="Register" component={RegisterScreen} />
-            <Stack.Screen name="Otp" component={OtpScreen} />
-            <Stack.Screen name="RegisterAccepted" component={RegisterAcceptedScreen} />
-            <Stack.Screen name="ChangeData" component={ChangeDataScreen} />
-            <Stack.Screen name="Tarrifs" component={TarrifsScreen} />
-            <Stack.Screen name="FAQ" component={FAQScreen} />
-            <Stack.Screen name="Hydration" component={HydrationScreen} />
-            <Stack.Screen name="TakePartHydration" component={TakePartHydrationScreen} />
-            <Stack.Screen name="TakePartInvite" component={TakePartInviteScreen} />
-            <Stack.Screen name="StartHydration" component={StartHydrationScreen} />
-            <Stack.Screen name="StartHydration2" component={StartHydrationScreen2} />
-            <Stack.Screen name="AddOrder" component={AddOrderScreen} />
-            <Stack.Screen name="Settings" component={SettingsScreen} />
-            <Stack.Screen name="WhatIsMyBalance" component={WhatIsMyBalanceScreen} />
-            <Stack.Screen name="HowToTopUp" component={HowToTopUpScreen} />
+              {/* Все экраны с нижней навигацией */}
+              <Stack.Screen name="Home" component={withLayout(HomeScreen)} />
+              <Stack.Screen name="Profile" component={withLayout(ProfileScreen)} />
+              <Stack.Screen name="History" component={withLayout(HistoryScreen)} />
+              <Stack.Screen name="Support" component={withLayout(SupportScreen)} />
+              <Stack.Screen name="OrderStatus" component={withLayout(OrderStatusScreen)} />
+              <Stack.Screen name="Bonus" component={withLayout(BonusScreen)} />
+              <Stack.Screen name="Wallet" component={withLayout(WalletScreen)} />
+              <Stack.Screen name="Chat" component={withLayout(ChatScreen)} />
+              <Stack.Screen name="Address" component={withLayout(AddressScreen)} />
+              <Stack.Screen name="AddOrUpdateAddress" component={withLayout(AddOrUpdateAddress)} />
+              <Stack.Screen 
+                name="Login" 
+                component={withLayout(LoginScreen)}
+                options={{
+                  gestureEnabled: false, // Отключаем смахивание
+                  headerLeft: () => null, // Убираем кнопку назад в заголовке
+                }}
+              />
+              <Stack.Screen name="Register" component={withLayout(RegisterScreen)} />
+              <Stack.Screen name="Otp" component={withLayout(OtpScreen)} />
+              <Stack.Screen name="RegisterAccepted" component={withLayout(RegisterAcceptedScreen)} />
+              <Stack.Screen name="ChangeData" component={withLayout(ChangeDataScreen)} />
+              <Stack.Screen name="Tarrifs" component={withLayout(TarrifsScreen)} />
+              <Stack.Screen name="FAQ" component={withLayout(FAQScreen)} />
+              <Stack.Screen name="Hydration" component={withLayout(HydrationScreen)} />
+              <Stack.Screen name="TakePartHydration" component={withLayout(TakePartHydrationScreen)} />
+              <Stack.Screen name="TakePartInvite" component={withLayout(TakePartInviteScreen)} />
+              <Stack.Screen name="StartHydration" component={withLayout(StartHydrationScreen)} />
+              <Stack.Screen name="StartHydration2" component={withLayout(StartHydrationScreen2)} />
+              <Stack.Screen name="AddOrder" component={withLayout(AddOrderScreen)} />
+              <Stack.Screen name="Settings" component={withLayout(SettingsScreen)} />
+              <Stack.Screen name="WhatIsMyBalance" component={withLayout(WhatIsMyBalanceScreen)} />
+              <Stack.Screen name="HowToTopUp" component={withLayout(HowToTopUpScreen)} />
             </Stack.Navigator>
           </NavigationContainer>
         </AuthWrapper>
@@ -102,12 +113,5 @@ function App() {
     </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-});
 
 export default App;

@@ -1,7 +1,8 @@
 import messaging from '@react-native-firebase/messaging';
-import { Platform, Alert, DeviceEventEmitter } from 'react-native';
+import { Platform, DeviceEventEmitter, PermissionsAndroid } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import notifee, { AndroidImportance } from '@notifee/react-native';
 
 const API_URL = 'https://api.tibetskayacrm.kz';
 
@@ -18,6 +19,9 @@ class PushNotificationService {
       console.log('📝 Установка userId:', userId);
       this.userId = userId;
     }
+
+    // Создаем канал уведомлений для notifee
+    await this.createNotificationChannel();
 
     // Запрос разрешения
     const authStatus = await this.requestPermission();
@@ -37,23 +41,66 @@ class PushNotificationService {
     }
   }
 
+  // Создание канала уведомлений для notifee
+  async createNotificationChannel() {
+    try {
+      const channelId = await notifee.createChannel({
+        id: 'orders_v2', // Новый ID канала - создаст новый канал со звуком
+        name: 'Уведомления о заказах',
+        importance: AndroidImportance.HIGH,
+        sound: 'default', // Системный звук по умолчанию
+        vibration: true,
+        badge: true,
+        lights: true,
+        lightColor: '#EE3F58',
+      });
+      console.log('✅ Канал уведомлений notifee создан:', channelId);
+    } catch (error) {
+      console.error('❌ Ошибка создания канала notifee:', error);
+    }
+  }
+
   // Запрос разрешения на уведомления
   async requestPermission(): Promise<boolean> {
     try {
+      // Для Android 13+ (API 33+) нужно явно запросить разрешение
+      if (Platform.OS === 'android' && Platform.Version >= 33) {
+        console.log('📱 Android 13+: Запрашиваем разрешение POST_NOTIFICATIONS');
+        
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+          {
+            title: 'Разрешение на уведомления',
+            message: 'Приложению нужно разрешение для отправки уведомлений о заказах',
+            buttonNeutral: 'Спросить позже',
+            buttonNegative: 'Отклонить',
+            buttonPositive: 'Разрешить',
+          }
+        );
+
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          console.log('✅ Android: Разрешение POST_NOTIFICATIONS получено');
+        } else {
+          console.log('❌ Android: Разрешение POST_NOTIFICATIONS отклонено');
+          return false;
+        }
+      }
+
+      // Запрос разрешения через Firebase (для iOS и дополнительная проверка для Android)
       const authStatus = await messaging().requestPermission();
       const enabled =
         authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
         authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
       if (enabled) {
-        console.log('✅ Разрешение на уведомления получено');
+        console.log('✅ Firebase: Разрешение на уведомления получено');
         return true;
       } else {
-        console.log('❌ Разрешение на уведомления отклонено');
+        console.log('❌ Firebase: Разрешение на уведомления отклонено');
         return false;
       }
     } catch (error) {
-      console.error('Ошибка при запросе разрешения:', error);
+      console.error('❌ Ошибка при запросе разрешения:', error);
       return false;
     }
   }
@@ -122,6 +169,34 @@ class PushNotificationService {
       } else {
         console.error('   Ошибка:', error.message);
       }
+    }
+  }
+
+  // Показать локальное уведомление
+  async displayLocalNotification(title: string, body: string, data?: any) {
+    try {
+      await notifee.displayNotification({
+        title,
+        body,
+        data,
+        android: {
+          channelId: 'orders_v2', // Используем новый канал со звуком
+          importance: AndroidImportance.HIGH,
+          pressAction: {
+            id: 'default',
+          },
+          sound: 'default', // Системный звук
+          vibrationPattern: [300, 500],
+          smallIcon: 'ic_notification', // Белая иконка колокольчика (маленькая, слева)
+          largeIcon: require('../assets/notificationIcon.png'), // Ваш цветной логотип (большая, справа)
+          color: '#EE3F58', // Цвет акцента (розовый)
+          showTimestamp: true,
+          autoCancel: true,
+        },
+      });
+      console.log('✅ Локальное уведомление показано');
+    } catch (error) {
+      console.error('❌ Ошибка показа локального уведомления:', error);
     }
   }
 
@@ -196,36 +271,29 @@ class PushNotificationService {
 
   // Настройка обработчиков уведомлений
   setupNotificationHandlers() {
-    // Обработчик для фоновых уведомлений
-    messaging().setBackgroundMessageHandler(async remoteMessage => {
-      console.log('📬 Фоновое уведомление:', remoteMessage);
-      await this.handleNotificationData(remoteMessage);
-    });
-
+    console.log('⚙️ Настройка обработчиков уведомлений...');
+    
+    // ВАЖНО: Фоновый обработчик должен быть в index.js
+    // Этот вызов оставляем для совместимости, но он не будет работать правильно
+    // messaging().setBackgroundMessageHandler уже зарегистрирован в index.js
+    
     // Обработчик для уведомлений когда приложение на переднем плане
     messaging().onMessage(async remoteMessage => {
-      console.log('📨 Уведомление на переднем плане:', remoteMessage);
+      console.log('🟢🟢🟢 УВЕДОМЛЕНИЕ НА ПЕРЕДНЕМ ПЛАНЕ! 🟢🟢🟢');
+      console.log('📨 Полные данные:', JSON.stringify(remoteMessage, null, 2));
+      console.log('📋 Notification title:', remoteMessage.notification?.title);
+      console.log('📋 Notification body:', remoteMessage.notification?.body);
+      console.log('📦 Data payload:', remoteMessage.data);
       
       // Обрабатываем данные уведомления
       await this.handleNotificationData(remoteMessage);
       
-      // Показываем алерт на iOS
-      if (Platform.OS === 'ios') {
-        Alert.alert(
-          remoteMessage.notification?.title || 'Уведомление',
-          remoteMessage.notification?.body || '',
-          [
-            {
-              text: 'Просмотреть',
-              onPress: () => {
-                console.log('👆 Пользователь нажал "Просмотреть"');
-                // Здесь можно добавить навигацию
-              },
-            },
-            { text: 'OK' },
-          ]
-        );
-      }
+      // Показываем системное уведомление
+      await this.displayLocalNotification(
+        remoteMessage.notification?.title || 'Уведомление',
+        remoteMessage.notification?.body || '',
+        remoteMessage.data
+      );
     });
 
     // Обработчик для клика по уведомлению
@@ -322,6 +390,31 @@ class PushNotificationService {
   // Получить текущий токен
   getToken(): string | null {
     return this.fcmToken;
+  }
+
+  // Проверить статус разрешения на уведомления
+  async checkPermission(): Promise<boolean> {
+    try {
+      if (Platform.OS === 'android' && Platform.Version >= 33) {
+        const result = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+        );
+        console.log('🔍 Статус разрешения POST_NOTIFICATIONS:', result);
+        return result;
+      }
+      
+      // Для iOS или старых Android
+      const authStatus = await messaging().hasPermission();
+      const enabled =
+        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+      
+      console.log('🔍 Статус разрешения Firebase:', enabled);
+      return enabled;
+    } catch (error) {
+      console.error('❌ Ошибка проверки разрешения:', error);
+      return false;
+    }
   }
 }
 

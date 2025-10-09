@@ -380,7 +380,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
           />
         ))}
       </ScrollView>
-      <Navigation />
+      {/* <Navigation /> */}
     </SafeAreaView>
   );
 };
