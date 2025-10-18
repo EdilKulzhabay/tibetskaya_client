@@ -16,7 +16,7 @@ const SpecialOffer: React.FC<{ navigation: any }> = ({ navigation }) => {
                         <Text style={styles.productPrice}>900 ₸</Text>
                     </View>
                 </View>
-                <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('AddOrder', { products: { b12: 1, b19: 0 } })}>
+                <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('AddOrder', { products: { b12: 2, b19: 0 } })}>
                     <Text style={styles.buttonText}>Заказать</Text>
                 </TouchableOpacity>
             </View>

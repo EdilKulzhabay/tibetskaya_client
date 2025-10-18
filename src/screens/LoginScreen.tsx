@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ActivityIndicator, Alert, Dimensions, Image, StatusBar, StyleSheet, Text, TouchableOpacity, View, BackHandler } from "react-native";
+import { ActivityIndicator, Alert, Dimensions, Image, StatusBar, StyleSheet, Text, TouchableOpacity, View, BackHandler, ScrollView } from "react-native";
 import OutlinedFilledLabelInput from "../components/OutlinedFilledLabelInput";
 import { apiService } from "../api/services";
 import { useAuth } from "../hooks/useAuth";
@@ -30,18 +30,19 @@ const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const handleLogin = async () => {
         setLoading(true);
         const res = await apiService.clientLogin({mail, password});
-        console.log(res);
         if (res.success) {
             // Передаем весь ответ сервера (включая токены)
+            setLoading(false);
             await saveUserData(res);
             Alert.alert("Успешно", `Добро пожаловать, ${res.clientData.fullName}!`);
             navigation.navigate("Home");
         } else {
+            setLoading(false);
             Alert.alert("Ошибка", res.message);
         }
     }
     return (
-        <View style={styles.container}>
+        <ScrollView style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor="#DC1818" />
             <View style={styles.bannerContainer}>
                 <Image
@@ -86,7 +87,7 @@ const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     </TouchableOpacity>
                 </View>
 
-                <View>
+                <View style={{ marginTop: 60 }}>
                     <TouchableOpacity
                         onPress={handleLogin}
                         style={styles.loginButton}
@@ -102,7 +103,7 @@ const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     </TouchableOpacity>
                 </View>
             </View>
-        </View>
+        </ScrollView>
     );
 };
     

@@ -8,6 +8,8 @@ import {
   ScrollView,
   Modal,
   DeviceEventEmitter,
+  Image,
+  Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -27,6 +29,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import pushNotificationService from '../services/pushNotifications';
 
 interface HomeScreenProps {}
+
+const width = Dimensions.get('window').width;
 
 const HomeScreen: React.FC<HomeScreenProps> = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -131,7 +135,21 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
 
           <MainPageWallet balance={user?.balance || 0} />
           <Products navigation={navigation} />
-          <Marketplace />
+          {/* <Marketplace /> */}
+          <Image 
+            source={require('../assets/marketPlace.png')} 
+            style={{ 
+              width: '100%', 
+              resizeMode: 'contain', 
+              marginBottom: -56, 
+              marginTop: -32,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 3.84,
+            }} 
+            resizeMode="contain"
+          />
           
         </View>
         <View style={styles.specialOfferContainer}>

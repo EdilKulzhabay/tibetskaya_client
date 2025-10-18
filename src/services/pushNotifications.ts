@@ -7,18 +7,12 @@ import notifee, { AndroidImportance } from '@notifee/react-native';
 const API_URL = 'https://api.tibetskayacrm.kz';
 
 class PushNotificationService {
-  private userId: string | null = null;
   private fcmToken: string | null = null;
   private isInitialized: boolean = false;
 
   // Инициализация сервиса
-  async initialize(userId?: string) {
+  async initialize() {
     console.log('🔔 Инициализация push-уведомлений...');
-    
-    if (userId) {
-      console.log('📝 Установка userId:', userId);
-      this.userId = userId;
-    }
 
     // Создаем канал уведомлений для notifee
     await this.createNotificationChannel();
@@ -115,12 +109,13 @@ class PushNotificationService {
       // Сохраняем токен локально
       await AsyncStorage.setItem('fcmToken', token);
       
-      // Отправляем токен на сервер, если есть userId
-      if (this.userId) {
-        console.log('📤 userId найден, отправляем токен на сервер');
+      // Проверяем userMail и отправляем токен на сервер
+      const userMail = await AsyncStorage.getItem('userMail');
+      if (userMail) {
+        console.log('📤 userMail найден в AsyncStorage, отправляем токен на сервер');
         await this.sendTokenToServer(token);
       } else {
-        console.log('⚠️ userId не установлен, токен НЕ отправлен на сервер');
+        console.log('⚠️ userMail не найден в AsyncStorage, токен НЕ отправлен на сервер');
       }
       
       return token;
@@ -193,8 +188,20 @@ class PushNotificationService {
           showTimestamp: true,
           autoCancel: true,
         },
+        ios: {
+          sound: 'default', // Системный звук для iOS
+          badgeCount: 1, // Увеличиваем badge на 1
+          critical: false, // Обычный приоритет
+          interruptionLevel: 'timeSensitive', // Важное уведомление (iOS 15+)
+          attachments: [
+            {
+              url: require('../assets/notificationIcon.png'), // Ваша иконка как вложение
+              thumbnailHidden: false,
+            },
+          ],
+        },
       });
-      console.log('✅ Локальное уведомление показано');
+      console.log('✅ Локальное уведомление показано (Android + iOS)');
     } catch (error) {
       console.error('❌ Ошибка показа локального уведомления:', error);
     }
@@ -356,19 +363,31 @@ class PushNotificationService {
       this.fcmToken = token;
       await AsyncStorage.setItem('fcmToken', token);
       
-      if (this.userId) {
+      // Проверяем userMail и отправляем токен
+      const userMail = await AsyncStorage.getItem('userMail');
+      if (userMail) {
         await this.sendTokenToServer(token);
       }
     });
   }
 
-  // Установка userId
-  setUserId(userId: string) {
-    this.userId = userId;
+  // Повторная отправка токена на сервер (вызывать после логина)
+  async resendToken() {
+    console.log('🔄 Повторная отправка токена на сервер...');
+    const userMail = await AsyncStorage.getItem('userMail');
+    
+    if (!userMail) {
+      console.log('⚠️ userMail не найден, пропускаем отправку токена');
+      return;
+    }
     
     // Если токен уже получен, отправляем его на сервер
     if (this.fcmToken) {
-      this.sendTokenToServer(this.fcmToken);
+      await this.sendTokenToServer(this.fcmToken);
+    } else {
+      // Если токена нет, пытаемся получить его
+      console.log('⚠️ FCM токен не найден, пытаемся получить');
+      await this.getFCMToken();
     }
   }
 
@@ -379,7 +398,6 @@ class PushNotificationService {
         await messaging().deleteToken();
         await AsyncStorage.removeItem('fcmToken');
         this.fcmToken = null;
-        this.userId = null;
         console.log('✅ FCM токен удален');
       }
     } catch (error) {

@@ -25,6 +25,7 @@ export {default as AddOrderScreen} from './AddOrderScreen';
 export {default as SettingsScreen} from './SettingsScreen';
 export {default as WhatIsMyBalanceScreen} from './WhatIsMyBalanceScreen';
 export {default as HowToTopUpScreen} from './HowToTopUpScreen';
+export {default as DeleteAccountScreen} from './DeleteAccountScreen';
 
 // Добавляйте новые экраны здесь
 // export {default as SettingsScreen} from './SettingsScreen';

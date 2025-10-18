@@ -46,15 +46,17 @@ export const useAuth = (): UseAuthReturn => {
         setUser(savedUser);
         console.log('Пользователь загружен из локального хранилища:', savedUser.mail);
         
-        // Сохраняем email для push notifications и получаем токен
+        // Сохраняем email для push notifications
         await AsyncStorage.setItem('userMail', savedUser.mail);
         console.log('✅ Email сохранён в AsyncStorage для push notifications');
         
-        // Инициализируем push notifications с userId и получаем токен
+        // Инициализируем push notifications и отправляем токен на сервер
         try {
-          console.log('⏳ Начинаем инициализацию push notifications с userId:', savedUser._id);
-          await pushNotificationService.initialize(savedUser._id);
-          console.log('✅ Push notifications инициализированы успешно');
+          console.log('⏳ Начинаем инициализацию push notifications');
+          await pushNotificationService.initialize();
+          // Отправляем токен на сервер (теперь userMail уже в AsyncStorage)
+          await pushNotificationService.resendToken();
+          console.log('✅ Push notifications инициализированы и токен отправлен');
         } catch (pushError) {
           console.error('❌ Ошибка при инициализации push notifications:', pushError);
         }
@@ -112,11 +114,13 @@ export const useAuth = (): UseAuthReturn => {
       setLoadingState('success');
       console.log('Пользователь и токены сохранены:', userData.mail);
       
-      // Инициализируем push notifications и получаем токен для отправки на сервер
+      // Инициализируем push notifications и отправляем токен на сервер
       try {
-        console.log('⏳ Начинаем инициализацию push notifications после логина/регистрации с userId:', userData._id);
-        await pushNotificationService.initialize(userData._id);
-        console.log('✅ Push notifications инициализированы успешно после логина/регистрации');
+        console.log('⏳ Начинаем инициализацию push notifications после логина/регистрации');
+        await pushNotificationService.initialize();
+        // Отправляем токен на сервер (userMail уже сохранен в AsyncStorage выше)
+        await pushNotificationService.resendToken();
+        console.log('✅ Push notifications инициализированы и токен отправлен');
       } catch (pushError) {
         console.error('❌ Ошибка при инициализации push notifications после логина/регистрации:', pushError);
       }

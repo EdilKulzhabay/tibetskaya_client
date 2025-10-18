@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { useNavigation, useNavigationState } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -9,7 +9,7 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const Navigation: React.FC = () => {
     const navigation = useNavigation<NavigationProp>();
-    const user = useAuth()
+    const { user, isAuthenticated, loadingState } = useAuth();
     
     // Получаем текущий маршрут из состояния навигации
     const currentScreen = useNavigationState(state => {
@@ -22,6 +22,23 @@ const Navigation: React.FC = () => {
             navigation.navigate(screenName as any);
         }
     };
+
+    const navigationProfileOrLogin = () => {
+        // Не делаем ничего пока загружаются данные
+        if (loadingState === 'loading') {
+            console.log('⏳ Ожидание загрузки данных пользователя...');
+            return;
+        }
+
+        // После загрузки проверяем авторизацию
+        if (isAuthenticated && user !== null) {
+            console.log('✅ Пользователь авторизован, переход на Profile');
+            navigateToScreen('Profile');
+        } else {
+            console.log('❌ Пользователь не авторизован, переход на Login');
+            navigateToScreen('Login');
+        }
+    }
 
     return (
         <View style={styles.container}>
@@ -45,13 +62,7 @@ const Navigation: React.FC = () => {
             
             <TouchableOpacity 
                 style={styles.navBlock} 
-                onPress={() => {
-                    if (user) {
-                        navigateToScreen('Profile')
-                    } else {
-                        navigation.navigate('Login')
-                    }
-                }}
+                onPress={() => {navigationProfileOrLogin()}}
                 activeOpacity={0.7}
             >
                 {currentScreen === 'Profile' ? (
@@ -111,8 +122,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 12,
-        paddingBottom: 10,
+        padding: 16,
+        paddingBottom: 30,
         backgroundColor: 'white',
     },
     navBlock: {

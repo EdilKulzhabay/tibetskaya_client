@@ -45,7 +45,10 @@ export const apiService = {
             const response = await api.post('/clientLogin', data);
             return response.data;
         } catch (error) {
-            throw error;
+            return {
+                success: false,
+                message: "Не удалось войти в систему",
+            };
         }
     },
 
@@ -88,6 +91,15 @@ export const apiService = {
     getCourierLocation: async (courierId: string) => {
         try {
             const response = await api.post('/getCourierLocation', {courierId});
+            return response.data;
+        } catch (error) {
+            throw error;
+        }
+    },
+
+    deleteAccount: async (mail: string) => {
+        try {
+            const response = await api.post('/deleteClientMobile', {mail});
             return response.data;
         } catch (error) {
             throw error;

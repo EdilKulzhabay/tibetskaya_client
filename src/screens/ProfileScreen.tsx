@@ -144,6 +144,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
         <ButtonWithSwitch title="Уведомления" icon={require('../assets/notification.png')} switchValue={notificationSwitchValue} onSwitchChange={() => setNotificationSwitchValue(!notificationSwitchValue)} />
 
+        <NavButton title="Удалить аккаунт" onPress={() => navigation.navigate('DeleteAccount')} icon={require('../assets/trash.png')} />
+
         <View style={{height: 120}} />
       </ScrollView>
       {/* <Navigation /> */}

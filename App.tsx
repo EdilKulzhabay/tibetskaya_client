@@ -38,7 +38,8 @@ import {
   AddOrderScreen,
   SettingsScreen,
   WhatIsMyBalanceScreen,
-  HowToTopUpScreen
+  HowToTopUpScreen,
+  DeleteAccountScreen
 } from './src/screens';
 import { RootStackParamList } from './src/types/navigation';
 import { ScreenLayout } from './src/components';
@@ -80,7 +81,7 @@ function App() {
               <Stack.Screen name="OrderStatus" component={withLayout(OrderStatusScreen)} />
               <Stack.Screen name="Bonus" component={withLayout(BonusScreen)} />
               <Stack.Screen name="Wallet" component={withLayout(WalletScreen)} />
-              <Stack.Screen name="Chat" component={withLayout(ChatScreen)} />
+              <Stack.Screen name="Chat" component={withLayout(ChatScreen, false)} />
               <Stack.Screen name="Address" component={withLayout(AddressScreen)} />
               <Stack.Screen name="AddOrUpdateAddress" component={withLayout(AddOrUpdateAddress)} />
               <Stack.Screen 
@@ -106,6 +107,7 @@ function App() {
               <Stack.Screen name="Settings" component={withLayout(SettingsScreen)} />
               <Stack.Screen name="WhatIsMyBalance" component={withLayout(WhatIsMyBalanceScreen)} />
               <Stack.Screen name="HowToTopUp" component={withLayout(HowToTopUpScreen)} />
+              <Stack.Screen name="DeleteAccount" component={withLayout(DeleteAccountScreen)} />
             </Stack.Navigator>
           </NavigationContainer>
         </AuthWrapper>

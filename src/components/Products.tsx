@@ -1,20 +1,12 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
-import { useAuth } from '../hooks';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 
 const Products: React.FC<{ navigation: any }> = ({ navigation }) => {
-    const { user } = useAuth();
-
     const [count12, setCount12] = useState(0);
     const [count19, setCount19] = useState(0);
 
     const handleOrder = () => {
-        if (!user) {
-            Alert.alert('Ошибка', 'Пожалуйста, войдите в систему');
-            return;
-        } else {
-            navigation.navigate('AddOrder', { products: { b12: count12, b19: count19 } });
-        }
+        navigation.navigate('AddOrder', { products: { b12: count12, b19: count19 } });
     }
 
     return (

@@ -173,6 +173,7 @@ export type RootStackParamList = {
   Settings: undefined;
   WhatIsMyBalance: undefined;
   HowToTopUp: undefined;
+  DeleteAccount: undefined;
 };
 
 export type TabParamList = {

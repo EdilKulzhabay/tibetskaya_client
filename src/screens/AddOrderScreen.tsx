@@ -271,7 +271,11 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
 
                         <TouchableOpacity style={[styles.button, {marginTop: 40}]} onPress={() => {
                             setAddressModalVisible(false);
-                            navigation.navigate('AddOrUpdateAddress', { address: null });
+                            if (!user) {
+                                navigation.navigate('Login');
+                            } else {
+                                navigation.navigate('AddOrUpdateAddress', { address: null });
+                            }
                         }}>
                             <Text style={styles.buttonText}>Добавить адрес</Text>
                         </TouchableOpacity>

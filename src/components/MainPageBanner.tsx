@@ -25,26 +25,32 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
 
   const firstBanner = () => {
     return (
-      <View style={{
-        backgroundColor: '#DC3F34',
-        borderRadius: 8,
-        height: 180,
-        overflow: 'hidden',
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 12,
-        paddingLeft: 16,
-        paddingRight: 45,
-      }}>
-        <View style={{ flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-          <Image source={require('../assets/banner4_2.png')} style={{ width: 200, height: 70, resizeMode: 'contain' }} />
-          <Text style={{ fontSize: 16, fontWeight: '500', color: '#fff' }}>“Чистая, полезная вода{"\n"}— прямо к вашей двери”</Text>
-        </View>
-        <View>
-          <Image source={require('../assets/banner4.png')} style={{ width: 106, height: 117, resizeMode: 'contain' }} />
-        </View>
+      <View style={styles.imageContainer}>
+        <Image source={require('../assets/newBanner.png')} style={styles.image} />
       </View>
+      // <View style={{
+      //   backgroundColor: '#DC3F34',
+      //   borderRadius: 8,
+      //   height: 180,
+      //   overflow: 'hidden',
+      //   flexDirection: 'row',
+      //   justifyContent: 'space-between',
+      //   alignItems: 'center',
+      //   padding: 12,
+      //   paddingLeft: 16,
+      //   paddingRight: 45,
+      // }}>
+      //   <View style={{ flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      //     <Image source={require('../assets/banner4_2.png')} style={{ width: 200, height: 70, resizeMode: 'contain' }} />
+      //     <Text style={{ fontSize: 16, fontWeight: '500', color: '#fff' }}>“Чистая, полезная вода{"\n"}— прямо к вашей двери”</Text>
+      //   </View>
+      //   <View>
+      //     <Image source={require('../assets/banner4.png')} style={{ width: 106, height: 117, resizeMode: 'contain' }} />
+      //   </View>
+      // </View>
+
+
+
       // <LinearGradient
       //   colors={['#CB5D5D', '#C0DDFE']}
       //   start={{ x: 0, y: 0 }}            
@@ -64,41 +70,45 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
 
   const secondBanner = () => {
     return (
-      <View style={{
-        backgroundColor: '#1FABEE',
-        borderRadius: 8,
-        height: 180,
-        overflow: 'hidden',
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 12,
-        paddingLeft: 16,
-        paddingRight: 16,
-        position: 'relative',
-      }}>
-        <View 
-          style={{
-            position: 'absolute',
-            width: 270,
-            height: 270,
-            backgroundColor: '#fff',
-            borderRadius: 135,
-            top: 90,
-            right: 0,
-            transform: [{ translateX: "38%" }, { translateY: "-50%" }],
-          }}
-        />
-        <View>
-          <Text style={{ fontSize: 18, fontWeight: '600', color: '#fff' }}>Новый удобный формат{"\n"}— 12,5 литров!</Text>
-          <Text style={{ marginTop: 4, fontSize: 14, fontWeight: '500', color: '#fff' }}>Попробуйте уже сегодня</Text>
-          <TouchableOpacity style={{ marginTop: 24, backgroundColor: '#DC1818', borderRadius: 8, paddingHorizontal: 20, paddingVertical: 8, alignSelf: 'flex-start' }} onPress={() => {}}>
-            <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>Купить сейчас</Text>
-          </TouchableOpacity>
-        </View>
-
-        <Image source={require('../assets/banner5.png')} style={{ width: 190, height: 190, resizeMode: 'contain', marginLeft: -10 }} />
+      <View style={styles.imageContainer}>
+        <Image source={require('../assets/newBanner2.png')} style={styles.image} />
       </View>
+      // <View style={{
+      //   backgroundColor: '#1FABEE',
+      //   borderRadius: 8,
+      //   height: 180,
+      //   overflow: 'hidden',
+      //   flexDirection: 'row',
+      //   justifyContent: 'space-between',
+      //   alignItems: 'center',
+      //   padding: 12,
+      //   paddingLeft: 16,
+      //   paddingRight: 16,
+      //   position: 'relative',
+      // }}>
+      //   <View 
+      //     style={{
+      //       position: 'absolute',
+      //       width: 270,
+      //       height: 270,
+      //       backgroundColor: '#fff',
+      //       borderRadius: 135,
+      //       top: 90,
+      //       right: 0,
+      //       transform: [{ translateX: "38%" }, { translateY: "-50%" }],
+      //     }}
+      //   />
+      //   <View>
+      //     <Text style={{ fontSize: 18, fontWeight: '600', color: '#fff' }}>Новый удобный формат{"\n"}— 12,5 литров!</Text>
+      //     <Text style={{ marginTop: 4, fontSize: 14, fontWeight: '500', color: '#fff' }}>Попробуйте уже сегодня</Text>
+      //     <TouchableOpacity style={{ marginTop: 24, backgroundColor: '#DC1818', borderRadius: 8, paddingHorizontal: 20, paddingVertical: 8, alignSelf: 'flex-start' }} onPress={() => {}}>
+      //       <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>Купить сейчас</Text>
+      //     </TouchableOpacity>
+      //   </View>
+
+      //   <Image source={require('../assets/banner5.png')} style={{ width: 190, height: 190, resizeMode: 'contain', marginLeft: -10 }} />
+      // </View>
+
       // <View style={secondBannerStyles.container}>
       //   <View style={secondBannerStyles.content}> 
       //     <Text style={secondBannerStyles.title}>Выпей 3{"\n"}бутылки воды</Text>
@@ -115,81 +125,86 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
 
   const thirdBanner = () => {
     return (
-      <View
-        style={{
-          backgroundColor: '#1488E8',
-          borderRadius: 8,
-          height: 180,
-          overflow: 'hidden',
-          padding: 24,
-          position: 'relative',
-        }}
-      >
-        <View>
-          <Text style={{ fontSize: 18, fontWeight: '600', color: '#fff' }}>Скоро вместе с Alma TV!</Text>
-          <Text style={{ marginTop: 4, fontSize: 14, fontWeight: '500', color: '#fff' }}>
-            Эксклюзивные бонусы и скидки{"\n"}для абонентов Alma TV на воду{"\n"}Тибетская.
-          </Text>
-          <TouchableOpacity style={{ marginTop: 24, backgroundColor: '#DC1818', borderRadius: 8, paddingHorizontal: 20, paddingVertical: 8, alignSelf: 'flex-start' }} onPress={() => setIsModalVisible(true)}>
-            <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>Отслеживать</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={{ 
-          position: 'absolute', 
-          right: 45, 
-          top: 24,
-          width: 60,
-          height: 60,
-          backgroundColor: '#DC1818',
-          borderRadius: 30,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          <Image source={require('../assets/banner4.png')} style={{ width: 30, height: 30, resizeMode: 'contain' }} />
-        </View>
-        <View style={{ 
-          position: 'absolute', 
-          right: 45, 
-          bottom: 0,
-          transform: [{ translateY: "30%" }],
-          width: 106,
-          height: 106,
-          borderRadius: 53,
-          backgroundColor: '#fff',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          <Image source={require('../assets/banner6.png')} style={{ width: 80, height: 30, resizeMode: 'contain', marginTop: -10, marginLeft: 5 }} />
-        </View>
-        <View style={{ 
-          position: 'absolute', 
-          right: 110, 
-          top: 70,
-          width: 6,
-          height: 6,
-          borderRadius: 3,
-          backgroundColor: '#fff',
-        }}/>
-        <View style={{ 
-          position: 'absolute', 
-          right: 115, 
-          top: 90,
-          width: 8,
-          height: 8,
-          borderRadius: 4,
-          backgroundColor: '#DC1818',
-        }}/>
-        <View style={{ 
-          position: 'absolute', 
-          right: 45, 
-          top: 110,
-          width: 6,
-          height: 6,
-          borderRadius: 3,
-          backgroundColor: '#fff',
-        }}/>
+      <View style={styles.imageContainer}>
+        <Image source={require('../assets/newBanner3.png')} style={styles.image} />
       </View>
+      // <View
+      //   style={{
+      //     backgroundColor: '#1488E8',
+      //     borderRadius: 8,
+      //     height: 180,
+      //     overflow: 'hidden',
+      //     padding: 24,
+      //     position: 'relative',
+      //   }}
+      // >
+      //   <View>
+      //     <Text style={{ fontSize: 18, fontWeight: '600', color: '#fff' }}>Скоро вместе с Alma TV!</Text>
+      //     <Text style={{ marginTop: 4, fontSize: 14, fontWeight: '500', color: '#fff' }}>
+      //       Эксклюзивные бонусы и скидки{"\n"}для абонентов Alma TV на воду{"\n"}Тибетская.
+      //     </Text>
+      //     <TouchableOpacity style={{ marginTop: 24, backgroundColor: '#DC1818', borderRadius: 8, paddingHorizontal: 20, paddingVertical: 8, alignSelf: 'flex-start' }} onPress={() => setIsModalVisible(true)}>
+      //       <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>Отслеживать</Text>
+      //     </TouchableOpacity>
+      //   </View>
+
+      //   <View style={{ 
+      //     position: 'absolute', 
+      //     right: 45, 
+      //     top: 24,
+      //     width: 60,
+      //     height: 60,
+      //     backgroundColor: '#DC1818',
+      //     borderRadius: 30,
+      //     alignItems: 'center',
+      //     justifyContent: 'center',
+      //   }}>
+      //     <Image source={require('../assets/banner4.png')} style={{ width: 30, height: 30, resizeMode: 'contain' }} />
+      //   </View>
+      //   <View style={{ 
+      //     position: 'absolute', 
+      //     right: 45, 
+      //     bottom: 0,
+      //     transform: [{ translateY: "30%" }],
+      //     width: 106,
+      //     height: 106,
+      //     borderRadius: 53,
+      //     backgroundColor: '#fff',
+      //     alignItems: 'center',
+      //     justifyContent: 'center',
+      //   }}>
+      //     <Image source={require('../assets/banner6.png')} style={{ width: 80, height: 30, resizeMode: 'contain', marginTop: -10, marginLeft: 5 }} />
+      //   </View>
+      //   <View style={{ 
+      //     position: 'absolute', 
+      //     right: 110, 
+      //     top: 70,
+      //     width: 6,
+      //     height: 6,
+      //     borderRadius: 3,
+      //     backgroundColor: '#fff',
+      //   }}/>
+      //   <View style={{ 
+      //     position: 'absolute', 
+      //     right: 115, 
+      //     top: 90,
+      //     width: 8,
+      //     height: 8,
+      //     borderRadius: 4,
+      //     backgroundColor: '#DC1818',
+      //   }}/>
+      //   <View style={{ 
+      //     position: 'absolute', 
+      //     right: 45, 
+      //     top: 110,
+      //     width: 6,
+      //     height: 6,
+      //     borderRadius: 3,
+      //     backgroundColor: '#fff',
+      //   }}/>
+      // </View>
+
+
       // <ImageBackground 
       //   source={require('../assets/banner3.png')} 
       //   style={thirdBannerStyles.container}
@@ -336,6 +351,16 @@ const styles = StyleSheet.create({
   paginationDotActive: {
     backgroundColor: '#DC1818',
     width: 24,
+  },
+  imageContainer: {
+    width: screenWidth,
+    height: 160,
+    marginLeft: -16,
+  },
+  image: {
+    width: '100%',
+    height: 160,
+    resizeMode: 'contain',
   },
 });
 
