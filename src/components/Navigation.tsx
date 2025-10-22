@@ -65,7 +65,7 @@ const Navigation: React.FC = () => {
                 onPress={() => {navigationProfileOrLogin()}}
                 activeOpacity={0.7}
             >
-                {currentScreen === 'Profile' ? (
+                {currentScreen === 'Profile' || currentScreen === 'Login' || currentScreen === 'Register' ? (
                     <>
                         <Image source={require('../assets/profileActiveIcon.png')} style={styles.navIcon} />
                         <Text style={styles.activeText}>Профиль</Text>

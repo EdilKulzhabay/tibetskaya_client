@@ -1,4 +1,5 @@
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import StableImage from './StableImage';
 
 const Back: React.FC<{ navigation: any, title: string }> = ({ navigation, title }) => {
 
@@ -9,7 +10,7 @@ const Back: React.FC<{ navigation: any, title: string }> = ({ navigation, title 
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={onPress} style={styles.button}>
-        <Image source={require('../assets/arrowBack.png')} style={styles.image} />
+        <StableImage source={require('../assets/arrowBack.png')} style={styles.image} />
       </TouchableOpacity>
       <Text style={styles.title}>{title}</Text>
     </View>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import StableImage from './StableImage';
 
 const Products: React.FC<{ navigation: any }> = ({ navigation }) => {
     const [count12, setCount12] = useState(0);
@@ -20,8 +21,8 @@ const Products: React.FC<{ navigation: any }> = ({ navigation }) => {
             <View style={styles.productContainer}>
                 <View style={styles.productTop}>
                     <View style={styles.product}>
-                        <View>
-                            <Image source={require('../assets/bottleProduct.png')} style={styles.productImage} />
+                        <View style={styles.productImageContainer}>
+                            <StableImage source={require('../assets/bottleProduct12.png')} style={styles.productImage} />
                         </View>
                         <View>
                             <Text style={styles.productTitle}>Вода 12,5 л</Text>
@@ -66,8 +67,8 @@ const Products: React.FC<{ navigation: any }> = ({ navigation }) => {
             <View style={styles.productContainer}>
                 <View style={styles.productTop}>
                     <View style={styles.product}>
-                        <View>
-                            <Image source={require('../assets/bottleProduct.png')} style={styles.productImage} />
+                        <View style={styles.productImageContainer}>
+                            <StableImage source={require('../assets/bottleProduct.png')} style={styles.productImage} />
                         </View>
                         <View>
                             <Text style={styles.productTitle}>Вода 18,9 л</Text>
@@ -157,6 +158,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 16,
+    },
+    productImageContainer: {
+        width: 40,
+        height: 60,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     productImage: {
         width: 40,

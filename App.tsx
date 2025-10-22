@@ -63,7 +63,6 @@ function App() {
   
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <ImagePreloader>
         <AuthWrapper>
           <NavigationContainer>
@@ -74,10 +73,34 @@ function App() {
               }}
             >
               {/* Все экраны с нижней навигацией */}
-              <Stack.Screen name="Home" component={withLayout(HomeScreen)} />
-              <Stack.Screen name="Profile" component={withLayout(ProfileScreen)} />
-              <Stack.Screen name="History" component={withLayout(HistoryScreen)} />
-              <Stack.Screen name="Support" component={withLayout(SupportScreen)} />
+              <Stack.Screen 
+                name="Home" 
+                component={withLayout(HomeScreen)}
+                options={{
+                  gestureEnabled: false, // Отключаем свайп назад
+                }}
+              />
+              <Stack.Screen 
+                name="Profile" 
+                component={withLayout(ProfileScreen)}
+                options={{
+                  gestureEnabled: false, // Отключаем свайп назад
+                }}
+              />
+              <Stack.Screen 
+                name="History" 
+                component={withLayout(HistoryScreen)}
+                options={{
+                  gestureEnabled: false, // Отключаем свайп назад
+                }}
+              />
+              <Stack.Screen 
+                name="Support" 
+                component={withLayout(SupportScreen)}
+                options={{
+                  gestureEnabled: false, // Отключаем свайп назад
+                }}
+              />
               <Stack.Screen name="OrderStatus" component={withLayout(OrderStatusScreen)} />
               <Stack.Screen name="Bonus" component={withLayout(BonusScreen)} />
               <Stack.Screen name="Wallet" component={withLayout(WalletScreen)} />

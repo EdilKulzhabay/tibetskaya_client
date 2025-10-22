@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import StableImage from './StableImage';
 
 const Marketplace = () => {
     return (
@@ -12,13 +13,13 @@ const Marketplace = () => {
 
             <View style={styles.marketplaceContainer}>
                 <View style={styles.marketplace}>
-                    <Image source={require('../assets/marketplace1.png')} style={styles.marketplaceImage} />
+                    <StableImage source={require('../assets/marketplace1.png')} style={styles.marketplaceImage} />
                     <Text numberOfLines={1} ellipsizeMode="tail" style={styles.marketplaceTitle}>Помпа электрическая</Text>
                     <Text numberOfLines={1} ellipsizeMode="tail" style={styles.marketplaceSubtitle}>Тибетская</Text>
                     <Text style={styles.marketplacePrice}>7 000 ₸</Text>
                 </View>
                 <View style={styles.marketplace}>
-                    <Image source={require('../assets/marketplace2.png')} style={styles.marketplaceImage} />
+                    <StableImage source={require('../assets/marketplace2.png')} style={styles.marketplaceImage} />
                     <Text numberOfLines={1} ellipsizeMode="tail" style={styles.marketplaceTitle}>Помпа механическая</Text>
                     <Text numberOfLines={1} ellipsizeMode="tail" style={styles.marketplaceSubtitle}>Тибетская</Text>
                     <Text style={styles.marketplacePrice}>6 000 ₸</Text>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Image } from 'react-native';
+import { Image, View, Text, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 
 interface ImagePreloaderProps {
   children: React.ReactNode;
@@ -23,6 +23,7 @@ const criticalImages = [
   require('../assets/marketplace1.png'),
   require('../assets/marketplace2.png'),
   require('../assets/bottleProduct.png'),
+  require('../assets/bottleProduct12.png'),
   require('../assets/whatIsMyBalance.png'),
   require('../assets/howToTopUp.png'),
   require('../assets/banner3.png'),
@@ -42,34 +43,103 @@ const ImagePreloader: React.FC<ImagePreloaderProps> = ({ children }) => {
 
   useEffect(() => {
     const preloadImages = async () => {
-      const loadPromises = criticalImages.map((imageSource, index) => {
-        return new Promise<void>((resolve) => {
-          Image.prefetch(Image.resolveAssetSource(imageSource).uri)
-            .then(() => {
+      // На iOS для локальных изображений (require) prefetch менее критичен
+      // Они уже встроены в bundle, поэтому загружаются быстро
+      if (Platform.OS === 'ios') {
+        // Для iOS даем небольшую задержку для инициализации Image cache
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Принудительно загружаем изображения через Image.getSize
+        const loadPromises = criticalImages.map((imageSource) => {
+          return new Promise<void>((resolve) => {
+            try {
+              const source = Image.resolveAssetSource(imageSource);
+              if (source && source.uri) {
+                // Используем Image.getSize для принудительной загрузки
+                Image.getSize(
+                  source.uri,
+                  () => {
+                    setLoadedCount(prev => prev + 1);
+                    resolve();
+                  },
+                  () => {
+                    // В случае ошибки все равно продолжаем
+                    setLoadedCount(prev => prev + 1);
+                    resolve();
+                  }
+                );
+              } else {
+                setLoadedCount(prev => prev + 1);
+                resolve();
+              }
+            } catch (error) {
               setLoadedCount(prev => prev + 1);
               resolve();
-            })
-            .catch(() => {
-              // Если изображение не загрузилось, все равно считаем его загруженным
-              setLoadedCount(prev => prev + 1);
-              resolve();
-            });
+            }
+          });
         });
-      });
 
-      await Promise.all(loadPromises);
+        await Promise.all(loadPromises);
+      } else {
+        // Для Android используем обычный prefetch
+        const loadPromises = criticalImages.map((imageSource) => {
+          return new Promise<void>((resolve) => {
+            Image.prefetch(Image.resolveAssetSource(imageSource).uri)
+              .then(() => {
+                setLoadedCount(prev => prev + 1);
+                resolve();
+              })
+              .catch(() => {
+                setLoadedCount(prev => prev + 1);
+                resolve();
+              });
+          });
+        });
+
+        await Promise.all(loadPromises);
+      }
+
       setImagesLoaded(true);
     };
 
     preloadImages();
   }, []);
 
-  // Показываем детей только после загрузки всех изображений
+  // Показываем индикатор загрузки
   if (!imagesLoaded) {
-    return null;
+    const progress = Math.round((loadedCount / criticalImages.length) * 100);
+    
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#DC1818" />
+        <Text style={styles.loaderText}>Загрузка изображений...</Text>
+        <Text style={styles.progressText}>{progress}%</Text>
+      </View>
+    );
   }
 
   return <>{children}</>;
 };
+
+const styles = StyleSheet.create({
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  loaderText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#545454',
+    fontWeight: '500',
+  },
+  progressText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#99A3B3',
+    fontWeight: '600',
+  },
+});
 
 export default ImagePreloader;

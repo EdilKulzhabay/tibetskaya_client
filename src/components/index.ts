@@ -19,6 +19,7 @@ export {default as AuthWrapper} from './AuthWrapper';
 export {default as ImagePreloader} from './ImagePreloader';
 export {default as OptimizedImage} from './OptimizedImage';
 export {default as ScreenLayout} from './ScreenLayout';
+export {default as StableImage} from './StableImage';
 // Добавляйте новые компоненты здесь
 // export {default as Input} from './Input';
 // export {default as Card} from './Card';

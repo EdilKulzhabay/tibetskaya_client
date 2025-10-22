@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useAuth } from '../hooks';
+import StableImage from './StableImage';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -26,7 +27,7 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
   const firstBanner = () => {
     return (
       <View style={styles.imageContainer}>
-        <Image source={require('../assets/newBanner.png')} style={styles.image} />
+        <StableImage source={require('../assets/newBanner.png')} style={styles.image} />
       </View>
       // <View style={{
       //   backgroundColor: '#DC3F34',
@@ -71,7 +72,7 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
   const secondBanner = () => {
     return (
       <View style={styles.imageContainer}>
-        <Image source={require('../assets/newBanner2.png')} style={styles.image} />
+        <StableImage source={require('../assets/newBanner2.png')} style={styles.image} />
       </View>
       // <View style={{
       //   backgroundColor: '#1FABEE',
@@ -126,7 +127,7 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
   const thirdBanner = () => {
     return (
       <View style={styles.imageContainer}>
-        <Image source={require('../assets/newBanner3.png')} style={styles.image} />
+        <StableImage source={require('../assets/newBanner3.png')} style={styles.image} />
       </View>
       // <View
       //   style={{

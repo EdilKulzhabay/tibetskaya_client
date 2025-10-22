@@ -43,7 +43,6 @@ const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     }
     return (
         <ScrollView style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="#DC1818" />
             <View style={styles.bannerContainer}>
                 <Image
                     source={require('../assets/loginBanner.png')} 

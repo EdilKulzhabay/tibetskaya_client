@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { useNavigation } from '@react-navigation/native';
+import StableImage from './StableImage';
 
 interface MainPageWalletProps {
   balance: number;
@@ -16,7 +17,7 @@ const MainPageWallet: React.FC<MainPageWalletProps> = ({ balance }) => {
       <View style={styles.balanceContainer}>
         <Text style={styles.balanceText}>{balance} ₸</Text>
         <TouchableOpacity>
-            <Image source={require('../assets/visibilityIcon.png')} style={styles.buttonIcon} />
+            <StableImage source={require('../assets/visibilityIcon.png')} style={styles.buttonIcon} />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>

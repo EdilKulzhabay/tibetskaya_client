@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import StableImage from './StableImage';
 
 const SpecialOffer: React.FC<{ navigation: any }> = ({ navigation }) => {
 
@@ -7,8 +8,8 @@ const SpecialOffer: React.FC<{ navigation: any }> = ({ navigation }) => {
             <Text style={styles.title}>Особое предложение!</Text>
             <View style={styles.content}>
                 <View style={styles.product}>
-                    <View>
-                        <Image source={require('../assets/bottleProduct.png')} style={styles.productImage} />
+                    <View style={styles.productImageContainer}>
+                        <StableImage source={require('../assets/bottleProduct12.png')} style={styles.productImage} />
                     </View>
                     <View>
                         <Text style={styles.productTitle}>Вода 12,5 л</Text>
@@ -48,6 +49,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 16,
+    },
+    productImageContainer: {
+        width: 40,
+        height: 60,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     productImage: {
         width: 40,

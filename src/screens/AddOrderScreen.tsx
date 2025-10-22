@@ -108,7 +108,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                             <View style={styles.productTop}>
                                 <View style={styles.product}>
                                     <View>
-                                        <Image source={require('../assets/bottleProduct.png')} style={styles.productImage} />
+                                        <Image source={require('../assets/bottleProduct12.png')} style={styles.productImage} />
                                     </View>
                                     <View>
                                         <Text style={styles.productTitle}>Вода 12,5 л</Text>

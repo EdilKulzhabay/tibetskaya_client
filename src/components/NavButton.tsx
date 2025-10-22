@@ -1,4 +1,5 @@
 import { Image, StyleSheet, Text, TouchableOpacity, View, ImageSourcePropType } from "react-native";
+import StableImage from './StableImage';
 
 interface NavButtonProps {
     title: string;
@@ -11,12 +12,12 @@ const NavButton: React.FC<NavButtonProps> = ({ title, onPress, additioinalText, 
     return (
         <TouchableOpacity style={styles.container} onPress={onPress}>
             <View style={styles.leftElements}>
-                {icon && <Image source={icon} style={styles.icon} />}
+                {icon && <StableImage source={icon} style={styles.icon} />}
                 <Text style={styles.title}>{title}</Text>
             </View>
             <View style={styles.rightElements}>
                 {additioinalText && <Text style={styles.additioinalText}>{additioinalText}</Text>}
-                <Image source={require('../assets/arrowRight.png')} style={styles.arrowRight} />
+                <StableImage source={require('../assets/arrowRight.png')} style={styles.arrowRight} />
             </View>
         </TouchableOpacity>
     );
