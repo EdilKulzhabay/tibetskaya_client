@@ -11,12 +11,15 @@ import {
 } from 'react-native';
 import { Header, MainPageBanner, Navigation } from '../components';
 import NavButton from '../components/NavButton';
+import { useAuth } from '../hooks';
 
 interface SupportScreenProps {
   navigation?: any;
 }
 
 const SupportScreen: React.FC<SupportScreenProps> = ({ navigation }) => {
+
+  const { user } = useAuth();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   
@@ -35,7 +38,11 @@ const SupportScreen: React.FC<SupportScreenProps> = ({ navigation }) => {
         <NavButton 
           title="Чат поддержка" 
           onPress={() => {
-            navigation.navigate('Chat');
+            if (user) {
+              navigation.navigate('Chat');
+            } else {
+              navigation.navigate('Login');
+            }
           }}
           icon={require('../assets/chat.png')} 
         />

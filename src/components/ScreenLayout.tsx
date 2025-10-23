@@ -13,6 +13,11 @@ const ScreenLayout: React.FC<ScreenLayoutProps> = ({ children, showNavigation = 
   const [showNav, setShowNav] = useState(showNavigation);
 
   useEffect(() => {
+    // Если Navigation не должен показываться вообще, не подписываемся на события клавиатуры
+    if (!showNavigation) {
+      return;
+    }
+
     // Для iOS используем Will события (срабатывают до анимации клавиатуры)
     // Для Android используем Did события (срабатывают после появления клавиатуры)
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -21,7 +26,6 @@ const ScreenLayout: React.FC<ScreenLayoutProps> = ({ children, showNavigation = 
     const keyboardDidShowListener = Keyboard.addListener(
       showEvent,
       (event) => {
-        console.log(`🎹 Клавиатура открылась (${Platform.OS})`);
         setKeyboardVisible(true);
         setShowNav(false);
         // Для Android используем немного более быструю анимацию
@@ -39,8 +43,6 @@ const ScreenLayout: React.FC<ScreenLayoutProps> = ({ children, showNavigation = 
     const keyboardDidHideListener = Keyboard.addListener(
       hideEvent,
       (event) => {
-        console.log(`🎹 Клавиатура закрылась (${Platform.OS})`);
-        
         const animationDuration = Platform.OS === 'ios' ? 250 : 200;
         
         Animated.timing(slideAnim, {
@@ -49,7 +51,10 @@ const ScreenLayout: React.FC<ScreenLayoutProps> = ({ children, showNavigation = 
           useNativeDriver: true,
         }).start(() => {
           setKeyboardVisible(false);
-          setShowNav(true);
+          // Восстанавливаем Navigation только если он должен быть показан
+          if (showNavigation) {
+            setShowNav(true);
+          }
         });
       }
     );
@@ -59,14 +64,15 @@ const ScreenLayout: React.FC<ScreenLayoutProps> = ({ children, showNavigation = 
       keyboardDidShowListener.remove();
       keyboardDidHideListener.remove();
     };
-  }, [slideAnim]);
+  }, [slideAnim, showNavigation]);
 
   return (
     <View style={styles.container}>
       <View style={styles.content}>
         {children}
       </View>
-      {showNav && (
+      {/* Показываем Navigation только если showNavigation=true И showNav=true */}
+      {showNavigation && showNav && (
         <Animated.View
           style={{
             transform: [{ translateY: slideAnim }],

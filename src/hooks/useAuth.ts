@@ -44,19 +44,15 @@ export const useAuth = (): UseAuthReturn => {
       
       if (savedUser) {
         setUser(savedUser);
-        console.log('Пользователь загружен из локального хранилища:', savedUser.mail);
         
         // Сохраняем email для push notifications
         await AsyncStorage.setItem('userMail', savedUser.mail);
-        console.log('✅ Email сохранён в AsyncStorage для push notifications');
         
         // Инициализируем push notifications и отправляем токен на сервер
         try {
-          console.log('⏳ Начинаем инициализацию push notifications');
           await pushNotificationService.initialize();
           // Отправляем токен на сервер (теперь userMail уже в AsyncStorage)
           await pushNotificationService.resendToken();
-          console.log('✅ Push notifications инициализированы и токен отправлен');
         } catch (pushError) {
           console.error('❌ Ошибка при инициализации push notifications:', pushError);
         }
@@ -77,8 +73,6 @@ export const useAuth = (): UseAuthReturn => {
     try {
       setLoadingState('loading');
       setError(null);
-
-      console.log("responseData = ", responseData);
 
       // Извлекаем данные из ответа сервера
       const { clientData, accessToken, refreshToken } = responseData;
@@ -112,15 +106,12 @@ export const useAuth = (): UseAuthReturn => {
 
       setUser(userData);
       setLoadingState('success');
-      console.log('Пользователь и токены сохранены:', userData.mail);
       
       // Инициализируем push notifications и отправляем токен на сервер
       try {
-        console.log('⏳ Начинаем инициализацию push notifications после логина/регистрации');
         await pushNotificationService.initialize();
         // Отправляем токен на сервер (userMail уже сохранен в AsyncStorage выше)
         await pushNotificationService.resendToken();
-        console.log('✅ Push notifications инициализированы и токен отправлен');
       } catch (pushError) {
         console.error('❌ Ошибка при инициализации push notifications после логина/регистрации:', pushError);
       }
@@ -162,7 +153,6 @@ export const useAuth = (): UseAuthReturn => {
 
       setUser(newUser);
       setLoadingState('success');
-      console.log('Успешная регистрация:', registerData.mail);
     } catch (error) {
       console.error('Ошибка при регистрации:', error);
       setError(error instanceof Error ? error.message : 'Ошибка при регистрации');
@@ -191,7 +181,6 @@ export const useAuth = (): UseAuthReturn => {
       setUser(null);
       setError(null);
       setLoadingState('idle');
-      console.log('Успешный выход из системы');
     } catch (error) {
       console.error('Ошибка при выходе:', error);
       setError('Ошибка при выходе из системы');
@@ -218,7 +207,6 @@ export const useAuth = (): UseAuthReturn => {
       // Пока используем данные из локального хранилища
       await loadUserFromStorage();
     } catch (error) {
-      console.error('Ошибка при обновлении пользователя:', error);
       setError('Не удалось обновить данные пользователя');
       setLoadingState('error');
     }
@@ -239,7 +227,6 @@ export const useAuth = (): UseAuthReturn => {
         await userStorage.save(response.clientData);
         setUser(response.clientData);
         setLoadingState('success');
-        console.log('Данные пользователя обновлены с сервера:', response.clientData.mail);
       } else {
         throw new Error(response.message || 'Не удалось получить данные пользователя');
       }
@@ -259,15 +246,12 @@ export const useAuth = (): UseAuthReturn => {
     try {
       setLoadingState('loading');
 
-      console.log("userData in updateUser = ", field, value);
-      
       const res = await apiService.updateData(user.mail, field, value);
       
       // Сохраняем обновленные данные
       await userStorage.save(res.clientData);
       setUser(res.clientData);
       setLoadingState('success');
-      console.log('Данные пользователя обновлены');
     } catch (error) {
       console.error('Ошибка при обновлении пользователя:', error);
       setError('Не удалось обновить данные пользователя');

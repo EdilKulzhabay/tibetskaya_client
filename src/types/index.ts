@@ -27,6 +27,13 @@ export interface User {
   }[];
   dailyWaterIntake?: number; // Потребление воды в мл за день
   isStartedHydration?: boolean;
+  supportMessages?: {
+    _id: string;
+    text: string;
+    isUser: boolean;
+    timestamp: string;
+    isRead: boolean;
+  }[];
   createdAt: string;
 }
 
@@ -58,6 +65,14 @@ export interface RegisterData {
   password: string;
   termsAccepted: boolean;
   privacyAccepted: boolean;
+}
+
+export interface SupportMessage {
+  _id: string;
+  text: string;
+  isUser: boolean;
+  timestamp: string;
+  isRead?: boolean;
 }
 
 export type LoadingState = 'idle' | 'loading' | 'success' | 'error';

@@ -1,6 +1,6 @@
 // import { Order } from '../types/interfaces';
 import api from './axios';
-import { RegisterData } from '../types';
+import { RegisterData, SupportMessage } from '../types';
 
 // Примеры API-сервисов
 export const apiService = {
@@ -104,5 +104,29 @@ export const apiService = {
         } catch (error) {
             throw error;
         }
-    }
+    },
+
+    sendSupportMessage: async (mail: string, message: SupportMessage) => {
+        try {
+            const response = await api.post('/sendSupportMessage', {mail, message});
+            return response.data;
+        } catch (error) {
+            return {
+                success: false,
+                message: "Не удалось отправить сообщение",
+            };
+        }
+    },
+
+    getSupportMessages: async (mail: string) => {
+        try {
+            const response = await api.post('/getSupportMessages', {mail});
+            return response.data;
+        } catch (error) {
+            return {
+                success: false,
+                message: "Не удалось получить сообщения",
+            };
+        }
+    },
 };

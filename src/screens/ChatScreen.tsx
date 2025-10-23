@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -7,125 +7,102 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  Image,
   KeyboardAvoidingView,
   Platform,
+  Alert,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { Back } from '../components';
-
-interface Message {
-  id: string;
-  text: string;
-  isUser: boolean;
-  timestamp: string;
-  isRead?: boolean;
-}
+import { useAuth } from '../hooks';
+import { apiService } from '../api/services';
+import { SupportMessage } from '../types';
 
 const ChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: 'Бутыль сломан, что делать?',
-      isUser: true,
-      timestamp: '09:40',
-      isRead: true,
-    },
-    {
-      id: '2',
-      text: 'Добрый день! Напишите ваш номер заказа',
-      isUser: false,
-      timestamp: '09:40',
-    },
-    {
-      id: '3',
-      text: 'Заказ 122',
-      isUser: true,
-      timestamp: '09:41',
-      isRead: true,
-    },
-    {
-      id: '4',
-      text: 'Минутку, уточняем информацию',
-      isUser: false,
-      timestamp: '09:41',
-    },
-  ]);
-
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<SupportMessage[]>(user?.supportMessages || []);
   const [inputText, setInputText] = useState('');
+  const scrollViewRef = useRef<ScrollView>(null);
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (inputText.trim()) {
-      const newMessage: Message = {
-        id: Date.now().toString(),
+      // Закрываем клавиатуру перед отправкой
+      Keyboard.dismiss();
+      
+      const newMessage = {
+        _id: '',
         text: inputText.trim(),
         isUser: true,
-        timestamp: new Date().toLocaleTimeString('ru-RU', {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
+        timestamp: new Date().toISOString(),
         isRead: false,
-      };
+      } as SupportMessage;
 
-      setMessages([...messages, newMessage]);
+      const res = await apiService.sendSupportMessage(user?.mail || '', newMessage);
+      console.log("res in ChatScreen.tsx = ", res);
+      if (res.success) {
+        setMessages([...messages, res.messages[res.messages.length - 1] as SupportMessage]);
+        // Прокручиваем вниз после добавления нового сообщения
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      } else {
+        Alert.alert('Ошибка', res.message);
+      }
       setInputText('');
     }
   };
 
-  const renderMessage = (message: Message) => {
+  const renderMessage = (message: SupportMessage, index: number) => {
     return (
-      <View
-        key={message.id}
+      <View 
+        key={message._id || index} 
         style={[
           styles.messageContainer,
-          message.isUser ? styles.userMessageContainer : styles.supportMessageContainer,
+          message.isUser ? styles.userMessageContainer : styles.supportMessageContainer
         ]}
       >
-        {/* Аватарка поддержки */}
-        {!message.isUser && (
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarIcon}>🌲</Text>
-            </View>
-            <View style={styles.onlineIndicator} />
-          </View>
-        )}
-
-        <View style={styles.messageContent}>
-          {/* Имя отправителя */}
-          {!message.isUser && (
-            <Text style={styles.senderName}>Поддержка</Text>
-          )}
-
-          {/* Пузырь с сообщением */}
-          <View
-            style={[
-              styles.messageBubble,
-              message.isUser ? styles.userBubble : styles.supportBubble,
-            ]}
-          >
-            <Text
-              style={[
-                styles.messageText,
-                message.isUser ? styles.userMessageText : styles.supportMessageText,
-              ]}
-            >
-              {message.text}
+        {/* Пузырь с сообщением */}
+        <View style={[
+          styles.messageBubble,
+          message.isUser ? styles.userBubble : styles.supportBubble
+        ]}>
+          <Text style={[
+            styles.messageText,
+            message.isUser ? styles.userMessageText : styles.supportMessageText
+          ]}>
+            {message.text}
+          </Text>
+        </View>
+        
+        {/* Информация о сообщении */}
+        <View style={styles.messageInfo}>
+          <Text style={styles.timestamp}>
+            {new Date(message.timestamp).toLocaleTimeString('ru-RU', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            })}
+          </Text>
+          {message.isUser && (
+            <Text style={message.isRead ? styles.readStatusRead : styles.readStatus}>
+              {message.isRead ? ' • Прочитано' : ' • Отправлено'}
             </Text>
-          </View>
-
-          {/* Время и статус */}
-          <View style={styles.messageInfo}>
-            <Text style={styles.timestamp}>{message.timestamp}</Text>
-            {message.isUser && (
-              <Text style={[styles.readStatus, message.isRead && styles.readStatusRead]}>
-                ✓✓
-              </Text>
-            )}
-          </View>
+          )}
         </View>
       </View>
     );
   };
+
+  useEffect(() => {
+    const getMessages = async () => {
+      if (user?.mail) {
+        const res = await apiService.getSupportMessages(user.mail);
+        if (res.success) {
+          setMessages(res.messages as SupportMessage[]);
+        }
+      }
+    };
+    getMessages();
+  }, [user?.mail]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -133,35 +110,47 @@ const ChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       
       <KeyboardAvoidingView 
         style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        {/* Список сообщений */}
-        <ScrollView
-          style={styles.messagesContainer}
-          contentContainerStyle={styles.messagesContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {messages.map(renderMessage)}
-        </ScrollView>
-
-        {/* Поле ввода */}
-        <View style={styles.inputContainer}>
-          <View style={styles.inputWrapper}>
-            <Text style={styles.smileyIcon}>😊</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Напишите что-то..."
-              placeholderTextColor="#999"
-              value={inputText}
-              onChangeText={setInputText}
-              multiline
-            />
-            <TouchableOpacity style={styles.attachButton}>
-              <Text style={styles.attachIcon}>📎</Text>
-            </TouchableOpacity>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.container}>
+            {/* Список сообщений */}
+            <ScrollView
+              ref={scrollViewRef}
+              style={styles.messagesContainer}
+              contentContainerStyle={styles.messagesContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {messages.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>Нет сообщений</Text>
+                  <Text style={styles.emptySubtext}>Начните разговор с поддержкой</Text>
+                </View>
+              ) : (
+                messages.map((message, index) => renderMessage(message, index))
+              )}
+            </ScrollView>
           </View>
+        </TouchableWithoutFeedback>
+
+        {/* Поле ввода - вне TouchableWithoutFeedback чтобы сохранить функциональность */}
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Напишите что-то..."
+            placeholderTextColor="#999"
+            value={inputText}
+            onChangeText={setInputText}
+            multiline
+            maxLength={500}
+          />
           <TouchableOpacity 
-            style={styles.sendButton}
+            style={[
+              styles.sendButton,
+              !inputText.trim() && styles.sendButtonDisabled
+            ]}
             onPress={sendMessage}
             disabled={!inputText.trim()}
           >
@@ -189,14 +178,16 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   messageContainer: {
-    flexDirection: 'row',
-    marginBottom: 20,
+    marginBottom: 16,
+    maxWidth: '80%',
   },
   userMessageContainer: {
-    justifyContent: 'flex-end',
+    alignSelf: 'flex-end',
+    alignItems: 'flex-end',
   },
   supportMessageContainer: {
-    justifyContent: 'flex-start',
+    alignSelf: 'flex-start',
+    alignItems: 'flex-start',
   },
   avatarContainer: {
     position: 'relative',
@@ -229,31 +220,27 @@ const styles = StyleSheet.create({
     flex: 1,
     maxWidth: '75%',
   },
-  senderName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-    marginLeft: 4,
-  },
   messageBubble: {
-    borderRadius: 18,
-    paddingHorizontal: 16,
+    borderRadius: 16,
+    paddingHorizontal: 14,
     paddingVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   userBubble: {
     backgroundColor: '#DC1818',
-    alignSelf: 'flex-end',
+    borderBottomRightRadius: 4,
   },
   supportBubble: {
     backgroundColor: 'white',
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderBottomLeftRadius: 4,
   },
   messageText: {
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 20,
   },
   userMessageText: {
     color: 'white',
@@ -263,55 +250,50 @@ const styles = StyleSheet.create({
   },
   messageInfo: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
     alignItems: 'center',
     marginTop: 4,
     paddingHorizontal: 4,
   },
   timestamp: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#999',
-    marginRight: 4,
   },
   readStatus: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#999',
   },
   readStatusRead: {
-    color: '#DC1818',
+    fontSize: 11,
+    color: '#4CAF50',
+    fontWeight: '500',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#999',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#BBB',
   },
   inputContainer: {
     flexDirection: 'row',
     padding: 16,
     backgroundColor: 'white',
-    alignItems: 'flex-end',
-  },
-  inputWrapper: {
-    flex: 1,
-    flexDirection: 'row',
-    backgroundColor: '#f8f8f8',
-    borderRadius: 25,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginRight: 8,
     alignItems: 'center',
-  },
-  smileyIcon: {
-    fontSize: 20,
-    marginRight: 8,
   },
   textInput: {
     flex: 1,
     fontSize: 16,
     color: '#333',
     maxHeight: 100,
-  },
-  attachButton: {
-    marginLeft: 8,
-  },
-  attachIcon: {
-    fontSize: 18,
-    color: '#999',
   },
   sendButton: {
     width: 44,
@@ -321,10 +303,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  sendButtonDisabled: {
+    backgroundColor: '#CCCCCC',
+    opacity: 0.5,
+  },
   sendIcon: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
+    marginLeft: 4,
   },
 });
 

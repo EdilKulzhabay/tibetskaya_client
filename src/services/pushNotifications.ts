@@ -26,7 +26,6 @@ class PushNotificationService {
       
       // Настройка обработчиков (только один раз)
       if (!this.isInitialized) {
-        console.log('⚙️ Настройка обработчиков уведомлений (первый раз)');
         this.setupNotificationHandlers();
         this.isInitialized = true;
       } else {
@@ -48,7 +47,6 @@ class PushNotificationService {
         lights: true,
         lightColor: '#EE3F58',
       });
-      console.log('✅ Канал уведомлений notifee создан:', channelId);
     } catch (error) {
       console.error('❌ Ошибка создания канала notifee:', error);
     }
@@ -59,7 +57,6 @@ class PushNotificationService {
     try {
       // Для Android 13+ (API 33+) нужно явно запросить разрешение
       if (Platform.OS === 'android' && Platform.Version >= 33) {
-        console.log('📱 Android 13+: Запрашиваем разрешение POST_NOTIFICATIONS');
         
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
@@ -103,7 +100,6 @@ class PushNotificationService {
   async getFCMToken(): Promise<string | null> {
     try {
       const token = await messaging().getToken();
-      console.log('📱 FCM Token:', token);
       this.fcmToken = token;
       
       // Сохраняем токен локально
@@ -112,7 +108,6 @@ class PushNotificationService {
       // Проверяем userMail и отправляем токен на сервер
       const userMail = await AsyncStorage.getItem('userMail');
       if (userMail) {
-        console.log('📤 userMail найден в AsyncStorage, отправляем токен на сервер');
         await this.sendTokenToServer(token);
       } else {
         console.log('⚠️ userMail не найден в AsyncStorage, токен НЕ отправлен на сервер');
@@ -130,18 +125,10 @@ class PushNotificationService {
     try {
       // Получаем email пользователя из AsyncStorage
       const userMail = await AsyncStorage.getItem('userMail');
-      console.log('📧 Проверка userMail в AsyncStorage:', userMail ? userMail : 'не найден');
-      
       if (!userMail) {
         console.log('⚠️ Email пользователя не найден в AsyncStorage, токен не отправлен');
         return;
       }
-
-      console.log('📤 Отправка FCM токена на сервер...');
-      console.log('   URL:', `${API_URL}/saveFcmToken`);
-      console.log('   Email:', userMail);
-      console.log('   Platform:', Platform.OS);
-      console.log('   Token (первые 20 символов):', token.substring(0, 20) + '...');
       
       const response = await axios.post(
         `${API_URL}/saveFcmToken`,
@@ -152,8 +139,6 @@ class PushNotificationService {
         }
       );
       
-      console.log('✅ FCM токен отправлен на сервер успешно');
-      console.log('   Ответ сервера:', response.data);
     } catch (error: any) {
       console.error('❌ Ошибка при отправке токена на сервер:');
       if (error.response) {
@@ -201,7 +186,6 @@ class PushNotificationService {
           ],
         },
       });
-      console.log('✅ Локальное уведомление показано (Android + iOS)');
     } catch (error) {
       console.error('❌ Ошибка показа локального уведомления:', error);
     }
@@ -209,7 +193,6 @@ class PushNotificationService {
 
   // Обработка данных уведомления
   private async handleNotificationData(remoteMessage: any) {
-    console.log('🔔 Обработка данных уведомления:', remoteMessage.data);
     
     if (!remoteMessage.data) {
       return;
@@ -219,12 +202,10 @@ class PushNotificationService {
     
     // Если это новый заказ
     if (newStatus === 'newOrder' && order) {
-      console.log('📦 Получен новый заказ:', order);
       try {
         const orderData = typeof order === 'string' ? JSON.parse(order) : order;
         // Сохраняем информацию о новом заказе
         await AsyncStorage.setItem(`order_${orderData._id || orderData.orderId}`, JSON.stringify(orderData));
-        console.log('✅ Данные нового заказа сохранены');
       } catch (error) {
         console.error('❌ Ошибка парсинга данных заказа:', error);
       }
@@ -232,7 +213,6 @@ class PushNotificationService {
     
     // Если это обновление статуса существующего заказа
     if (newStatus && newStatus !== 'newOrder') {
-      console.log('📝 Обновление статуса заказа:', newStatus);
       try {
         if (order) {
           const orderData = typeof order === 'string' ? JSON.parse(order) : order;
@@ -246,7 +226,6 @@ class PushNotificationService {
               parsedOrder.status = newStatus;
               parsedOrder.updatedAt = new Date().toISOString();
               await AsyncStorage.setItem(`order_${orderId}`, JSON.stringify(parsedOrder));
-              console.log(`✅ Статус заказа ${orderId} обновлен на: ${newStatus}`);
               
               // Уведомляем компоненты приложения об обновлении
               DeviceEventEmitter.emit('orderStatusUpdated', { 
@@ -256,7 +235,6 @@ class PushNotificationService {
               });
             } else {
               // Если заказа нет в локальном хранилище, сохраняем новые данные
-              console.log(`ℹ️ Заказ ${orderId} не найден локально, сохраняем новые данные`);
               orderData.status = newStatus;
               orderData.updatedAt = new Date().toISOString();
               await AsyncStorage.setItem(`order_${orderId}`, JSON.stringify(orderData));
