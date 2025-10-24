@@ -1,8 +1,9 @@
 import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, Image, Modal, ActivityIndicator, Alert, ScrollView } from "react-native";
 import Back from "../components/Back";
 import { useAuth } from "../hooks";
-import { useState, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { apiService } from "../api/services";
+import { useFocusEffect } from "@react-navigation/native";
 
 const payments = [
     { label: 'Наличными', value: 'fakt' },
@@ -28,21 +29,21 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
     const [loading, setLoading] = useState(false);
 
     // Обновляем данные пользователя при загрузке страницы
-    useEffect(() => {
-        const loadUserData = async () => {
-            try {
-                await refreshUserData();
-            } catch (error) {
-                console.error('Ошибка при обновлении данных пользователя:', error);
-            }
-        };
+    useFocusEffect(
+        useCallback(() => {
+            console.log('🔄 AddOrderScreen: обновляем данные пользователя');
+            refreshUserData();
+        }, [refreshUserData])
+    );
 
-        loadUserData();
-    }, []);
-
+    // Обновляем цены когда изменяются данные пользователя
     useEffect(() => {
-        console.log("user = ", user);
-    }, [user]);
+        if (user) {
+            console.log('💰 Обновляем цены:', user.price12, user.price19);
+            setPrice12(user.price12 || 900);
+            setPrice19(user.price19 || 1300);
+        }
+    }, [user, user?.price12, user?.price19]);
 
     const handleOrder = async () => {
         setLoading(true);

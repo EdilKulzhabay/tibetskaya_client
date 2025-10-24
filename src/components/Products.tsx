@@ -6,8 +6,21 @@ const Products: React.FC<{ navigation: any }> = ({ navigation }) => {
     const [count12, setCount12] = useState(0);
     const [count19, setCount19] = useState(0);
 
+    // Логируем изменения счетчиков и условие показа кнопки
+    const shouldShowButton = count12 > 1 || count19 > 1 || (count12 > 0 && count19 > 0);
+    console.log('📊 Счетчики - 12.5л:', count12, '18.9л:', count19, '| Показать кнопку:', shouldShowButton);
+
     const handleOrder = () => {
-        navigation.navigate('AddOrder', { products: { b12: count12, b19: count19 } });
+        console.log('🛒 handleOrder вызван');
+        console.log('📦 count12:', count12, 'count19:', count19);
+        console.log('🧭 navigation:', navigation);
+        
+        try {
+            navigation.navigate('AddOrder', { products: { b12: count12, b19: count19 } });
+            console.log('✅ navigate вызван успешно');
+        } catch (error) {
+            console.error('❌ Ошибка навигации:', error);
+        }
     }
 
     return (
@@ -110,9 +123,16 @@ const Products: React.FC<{ navigation: any }> = ({ navigation }) => {
                 </View>
             </View>
 
-            {(count12 > 1 || count19 > 1 || (count12 > 0 && count19 > 0)) && (
+            {shouldShowButton && (
                 <View style={styles.order}>
-                    <TouchableOpacity style={styles.orderButton} onPress={handleOrder}>
+                    <TouchableOpacity 
+                        style={styles.orderButton} 
+                        onPress={() => {
+                            console.log('🔴 Кнопка "Заказать" нажата!');
+                            handleOrder();
+                        }}
+                        activeOpacity={0.7}
+                    >
                         <Text style={styles.orderButtonText}>Заказать</Text>
                     </TouchableOpacity>
                 </View>
@@ -223,12 +243,16 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'flex-end',
         marginTop: 16,
+        zIndex: 999, // Убедимся что кнопка поверх всего
     },
     orderButton: {
         backgroundColor: '#DC1818',
         borderRadius: 16,
         paddingHorizontal: 16,
         paddingVertical: 8,
+        minHeight: 40, // Увеличим область нажатия
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     orderButtonText: {
         fontSize: 16,
