@@ -133,7 +133,7 @@ export interface AddressData {
 
 export interface RegisterData {
   mail: string;
-  fullName: string;
+  userName: string;
   phone: string;
   password: string;
   termsAccepted: boolean;

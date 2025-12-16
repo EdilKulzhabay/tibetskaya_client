@@ -13,6 +13,7 @@ import {
 interface Item {
     label: string;
     value: string;
+    disabled?: boolean;
 }
 
 interface MultiSelectProps {
@@ -118,13 +119,22 @@ const MultiSelectInput: React.FC<MultiSelectProps> = ({
                     <ScrollView>
                     {items.map((item) => {
                         const isSelected = selectedValues.includes(item.value);
+                        const isDisabled = item.disabled === true;
                         return (
                         <TouchableOpacity
                             key={item.value}
-                            onPress={() => toggleSelection(item.value)}
-                            style={[styles.optionItem, isSelected && styles.selectedItem]}
+                            onPress={() => !isDisabled && toggleSelection(item.value)}
+                            disabled={isDisabled}
+                            style={[
+                                styles.optionItem, 
+                                isSelected && styles.selectedItem,
+                                isDisabled && styles.disabledItem
+                            ]}
                         >
-                            <Text style={styles.optionText}>
+                            <Text style={[
+                                styles.optionText,
+                                isDisabled && styles.disabledText
+                            ]}>
                             {item.label}
                             </Text>
                             {/* {isSelected && (
@@ -220,6 +230,12 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 18,
         color: 'black',
+    },
+    disabledItem: {
+        opacity: 0.5,
+    },
+    disabledText: {
+        color: '#999',
     },
     doneButton: {
         marginTop: 16,

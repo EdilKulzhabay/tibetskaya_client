@@ -12,10 +12,11 @@ import CollapsibleSection from './CollapsibleSection';
 interface AwaitingOrderViewProps {
   order: OrderData;
   onCancelOrder: () => void;
+  onCallCourier: () => void;
   navigation: any;
 }
 
-const AwaitingOrderView: React.FC<AwaitingOrderViewProps> = ({ order, onCancelOrder, navigation }) => {
+const AwaitingOrderView: React.FC<AwaitingOrderViewProps> = ({ order, onCancelOrder, onCallCourier, navigation }) => {
   const [timeRemaining, setTimeRemaining] = useState(25 * 60); // 25 минут в секундах
 
   useEffect(() => {
@@ -99,22 +100,6 @@ const AwaitingOrderView: React.FC<AwaitingOrderViewProps> = ({ order, onCancelOr
               </Text>
             </View>
           )}
-          {/* {order.products.map((product, index) => (
-            <View key={index} style={styles.productRow}>
-              <View style={styles.productInfo}>
-                {product.b12 > 0 && (
-                  <Text style={styles.productText}>Вода 18,9 л</Text>
-                )}
-                {product.b19 > 0 && (
-                  <Text style={styles.productText}>Вода 19 л</Text>
-                )}
-                <Text style={styles.productSubtext}>Негазированная</Text>
-              </View>
-              <Text style={styles.productQuantity}>
-                x{product.b12 > 0 ? product.b12 : product.b19}
-              </Text>
-            </View>
-          ))} */}
         </CollapsibleSection>
 
         {/* Delivery Info Section - Collapsible */}
@@ -152,6 +137,10 @@ const AwaitingOrderView: React.FC<AwaitingOrderViewProps> = ({ order, onCancelOr
               </Text>
             </View>
           )}
+
+          <TouchableOpacity style={styles.callCourierButton} onPress={onCallCourier}>
+            <Text style={styles.callCourierButtonText}>Позвонить курьеру</Text>
+          </TouchableOpacity>
         </CollapsibleSection>
 
         {/* Support Section - Collapsible */}
@@ -160,7 +149,7 @@ const AwaitingOrderView: React.FC<AwaitingOrderViewProps> = ({ order, onCancelOr
           defaultExpanded={false}
           containerStyle={styles.sectionContainer}
         >
-          <TouchableOpacity style={styles.supportButton} onPress={() => navigation.navigate('Support')}>
+          <TouchableOpacity style={styles.supportButton} onPress={() => navigation.navigate('Chat')}>
             <View style={styles.supportIcon}>
               <Text style={styles.supportIconText}>?</Text>
             </View>
@@ -339,6 +328,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
   },
   cancelButtonText: {
+    color: '#DC1818',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  callCourierButton: {
+    borderWidth: 2,
+    borderColor: '#DC1818',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  callCourierButtonText: {
     color: '#DC1818',
     fontSize: 16,
     fontWeight: '600',

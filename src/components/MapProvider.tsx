@@ -4,14 +4,11 @@ import {
   Text,
   StyleSheet,
   Dimensions,
-  TouchableOpacity,
   Platform,
-  Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
-
-const { width, height } = Dimensions.get('window');
 
 interface Location {
   latitude: number;
@@ -47,6 +44,7 @@ const MapProvider: React.FC<MapProviderProps> = ({
   );
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
   
   // Маршрут курьера до точки доставки
   const [routeCoordinates, setRouteCoordinates] = useState<Location[]>([
@@ -200,117 +198,40 @@ const MapProvider: React.FC<MapProviderProps> = ({
           />
         )}
 
-        {/* Маркер курьера */}
-        {currentCourierLocation && (
-          <Marker
-            coordinate={currentCourierLocation}
-            title="Курьер"
-            description="Ваш курьер едет к вам"
-            pinColor="blue"
-          />
-        )}
-
         {/* Линия между курьером и местом доставки */}
         {currentCourierLocation && deliveryLocation && (
           <Polyline
             coordinates={[currentCourierLocation, deliveryLocation]}
-            strokeColor="#DC1818"
+            strokeColor="#000000"
             strokeWidth={3}
             lineDashPattern={[5, 5]}
           />
         )}
+
+        {/* Маркер курьера */}
+        {currentCourierLocation && (
+          Platform.OS === 'ios' ? (
+            <Marker
+              coordinate={currentCourierLocation}
+              title="Курьер"
+              description="Ваш курьер едет к вам"
+              anchor={{ x: 0.5, y: 0.5 }}
+            >
+              <Image source={require('../assets/courierCar.png')} style={{width: 40, height: 40}} />
+            </Marker>
+          ) : (
+            <Marker
+              coordinate={currentCourierLocation}
+              title="Курьер"
+              description="Ваш курьер едет к вам"
+              image={require('../assets/courierCar.png')}
+              anchor={{ x: 0.5, y: 0.5 }}
+            />
+          )
+        )}
       </MapView>
     </View>
   );
-
-  // return (
-  //   <View style={styles.container}>
-  //     <MapView 
-  //       ref={mapRef}
-  //       style={styles.map}
-  //       provider={PROVIDER_GOOGLE}
-  //       initialRegion={{
-  //         latitude: deliveryLocation?.latitude || 43.2220,
-  //         longitude: deliveryLocation?.longitude || 76.8512,
-  //         latitudeDelta: 0.05,
-  //         longitudeDelta: 0.05,
-  //       }}
-  //       showsUserLocation={true}
-  //       showsMyLocationButton={true}
-  //     >
-  //       {/* Маркер курьера */}
-  //       {currentCourierLocation && (
-  //         <Marker
-  //           coordinate={currentCourierLocation}
-  //           title="Курьер"
-  //           description="Ваш курьер едет к вам"
-  //         >
-  //           <View style={styles.courierMarker}>
-  //             <Text style={styles.courierText}>🚗</Text>
-  //           </View>
-  //         </Marker>
-  //       )}
-
-  //       {/* Маркер места доставки */}
-  //       {deliveryLocation && (
-  //         <Marker
-  //           coordinate={deliveryLocation}
-  //           title="Место доставки"
-  //           description="Ваш адрес доставки"
-  //         >
-  //           <View style={styles.deliveryMarker}>
-  //             <Text style={styles.deliveryText}>🏠</Text>
-  //           </View>
-  //         </Marker>
-  //       )}
-
-  //       {/* Маршрут курьера */}
-  //       {showCourierRoute && routeCoordinates.length > 1 && (
-  //         <Polyline
-  //           coordinates={routeCoordinates}
-  //           strokeColor="#007AFF"
-  //           strokeWidth={3}
-  //           lineDashPattern={[10, 5]}
-  //         />
-  //       )}
-
-  //       {/* Прямая линия от курьера к месту доставки */}
-  //       {currentCourierLocation && deliveryLocation && (
-  //         <Polyline
-  //           coordinates={[currentCourierLocation, deliveryLocation]}
-  //           strokeColor="#DC1818"
-  //           strokeWidth={2}
-  //         />
-  //       )}
-  //     </MapView>
-
-  //     {/* Кнопки управления */}
-  //     <View style={styles.controls}>
-  //       <TouchableOpacity style={styles.controlButton} onPress={centerMapOnDelivery}>
-  //         <Text style={styles.controlButtonText}>К адресу</Text>
-  //       </TouchableOpacity>
-  //       <TouchableOpacity style={styles.controlButton} onPress={showFullRoute}>
-  //         <Text style={styles.controlButtonText}>Весь маршрут</Text>
-  //       </TouchableOpacity>
-  //     </View>
-
-  //     {/* Информация о курьере */}
-  //     <View style={styles.courierInfo}>
-  //       <Text style={styles.courierInfoTitle}>Курьер в пути</Text>
-  //       <Text style={styles.courierInfoText}>
-  //         {deliveryLocation && currentCourierLocation ? 
-  //           `Расстояние до адреса: ~${Math.round(
-  //             Math.sqrt(
-  //               Math.pow(deliveryLocation.latitude - currentCourierLocation.latitude, 2) +
-  //               Math.pow(deliveryLocation.longitude - currentCourierLocation.longitude, 2)
-  //             ) * 111000
-  //           )} м` 
-  //           : 'Загружается информация о местоположении...'
-  //         }
-  //       </Text>
-  //     </View>
-  //   </View>
-  // );
 };
 
 const styles = StyleSheet.create({
@@ -340,19 +261,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   courierMarker: {
-    backgroundColor: '#007AFF',
     borderRadius: 20,
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
+    borderColor: '#007AFF',
+  },
+  courierImage: {
+    width: 28,
+    height: 28,
   },
   courierText: {
     fontSize: 18,

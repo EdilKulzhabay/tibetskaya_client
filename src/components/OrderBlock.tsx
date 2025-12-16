@@ -52,7 +52,7 @@ const OrderBlock: React.FC<OrderBlockProps> = ({_id, date, status, products, cou
     };
 
     return (
-        <TouchableOpacity style={styles.container} onPress={handleOrderPress}>
+        <TouchableOpacity style={[styles.container, { borderColor: status === "onTheWay" ? "#DC1818" : "#E3E3E3", borderWidth: status === "onTheWay" ? 2 : 0 }]} onPress={handleOrderPress}>
             <View style={styles.orderHeader}>
                 <Text># <Text style={{fontSize: 18, fontWeight: '600'}}>
                   {typeof date === 'string' ? date : date?.d || 'Не указана'}
@@ -61,7 +61,7 @@ const OrderBlock: React.FC<OrderBlockProps> = ({_id, date, status, products, cou
                     [styles.orderStatus, 
                     status === "awaitingOrder" || status === "onTheWay" ? { color: "#EB7E00" } : 
                     status === "delivered" ? { color: "#00B01A" } : { color: "#DC1818" }]
-                }>{status === "awaitingOrder" ? "Ожидает заказа" : status === "onTheWay" ? "В пути" : status === "delivered" ? "Принято" : "Отменено"}</Text>
+                }>{status === "awaitingOrder" ? "Заказ принят" : status === "onTheWay" ? "В пути" : status === "delivered" ? "Доставлен" : "Отменен"}</Text>
             </View>
             <View style={{height: 1, backgroundColor: '#E3E3E3', marginVertical: 12, width: '100%' }} />
             <View style={styles.orderBody}>

@@ -52,7 +52,7 @@ export interface CourierAggregatorDocument extends CourierAggregator {
 
 export interface ClientDocument {
   _id: string;
-  fullName: string;
+  userName: string;
   phone: string;
   email?: string;
   addresses?: OrderAddress[];
@@ -62,7 +62,7 @@ export interface ClientDocument {
 
 export interface UserDocument {
   _id: string;
-  fullName: string;
+  userName: string;
   mail: string;
   avatar?: string;
   phone?: string;

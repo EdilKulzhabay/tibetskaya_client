@@ -27,11 +27,11 @@ const Products: React.FC<{ navigation: any }> = ({ navigation }) => {
         <View>
             <View style={styles.containerTitle}>
                 <Text style={styles.title}>Товары</Text>
-                <TouchableOpacity>
+                {/* <TouchableOpacity>
                     <Text style={styles.button}>смотреть все</Text>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
             </View>
-            <View style={styles.productContainer}>
+            {/* <View style={styles.productContainer}>
                 <View style={styles.productTop}>
                     <View style={styles.product}>
                         <View style={styles.productImageContainer}>
@@ -75,7 +75,7 @@ const Products: React.FC<{ navigation: any }> = ({ navigation }) => {
                         <Text>{count12 * 900} ₸</Text>
                     </View>
                 </View>
-            </View>
+            </View> */}
 
             <View style={styles.productContainer}>
                 <View style={styles.productTop}>
@@ -122,6 +122,20 @@ const Products: React.FC<{ navigation: any }> = ({ navigation }) => {
                     </View>
                 </View>
             </View>
+
+            {!shouldShowButton && count19 > 0 && (
+                <View style={{
+                    marginTop: 4,
+                }}>
+                    <Text style={{
+                        textAlign: 'right',
+                        fontSize: 14,
+                        fontWeight: '500',
+                        color: '#DC1818',
+                    }}
+                    >Минимальный заказ 2 бутыля.</Text>
+                </View>
+            )}
 
             {shouldShowButton && (
                 <View style={styles.order}>

@@ -42,6 +42,7 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
   const [currentCourierLocation, setCurrentCourierLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isMoving, setIsMoving] = useState(false);
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+  const [refreshTimer, setRefreshTimer] = useState<number>(0);
 
   const deliveryLocation = order.deliveryCoordinates || 
     (order.address?.point ? { latitude: order.address.point.lat, longitude: order.address.point.lon } : null) ||
@@ -76,6 +77,11 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
       return;
     }
 
+    // Если таймер активен, не выполняем запрос
+    if (refreshTimer > 0) {
+      return;
+    }
+
     try {
       const courierId = order.courierAggregator._id;
       console.log('Запрашиваем местоположение курьера:', courierId);
@@ -96,6 +102,35 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
       console.error('Ошибка при получении местоположения курьера:', error);
     }
   };
+
+  // Обработчик нажатия на кнопку обновления местоположения
+  const handleRefreshLocation = () => {
+    if (refreshTimer > 0) {
+      return; // Игнорируем нажатие, если таймер активен
+    }
+    
+    // Запускаем таймер на 20 секунд
+    setRefreshTimer(20);
+    
+    // Выполняем обновление местоположения
+    fetchCourierLocation(true);
+  };
+
+  // Эффект для обратного отсчета таймера
+  useEffect(() => {
+    if (refreshTimer > 0) {
+      const interval = setInterval(() => {
+        setRefreshTimer((prev) => {
+          if (prev <= 1) {
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [refreshTimer]);
 
   // Обновление информации о курьере при изменении его местоположения
   const handleCourierLocationUpdate = useCallback((newLocation: { latitude: number; longitude: number }) => {
@@ -124,7 +159,6 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
-
 
   // Запуск отслеживания курьера
   useEffect(() => {
@@ -185,32 +219,27 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
     }
   }, [currentCourierLocation]);
 
+  useEffect(() => {
+    console.log('Заказ обновлен в статусе onTheWay');
+    console.log('Заказ:', order ? JSON.stringify(order, null, 2) : 'Не указан');
+    console.log('Курьер:', order.courierAggregator ? JSON.stringify(order.courierAggregator, null, 2) : 'Не указан');
+  }, [order]);
+
   return (
     <View style={styles.container}>
       {/* Информация о заказе */}
       <View style={styles.orderInfo}>
         <Text style={styles.orderTitle}>
-          Заказ #{order._id} {order.status === 'onTheWay' ? 'в пути' : order.status === 'preparing' ? 'готовится' : 'ожидает'}
+          Заказ {order.status === 'onTheWay' ? 'в пути' : order.status === 'awaitingOrder' ? 'ожидает курьера' : ""}
         </Text>
         <View style={styles.deliveryInfo}>
           <Text style={styles.deliveryText}>
             <Text style={styles.label}>Курьер: </Text>
-            {!order.courierAggregator 
-              ? 'Ожидается назначение курьера'
-              : typeof order.courierAggregator === 'string' 
-                ? 'ID: ' + order.courierAggregator 
-                : (order.courierAggregator?.fullName || 'Неизвестно')
+            {!order.courierAggregator && 'Ожидается назначение курьера'}
+            {order.courierAggregator && typeof order.courierAggregator === 'object' && 'fullName' in order.courierAggregator && order.courierAggregator.fullName && (
+             order.courierAggregator?.fullName || 'Неизвестно')
             }
-            {order.courierAggregator && typeof order.courierAggregator === 'object' && 'raiting' in order.courierAggregator && order.courierAggregator.raiting && (
-              <Text style={styles.rating}> ⭐ {order.courierAggregator.raiting}</Text>
-            )}
           </Text>
-          {/* {order.courierAggregator && typeof order.courierAggregator === 'object' && 'phone' in order.courierAggregator && order.courierAggregator.phone && (
-            <Text style={styles.deliveryText}>
-              <Text style={styles.label}>Телефон: </Text>
-              {order.courierAggregator.phone}
-            </Text>
-          )} */}
           {order.courierAggregator && typeof order.courierAggregator === 'object' && 'carNumber' in order.courierAggregator && order.courierAggregator.carNumber && (
             <Text style={styles.deliveryText}>
               <Text style={styles.label}>Автомобиль: </Text>
@@ -219,11 +248,11 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
           )}
           <Text style={styles.deliveryText}>
             <Text style={styles.label}>Адрес: </Text>
-            {order.fullAddress || order.address?.actual || order.address?.name || 'Не указан'}
+            {order.address?.actual || 'Не указан'}
           </Text>
           <Text style={styles.deliveryText}>
             <Text style={styles.label}>Время доставки: </Text>
-            {order.date?.d || order.deliveryTime || 'Не указано'}
+            {order?.date?.d || 'Не указано'}
           </Text>
           {(order.comment || order.customerNotes) && (
             <Text style={styles.deliveryText}>
@@ -263,58 +292,17 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
           
           {order.courierAggregator && (
             <TouchableOpacity 
-              style={[styles.button, styles.refreshButton]} 
-              onPress={() => fetchCourierLocation(true)}
+              style={[styles.button, styles.refreshButton, refreshTimer > 0 && styles.buttonDisabled]} 
+              onPress={handleRefreshLocation}
+              disabled={refreshTimer > 0}
             >
-              <Text style={styles.buttonText}>🔄 Обновить местоположение</Text>
+              <Text style={[styles.buttonText, refreshTimer > 0 && styles.buttonTextDisabled]}>
+                {refreshTimer > 0 ? `⏳ Обновление через ${refreshTimer} сек` : '🔄 Обновить местоположение'}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
       )}
-
-      {/* Информация о товарах */}
-      {/* <View style={styles.productsInfo}>
-        <Text style={styles.productsTitle}>Состав заказа:</Text>
-        {order.products.map((product, index) => (
-          <View key={index} style={styles.productItem}>
-            {product.b12 > 0 && (
-              <View style={styles.productRow}>
-                <Text style={styles.productText}>• {product.b12}x Вода 12,5 л</Text>
-                {product.price && <Text style={styles.productPrice}>{product.price} ₸</Text>}
-              </View>
-            )}
-            {product.b19 > 0 && (
-              <View style={styles.productRow}>
-                <Text style={styles.productText}>• {product.b19}x Вода 18,9 л</Text>
-                {product.price && <Text style={styles.productPrice}>{product.price} ₸</Text>}
-              </View>
-            )}
-            {product.name && !product.b12 && !product.b19 && (
-              <View style={styles.productRow}>
-                <Text style={styles.productText}>• {product.name}</Text>
-                {product.price && <Text style={styles.productPrice}>{product.price} ₸</Text>}
-              </View>
-            )}
-          </View>
-        ))}
-        <View style={styles.orderSummary}>
-          {order.subtotal && (
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Подитог:</Text>
-              <Text style={styles.summaryValue}>{order.subtotal} ₸</Text>
-            </View>
-          )}
-          {order.deliveryFee && order.deliveryFee > 0 && (
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Доставка:</Text>
-              <Text style={styles.summaryValue}>{order.deliveryFee} ₸</Text>
-            </View>
-          )}
-          <View style={styles.summaryRow}>
-            <Text style={styles.totalAmount}>Итого: {order.totalAmount} ₸</Text>
-          </View>
-        </View>
-      </View> */}
     </View>
   );
 };

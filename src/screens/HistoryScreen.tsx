@@ -324,31 +324,61 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
 
   // Подписка на обновления статусов заказов
   useEffect(() => {
+    let isMounted = true;
+    
     const subscription = DeviceEventEmitter.addListener(
       'orderStatusUpdated',
-      ({ orderId, newStatus, orderData }) => {
-        console.log('🔄 HistoryScreen: Получено обновление заказа:', orderId, newStatus);
+      async ({ orderId, newStatus }) => {
+        // Проверяем, что компонент все еще смонтирован
+        if (!isMounted) {
+          return;
+        }
         
+        // Проверяем наличие обязательных данных
+        if (!orderId || !newStatus) {
+          console.warn('⚠️ HomeScreen: Неполные данные обновления заказа:', { orderId, newStatus });
+          return;
+        }
+
+        const fetchOrder = async () => {
+          const orderData = await apiService.getOrder(orderId);
+          return orderData.order;
+        }
+        const orderData = await fetchOrder();
+        if (!orderData) {
+          console.warn('⚠️ HomeScreen: Не удалось получить данные заказа:', orderId);
+          return;
+        }
+
         // Обновляем состояние заказов
         setOrders(prevOrders => {
-          const orderExists = prevOrders.some(order => order._id === orderId);
+          
+          // Защита от null/undefined
+          if (!prevOrders || !Array.isArray(prevOrders)) {
+            console.warn('⚠️ HomeScreen: prevOrders не является массивом');
+            return orderData ? [orderData] : [];
+          }
+          
+          const orderExists = prevOrders.some(order => order && order._id === orderId);
           
           if (orderExists) {
             // Обновляем существующий заказ
-            return prevOrders.map(order =>
-              order._id === orderId
-                ? { ...order, status: newStatus, updatedAt: orderData.updatedAt }
-                : order
-            );
+            return prevOrders.map(order => {
+              if (!order) return order;
+              return order._id === orderId
+                ? { ...order, courierAggregator: orderData?.courierAggregator, status: newStatus, updatedAt: orderData?.updatedAt || new Date().toISOString() }
+                : order;
+            });
           } else {
             // Добавляем новый заказ в начало списка
-            return [orderData, ...prevOrders];
+            return orderData ? [orderData, ...prevOrders] : prevOrders;
           }
         });
       }
     );
 
     return () => {
+      isMounted = false;
       subscription.remove();
     };
   }, []);
@@ -356,8 +386,9 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <Header 
-          bonus="50" 
+          bonus={0}
           showBackButton={false}
+          showBonus={false}
         />
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {orders.length === 0 && (

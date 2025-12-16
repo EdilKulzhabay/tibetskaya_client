@@ -16,22 +16,22 @@ const WhatIsMyBalanceScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                 
                 <View style={styles.container}>
                     <Text style={styles.title}>Мой баланс</Text>
-                    <Text style={styles.subtitle}> — это ваш личный счёт в приложении «Тибетская вода».</Text>
+                    <Text style={styles.subtitle}> — это ваш личный счёт в приложении «Тибетская».</Text>
                     <View style={{height: 1, backgroundColor: '#E3E3E3', marginVertical: 6, width: '100%' }} />
 
                     <Text style={[styles.title, { marginTop: 20 }]}>Как это работает?</Text>
                     <Text style={[styles.subtitle, { marginTop: 8 }]}>
                         Пополните баланс заранее — и сможете оформить заказ в один клик.{'\n'}
                         Средства списываются автоматически при оформлении заказа.{'\n'}
-                        Остаток сохраняется и доступен для следующих покупок.
+                        Остаток сохраняется и доступен для последующих покупок.
                     </Text>
                     <View style={{height: 1, backgroundColor: '#E3E3E3', marginVertical: 6, width: '100%' }} />
 
-                    <Text style={[styles.title, { marginTop: 20 }]}>Почему это удобно</Text>
+                    <Text style={[styles.title, { marginTop: 20 }]}>Почему это удобно?</Text>
                     <Text style={[styles.subtitle, { marginTop: 8 }]}>
-                        Быстрая оплата без ожидания сдачи или перевода{'\n'}
-                        Все операции прозрачны и доступны в истории заказов{'\n'}
-                        Средства на балансе не сгорают и всегда под рукой
+                        Быстрая оплата без ожидания сдачи или перевода.{'\n'}
+                        Все операции прозрачны и доступны в истории заказов.{'\n'}
+                        Средства на балансе не сгорают и всегда под рукой.
                     </Text>
                     <View style={{height: 1, backgroundColor: '#E3E3E3', marginVertical: 6, width: '100%' }} />
 

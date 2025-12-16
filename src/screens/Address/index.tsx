@@ -7,7 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 // const addresses = [];
 
 const AddressScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-    const { user, refreshUser, loadingState } = useAuth();
+    const { user, refreshUserData, loadingState } = useAuth();
     const [isRefreshing, setIsRefreshing] = useState(false);
 
     useEffect(() => {
@@ -19,10 +19,10 @@ const AddressScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         useCallback(() => {
             console.log('Address screen focused - refreshing user data');
             setIsRefreshing(true);
-            refreshUser().finally(() => {
+            refreshUserData().finally(() => {
                 setIsRefreshing(false);
             });
-        }, [refreshUser])
+        }, [refreshUserData])
     );
 
     const [selectedAddress, setSelectedAddress] = useState<any>(null);

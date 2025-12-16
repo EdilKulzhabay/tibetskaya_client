@@ -17,6 +17,7 @@ import { NavButton, Navigation } from '../components';
 import ButtonWithSwitch from '../components/ButtonWithSwitch';
 import { useAuth } from '../hooks';
 import { profileImageStorage } from '../utils/storage';
+import pushNotificationService from '../services/pushNotifications';
 
 interface ProfileScreenProps {
   navigation: any;
@@ -43,6 +44,60 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     };
     loadProfileImage();
   }, []);
+
+  // Загружаем состояние уведомлений при монтировании компонента
+  useEffect(() => {
+    const loadNotificationStatus = async () => {
+      try {
+        const enabled = await pushNotificationService.isNotificationsEnabled();
+        setNotificationSwitchValue(enabled);
+      } catch (error) {
+        console.error('Ошибка при загрузке статуса уведомлений:', error);
+      }
+    };
+    loadNotificationStatus();
+  }, []);
+
+  // Обработчик переключения уведомлений
+  const handleNotificationToggle = async () => {
+    const newValue = !notificationSwitchValue;
+    
+    try {
+      // Оптимистично обновляем UI
+      setNotificationSwitchValue(newValue);
+      
+      if (newValue) {
+        // Включаем уведомления
+        const success = await pushNotificationService.enableNotifications();
+        if (!success) {
+          Alert.alert(
+            'Ошибка',
+            'Не удалось включить уведомления. Проверьте разрешения в настройках приложения.',
+            [{ text: 'OK' }]
+          );
+          setNotificationSwitchValue(false);
+        }
+      } else {
+        // Отключаем уведомления
+        const success = await pushNotificationService.disableNotifications();
+        if (!success) {
+          Alert.alert('Ошибка', 'Не удалось отключить уведомления', [{ text: 'OK' }]);
+          setNotificationSwitchValue(true);
+        } else {
+          Alert.alert(
+            'Уведомления отключены',
+            'Вы больше не будете получать push-уведомления',
+            [{ text: 'OK' }]
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Ошибка при переключении уведомлений:', error);
+      Alert.alert('Ошибка', 'Не удалось изменить настройки уведомлений', [{ text: 'OK' }]);
+      // Возвращаем предыдущее значение
+      setNotificationSwitchValue(!newValue);
+    }
+  };
 
   // Проверяем авторизацию пользователя после загрузки
   useEffect(() => {
@@ -100,8 +155,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       <View style={styles.header}>
         <View style={{width: 24}} />
         <Text style={styles.profileTitle}>Профиль</Text>
-        <TouchableOpacity style={styles.logInOutButton} onPress={() => {
-          logout()
+        <TouchableOpacity style={styles.logInOutButton} onPress={async () => {
+          await logout()
           navigation.navigate('Home');
         }}>
           <Image source={require('../assets/logInOut.png')} style={styles.logInOutIcon} />
@@ -121,7 +176,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           <TouchableOpacity style={styles.profileImageButton} onPress={handleSelectPhoto}>
             <Text style={styles.profileImageButtonText}>Изменить{'\n'}фото</Text>
           </TouchableOpacity>
-          <Text style={styles.profileName}>{user?.fullName}</Text>
+          <Text style={styles.profileName}>{user?.userName}</Text>
         </View>
 
         <NavButton title="Изменить данные" onPress={() => navigation.navigate('ChangeData')} icon={require('../assets/edit.png')} />
@@ -142,7 +197,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
         <NavButton title="Язык" onPress={() => setLanguageModalVisible(true)} icon={require('../assets/language.png')}  additioinalText={language}/>
 
-        <ButtonWithSwitch title="Уведомления" icon={require('../assets/notification.png')} switchValue={notificationSwitchValue} onSwitchChange={() => setNotificationSwitchValue(!notificationSwitchValue)} />
+        <ButtonWithSwitch title="Уведомления" icon={require('../assets/notification.png')} switchValue={notificationSwitchValue} onSwitchChange={() => { handleNotificationToggle(); }} />
 
         <NavButton title="Удалить аккаунт" onPress={() => navigation.navigate('DeleteAccount')} icon={require('../assets/trash.png')} />
 

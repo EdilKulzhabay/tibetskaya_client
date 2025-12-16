@@ -52,8 +52,10 @@ const OtpScreen: React.FC<OtpScreenProps> = ({ navigation, route }) => {
                 Keyboard.dismiss(); // Скрываем клавиатуру
                 
                 const res = await apiService.codeConfirm(form.mail, fullCode);
+                console.log("res in otp = ", res);
                 if (res.success) {
                     const registerRes = await apiService.clientRegister(form);
+                    console.log("registerRes in otp = ", registerRes);
                     // Сохраняем данные пользователя и токены если они есть в ответе
                     if (registerRes.clientData && registerRes.accessToken) {
                         await saveUserData(registerRes);

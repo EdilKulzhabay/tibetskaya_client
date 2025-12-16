@@ -26,8 +26,9 @@ const SupportScreen: React.FC<SupportScreenProps> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <Header 
-        bonus="50" 
+        bonus={user?.balance || 0} 
         showBackButton={false}
+        showBonus={false}
       />
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
 

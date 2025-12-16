@@ -59,7 +59,7 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
-	<key>FirebaseAppDelegateProxyEnabled</key>
-	<false/>
+	<key>NSPushNotificationsUsageDescription</key>
+	<string>Мы используем уведомления для уведомления о новых заказах</string>
 </dict>
 </plist>

@@ -61,9 +61,9 @@ export const apiService = {
         }
     },
 
-    addOrder: async (mail: string, address: any, products: any, clientNotes: any, date: any, opForm: string) => {
+    addOrder: async (mail: string, address: any, products: any, clientNotes: any, date: any, opForm: string, needCall: boolean, comment: string) => {
         try {
-            const response = await api.post('/addOrderClientMobile', {mail, address, products, clientNotes, date, opForm});
+            const response = await api.post('/addOrderClientMobile', {mail, address, products, clientNotes, date, opForm, needCall, comment});
             return response.data;
         } catch (error) {
             throw error;
@@ -126,6 +126,45 @@ export const apiService = {
             return {
                 success: false,
                 message: "Не удалось получить сообщения",
+            };
+        }
+    },
+
+    getOrder: async (orderId: string) => {
+        try {
+            const response = await api.post('/getOrderDataMobile', {orderId});
+            return response.data;
+        } catch (error) {
+            throw error;
+        }
+    },
+    cancelOrder: async (orderId: string, reason: string) => {
+        try {
+            const response = await api.post('/cancelOrderMobile', {orderId, reason});
+            return response.data;
+        } catch (error) {
+            throw error;
+        }
+    },
+    updateOrderData: async (orderId: string, field: string, value: any) => {
+        try {
+            const response = await api.post('/updateOrderDataMobile', {orderId, field, value});
+            return response.data;
+        } catch (error) {
+            return {
+                success: false,
+                message: "Не удалось обновить данные заказа",
+            };
+        }
+    },
+    getFaq: async () => {
+        try {
+            const response = await api.get('/getFaq');
+            return response.data;
+        } catch (error) {
+            return {
+                success: false,
+                message: "Не удалось получить FAQ",
             };
         }
     },

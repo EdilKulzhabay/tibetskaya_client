@@ -1,14 +1,18 @@
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, Image, Modal, ActivityIndicator, Alert, ScrollView } from "react-native";
+import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, Image, Modal, ActivityIndicator, Alert, ScrollView, TextInput } from "react-native";
 import Back from "../components/Back";
 import { useAuth } from "../hooks";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { apiService } from "../api/services";
 import { useFocusEffect } from "@react-navigation/native";
 
 const payments = [
     { label: 'Наличными', value: 'fakt' },
     { label: 'Картой', value: 'card' },
-    { label: 'С баланса', value: 'balance' },
+];
+
+const calls = [
+    { label: 'Позвонить заранее', value: true },
+    { label: 'Не звонить', value: false },
 ];
 
 const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation, route }) => {
@@ -22,11 +26,73 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
 
     const [addressModalVisible, setAddressModalVisible] = useState(false);
     const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+    const [callModalVisible, setCallModalVisible] = useState(false);
+    const [dateModalVisible, setDateModalVisible] = useState(false);
 
     const [selectedAddress, setSelectedAddress] = useState<any>(null);
     const [selectedPayment, setSelectedPayment] = useState<any>(null);
-
+    const [selectedCall, setSelectedCall] = useState<any>(calls[0]);
+    const [selectedDate, setSelectedDate] = useState<any>(null);
+    const [availableDates, setAvailableDates] = useState<any[]>([]);
+    const [comment, setComment] = useState('');
     const [loading, setLoading] = useState(false);
+    const [scrollPaddingBottom, setScrollPaddingBottom] = useState(0);
+    const [commentInputY, setCommentInputY] = useState(0);
+    
+    const scrollViewRef = useRef<ScrollView>(null);
+    const commentInputRef = useRef<TextInput>(null);
+
+    useEffect(() => {
+        console.log('🔄 AddOrderScreen: selectedDate', selectedDate);
+    }, [selectedDate]);
+
+    // Функция для генерации доступных дат (исключая воскресенья)
+    const generateAvailableDates = useCallback(() => {
+        const dates = [];
+        const now = new Date();
+        const currentHour = now.getHours();
+        
+        // Определяем, можно ли выбрать "Сегодня"
+        const canSelectToday = currentHour < 19;
+        
+        // Начинаем с сегодня или с завтра
+        let startDate = new Date();
+        if (!canSelectToday) {
+            startDate.setDate(startDate.getDate() + 1);
+        }
+        
+        // Генерируем даты на следующие 14 дней, исключая воскресенья
+        for (let i = 0; i < 30; i++) {
+            const date = new Date(startDate);
+            date.setDate(startDate.getDate() + i);
+            
+            // Пропускаем воскресенье (0)
+            if (date.getDay() !== 0) {
+                const dateStr = date.toISOString().split('T')[0];
+                const isToday = date.toDateString() === new Date().toDateString();
+                const dayName = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'][date.getDay()];
+                
+                dates.push({
+                    value: dateStr,
+                    label: isToday ? 'Сегодня' : `${dayName}, ${date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}`,
+                    date: date
+                });
+            }
+        }
+        console.log('🔄 AddOrderScreen: dates', dates);
+        return dates;
+    }, []);
+
+    // Инициализация доступных дат и начального значения
+    useEffect(() => {
+        const dates = generateAvailableDates();
+        setAvailableDates(dates);
+        
+        // Устанавливаем первую доступную дату по умолчанию
+        if (dates.length > 0 && !selectedDate) {
+            setSelectedDate(dates[0]);
+        }
+    }, [generateAvailableDates]);
 
     // Обновляем данные пользователя при загрузке страницы
     useFocusEffect(
@@ -58,14 +124,34 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
             return;
         }
 
-        const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth() + 1).padStart(2, '0');
-        const dd = String(today.getDate()).padStart(2, '0');
-        const todayStr = `${yyyy}-${mm}-${dd}`; 
+        if (count12 + count19 < 2) {
+            Alert.alert('Ошибка', 'Пожалуйста, выберите хотя бы 2 бутыля воды');
+            setLoading(false);
+            return;
+        }
+
+        if (!selectedCall) {
+            Alert.alert('Ошибка', 'Пожалуйста, выберите нужен ли звонок от курьера');
+            setLoading(false);
+            return;
+        }
+
+        if (!selectedDate) {
+            Alert.alert('Ошибка', 'Пожалуйста, выберите дату доставки');
+            setLoading(false);
+            return;
+        }
+
+        let actualAddress = selectedAddress.street;
+        if (selectedAddress.floor) {
+            actualAddress += `, этаж ${selectedAddress.floor}`;
+        }
+        if (selectedAddress.apartment) {
+            actualAddress += `, квартира ${selectedAddress.apartment}`;
+        }
 
         const orderAddress = {
-            actual: selectedAddress.street,
+            actual: actualAddress,
             name: selectedAddress.name,
             phone: user?.phone,
             point: {
@@ -81,8 +167,10 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                 orderAddress, 
                 { b12: count12, b19: count19 }, 
                 [], 
-                {d: todayStr, time: ""}, 
-                selectedPayment?.value
+                {d: selectedDate?.value, time: ""}, 
+                selectedPayment?.value,
+                selectedCall?.value,
+                comment,
             );
 
 
@@ -99,12 +187,28 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
         setLoading(false);
     }
 
+    useEffect(() => {
+        if (selectedPayment && selectedPayment.value === 'card') {
+            const totalAmount = count12 * price12 + count19 * price19;
+            if (user && user.balance !== undefined && user.balance !== null && user.balance < totalAmount) {
+                setSelectedPayment(null);
+                Alert.alert('Недостаточно средств', 'У вас недостаточно на балансе для оплаты заказа');
+                navigation.navigate('Wallet');
+                return;
+            }
+        }
+    }, [selectedPayment, count12, count19, price12, price19, user?.balance]);
+
     return (
         <SafeAreaView style={styles.safeArea}>
             <Back navigation={navigation} title="Оформление заказа" />
-            <ScrollView style={styles.container}>
+            <ScrollView 
+                ref={scrollViewRef}
+                style={styles.container}
+                contentContainerStyle={{ paddingBottom: scrollPaddingBottom }}
+            >
                 <View>
-                    {products.b12 > 0 && (
+                    {products.b12 >= 0 && (
                         <View style={styles.productContainer}>
                             <View style={styles.productTop}>
                                 <View style={styles.product}>
@@ -151,7 +255,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                             </View>
                         </View>
                     )}
-                    {products.b19 > 0 && (
+                    {products.b19 >= 0 && (
                         <View style={styles.productContainer}>
                             <View style={styles.productTop}>
                                 <View style={styles.product}>
@@ -160,7 +264,6 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                     </View>
                                     <View>
                                         <Text style={styles.productTitle}>Вода 18,9 л</Text>
-                                        <Text style={styles.productSubtitle}>Негазированная</Text>
                                     </View>
                                 </View>
                                 <View style={styles.productBottoms}>
@@ -207,7 +310,22 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                         </View>
                     )}
 
-                    <TouchableOpacity style={[styles.additionalInfo, {marginTop: 32}]} onPress={() => setAddressModalVisible(true)}>
+                    <TouchableOpacity style={[styles.additionalInfo, {marginTop: 32}]} onPress={() => setDateModalVisible(true)}>
+                        <View>
+                            <Text style={{
+                                fontWeight: '500',
+                                color: '#99A3B3',
+                                fontSize: selectedDate ? 14 : 16,
+                                transform: selectedDate ? [{translateY: -8}] : [],
+                            }}>
+                                Дата доставки
+                            </Text>
+                            {selectedDate && <Text style={{fontSize: 18, fontWeight: '500'}}> {selectedDate?.label}</Text>}
+                        </View>
+                        <Image source={require('../assets/arrowDown.png')} style={{width: 24, height: 24}} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.additionalInfo, {marginTop: 24}]} onPress={() => setAddressModalVisible(true)}>
                         <View>
                             <Text style={{
                                 fontWeight: '500',
@@ -234,6 +352,63 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                         </View>
                         <Image source={require('../assets/arrowDown.png')} style={{width: 24, height: 24}} />
                     </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.additionalInfo, {marginTop: 24}]} onPress={() => setCallModalVisible(true)}>
+                        <View>
+                            <Text style={{
+                                fontWeight: '500',
+                                color: '#99A3B3',
+                                fontSize: selectedCall ? 14 : 16,
+                                transform: selectedCall ? [{translateY: -8}] : [],
+                            }}>Звонок курьера перед доставкой</Text>
+                            {selectedCall && <Text style={{fontSize: 18, fontWeight: '500'}}> {selectedCall?.label}</Text>}
+                        </View>
+                        <Image source={require('../assets/arrowDown.png')} style={{width: 24, height: 24}} />
+                    </TouchableOpacity>
+
+                <View 
+                    style={[styles.additionalInfo, {marginTop: 24}]}
+                    onLayout={(event) => {
+                        const { y } = event.nativeEvent.layout;
+                        setCommentInputY(y);
+                    }}
+                >
+                    <TextInput
+                        ref={commentInputRef}
+                        style={{
+                            fontSize: 16,
+                            color: '#101010',
+                            minHeight: 64,
+                            textAlignVertical: 'top',
+                            width: '100%',
+                            borderWidth: 1,
+                            borderColor: '#E3E3E3',
+                            borderRadius: 12,
+                            padding: 12,
+                            backgroundColor: '#F8F8F8',
+                        }}
+                        value={comment}
+                        onChangeText={setComment}
+                        placeholder="Комментарий для курьера..."
+                        multiline={true}
+                        numberOfLines={4}
+                        maxLength={400}
+                        onFocus={() => {
+                            setScrollPaddingBottom(300);
+                            setTimeout(() => {
+                                if (scrollViewRef.current && commentInputY > 0) {
+                                    scrollViewRef.current.scrollTo({
+                                        y: commentInputY - 100,
+                                        animated: true,
+                                    });
+                                }
+                            }, 100);
+                        }}
+                        onBlur={() => {
+                            setScrollPaddingBottom(0);
+                        }}
+                    />
+                </View>
 
                 </View>
 
@@ -308,6 +483,56 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                 </View>
                             </TouchableOpacity>
                         ))}
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
+
+            <Modal
+                visible={callModalVisible}
+                onRequestClose={() => setCallModalVisible(false)}
+                transparent={true}
+                animationType="fade"
+            >
+                <TouchableOpacity style={styles.modalOverlay} onPress={() => setCallModalVisible(false)}>
+                    <TouchableOpacity style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
+                        <Text style={{fontSize: 24, fontWeight: '600', color: '#101010', marginBottom: 16, textAlign: 'center'}}>Нужен ли звонок от курьера?</Text>
+                        {calls.map((call, index) => (
+                            <TouchableOpacity key={call.label || index} style={styles.modalAddress} onPress={() => {
+                                setSelectedCall(call)
+                                setCallModalVisible(false)
+                            }}>
+                                <Text style={styles.modalAddressText}>{call.label}</Text>
+                                <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: selectedCall?.value === call?.value ? '#DC1818' : '#101010' }}>
+                                    {selectedCall?.value === call?.value && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
+                                </View>
+                            </TouchableOpacity>
+                        ))}
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
+
+            <Modal
+                visible={dateModalVisible}
+                onRequestClose={() => setDateModalVisible(false)}
+                transparent={true}
+                animationType="fade"
+            >
+                <TouchableOpacity style={styles.modalOverlay} onPress={() => setDateModalVisible(false)}>
+                    <TouchableOpacity style={[styles.modalContainer, {maxHeight: '70%'}]} onPress={(e) => e.stopPropagation()}>
+                        <Text style={{fontSize: 24, fontWeight: '600', color: '#101010', marginBottom: 16, textAlign: 'center'}}>Выберите дату доставки</Text>
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            {availableDates.map((date, index) => (
+                                <TouchableOpacity key={date.value || index} style={styles.modalAddress} onPress={() => {
+                                    setSelectedDate(date);
+                                    setDateModalVisible(false);
+                                }}>
+                                    <Text style={styles.modalAddressText}>{date.label}</Text>
+                                    <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: selectedDate?.value === date?.value ? '#DC1818' : '#101010' }}>
+                                        {selectedDate?.value === date?.value && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
                     </TouchableOpacity>
                 </TouchableOpacity>
             </Modal>

@@ -34,7 +34,7 @@ const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             // Передаем весь ответ сервера (включая токены)
             setLoading(false);
             await saveUserData(res);
-            Alert.alert("Успешно", `Добро пожаловать, ${res.clientData.fullName}!`);
+            Alert.alert("Успешно", `Добро пожаловать, ${res.clientData.userName}!`);
             navigation.navigate("Home");
         } else {
             setLoading(false);

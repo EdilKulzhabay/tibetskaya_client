@@ -18,7 +18,7 @@ const criticalImages = [
   require('../assets/supportActiveIcon.png'),
   require('../assets/bonusIcon.png'),
   require('../assets/arrowBack.png'),
-  require('../assets/bannerBottle.png'),
+  // require('../assets/bannerBottle.png'),
   require('../assets/bannerBottle2.png'),
   require('../assets/marketplace1.png'),
   require('../assets/marketplace2.png'),
@@ -40,66 +40,89 @@ const criticalImages = [
 const ImagePreloader: React.FC<ImagePreloaderProps> = ({ children }) => {
   const [imagesLoaded, setImagesLoaded] = useState(false);
   const [loadedCount, setLoadedCount] = useState(0);
+  const [useHiddenImages] = useState(Platform.OS === 'ios');
 
   useEffect(() => {
     const preloadImages = async () => {
-      // На iOS для локальных изображений (require) prefetch менее критичен
-      // Они уже встроены в bundle, поэтому загружаются быстро
-      if (Platform.OS === 'ios') {
-        // Для iOS даем небольшую задержку для инициализации Image cache
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Принудительно загружаем изображения через Image.getSize
-        const loadPromises = criticalImages.map((imageSource) => {
-          return new Promise<void>((resolve) => {
-            try {
-              const source = Image.resolveAssetSource(imageSource);
-              if (source && source.uri) {
-                // Используем Image.getSize для принудительной загрузки
-                Image.getSize(
-                  source.uri,
-                  () => {
-                    setLoadedCount(prev => prev + 1);
-                    resolve();
-                  },
-                  () => {
-                    // В случае ошибки все равно продолжаем
-                    setLoadedCount(prev => prev + 1);
-                    resolve();
-                  }
-                );
-              } else {
+      try {
+        // Для iOS используем prefetch + дополнительную задержку для стабилизации
+        if (Platform.OS === 'ios') {
+          console.log('🖼️ [ImagePreloader] iOS: Начало предзагрузки изображений...');
+          
+          // Даем время на инициализацию
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Используем prefetch для реальной загрузки в кеш
+          const loadPromises = criticalImages.map((imageSource, index) => {
+            return new Promise<void>((resolve) => {
+              try {
+                const source = Image.resolveAssetSource(imageSource);
+                if (source && source.uri) {
+                  // Используем prefetch для загрузки в кеш
+                  Image.prefetch(source.uri)
+                    .then(() => {
+                      setLoadedCount(prev => prev + 1);
+                      console.log(`✅ [ImagePreloader] Загружено ${index + 1}/${criticalImages.length}`);
+                      resolve();
+                    })
+                    .catch((error) => {
+                      console.warn(`⚠️ [ImagePreloader] Ошибка загрузки изображения ${index + 1}:`, error);
+                      setLoadedCount(prev => prev + 1);
+                      resolve();
+                    });
+                } else {
+                  setLoadedCount(prev => prev + 1);
+                  resolve();
+                }
+              } catch (error) {
+                console.warn(`⚠️ [ImagePreloader] Ошибка resolveAssetSource ${index + 1}:`, error);
                 setLoadedCount(prev => prev + 1);
                 resolve();
               }
-            } catch (error) {
-              setLoadedCount(prev => prev + 1);
-              resolve();
-            }
+            });
           });
-        });
 
-        await Promise.all(loadPromises);
-      } else {
-        // Для Android используем обычный prefetch
-        const loadPromises = criticalImages.map((imageSource) => {
-          return new Promise<void>((resolve) => {
-            Image.prefetch(Image.resolveAssetSource(imageSource).uri)
-              .then(() => {
+          await Promise.all(loadPromises);
+          
+          // Дополнительная задержка для стабилизации кеша на iOS
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+          console.log('✅ [ImagePreloader] iOS: Все изображения загружены');
+        } else {
+          // Для Android используем обычный prefetch
+          console.log('🖼️ [ImagePreloader] Android: Начало предзагрузки изображений...');
+          
+          const loadPromises = criticalImages.map((imageSource, index) => {
+            return new Promise<void>((resolve) => {
+              try {
+                const source = Image.resolveAssetSource(imageSource);
+                Image.prefetch(source.uri)
+                  .then(() => {
+                    setLoadedCount(prev => prev + 1);
+                    resolve();
+                  })
+                  .catch(() => {
+                    setLoadedCount(prev => prev + 1);
+                    resolve();
+                  });
+              } catch (error) {
                 setLoadedCount(prev => prev + 1);
                 resolve();
-              })
-              .catch(() => {
-                setLoadedCount(prev => prev + 1);
-                resolve();
-              });
+              }
+            });
           });
-        });
 
-        await Promise.all(loadPromises);
+          await Promise.all(loadPromises);
+          
+          console.log('✅ [ImagePreloader] Android: Все изображения загружены');
+        }
+
+        setImagesLoaded(true);
+      } catch (error) {
+        console.error('❌ [ImagePreloader] Критическая ошибка при предзагрузке:', error);
+        // В случае критической ошибки все равно показываем приложение
+        setImagesLoaded(true);
       }
-
-      setImagesLoaded(true);
     };
 
     preloadImages();
@@ -114,6 +137,25 @@ const ImagePreloader: React.FC<ImagePreloaderProps> = ({ children }) => {
         <ActivityIndicator size="large" color="#DC1818" />
         <Text style={styles.loaderText}>Загрузка изображений...</Text>
         <Text style={styles.progressText}>{progress}%</Text>
+        
+        {/* Для iOS: скрытые Image компоненты для гарантированной загрузки в память */}
+        {useHiddenImages && (
+          <View style={styles.hiddenImagesContainer}>
+            {criticalImages.map((imageSource, index) => (
+              <Image
+                key={`hidden-image-${index}`}
+                source={imageSource}
+                style={styles.hiddenImage}
+                onLoad={() => {
+                  // Дополнительная проверка загрузки
+                }}
+                onError={(error) => {
+                  console.warn(`⚠️ [ImagePreloader] Ошибка загрузки скрытого изображения ${index}:`, error.nativeEvent.error);
+                }}
+              />
+            ))}
+          </View>
+        )}
       </View>
     );
   }
@@ -139,6 +181,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#99A3B3',
     fontWeight: '600',
+  },
+  hiddenImagesContainer: {
+    position: 'absolute',
+    top: -10000,
+    left: -10000,
+    width: 1,
+    height: 1,
+    opacity: 0,
+    overflow: 'hidden',
+  },
+  hiddenImage: {
+    width: 1,
+    height: 1,
+    opacity: 0,
   },
 });
 

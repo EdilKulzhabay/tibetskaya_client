@@ -11,10 +11,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'AddOrUpdateAddress'>;
 
 const cities = [
     { label: 'Алматы', value: 'Алматы' },
-    { label: 'Нур-Султан', value: 'Нур-Султан' },
-    { label: 'Астана', value: 'Астана' },
-    { label: 'Караганда', value: 'Караганда' },
-    { label: 'Шымкент', value: 'Шымкент' },
+    { label: 'Астана (уже скоро!)', value: 'Астана', disabled: true },
 ];
 
 // Функция для генерации ObjectId в стиле MongoDB
@@ -33,7 +30,7 @@ const generateObjectId = (): string => {
 
 const AddOrUpdateAddress: React.FC<Props> = ({ navigation, route }) => {
     const { address } = route.params;
-    const { user, updateUser, loadingState } = useAuth()
+    const { user, updateUser, refreshUserData, loadingState } = useAuth()
     const [form, setForm] = useState<any>(address || null);
     const [disabled, setDisabled] = useState<boolean>(true);
     const [modalVisible, setModalVisible] = useState<boolean>(false);
@@ -70,6 +67,9 @@ const AddOrUpdateAddress: React.FC<Props> = ({ navigation, route }) => {
             
             await updateUser('addresses', updatedAddresses);
             
+            // Обновляем данные пользователя с сервера перед переходом назад
+            await refreshUserData();
+            
             console.log('Адрес добавлен:', newAddress);
             navigation.goBack();
         } catch (error) {
@@ -96,6 +96,9 @@ const AddOrUpdateAddress: React.FC<Props> = ({ navigation, route }) => {
             );
             
             await updateUser('addresses', updatedAddresses);
+            
+            // Обновляем данные пользователя с сервера перед переходом назад
+            await refreshUserData();
             
             console.log('Адрес обновлен:', newAddress);
             navigation.goBack();
@@ -163,7 +166,7 @@ const AddOrUpdateAddress: React.FC<Props> = ({ navigation, route }) => {
             <Back navigation={navigation} title="Добавить адрес" />
             <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
                 <OutlinedFilledLabelInput
-                    label="Название"
+                    label="Название: (Дом, Работа, Дача)"
                     value={form?.name}
                     onChangeText={(value) => handleChange('name', value)}
                     bgWhite={true}
@@ -189,7 +192,7 @@ const AddOrUpdateAddress: React.FC<Props> = ({ navigation, route }) => {
                     bgWhite={true}
                 />
                 <OutlinedFilledLabelInput
-                    label="Квартира"
+                    label="Квартира/Офис/Кабинет"
                     value={form?.apartment}
                     onChangeText={(value) => handleChange('apartment', value)}
                     bgWhite={true}

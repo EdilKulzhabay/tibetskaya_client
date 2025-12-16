@@ -45,47 +45,88 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
     });
   }, []);
 
+  // Очистка заказов при выходе из системы
   useFocusEffect(
     useCallback(() => {
-      // Запрашиваем активные заказы только один раз при загрузке экрана
-      if (user?.mail && loadingState === 'success' && orders.length === 0) {
+      if (!user) {
+        console.log('Пользователь вышел из системы - очищаем заказы');
+        setOrders([]);
+      }
+    }, [user])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      // Запрашиваем активные заказы каждый раз при переходе на экран
+      if (user?.mail && loadingState === 'success') {
         console.log('Запрашиваем активные заказы для:', user.mail);
         apiService.getActiveOrders(user.mail).then((res: any) => {
+          console.log("res.orders", res.orders);
           setOrders(res.orders);
         }).catch((error) => {
           console.error('Ошибка при получении активных заказов:', error);
         });
       }
-    }, [user?.mail, loadingState, orders.length])
+    }, [user?.mail, loadingState])
   );
 
   // Подписка на обновления статусов заказов
   useEffect(() => {
+    let isMounted = true;
+    
     const subscription = DeviceEventEmitter.addListener(
       'orderStatusUpdated',
-      ({ orderId, newStatus, orderData }) => {
-        console.log('🔄 HomeScreen: Получено обновление заказа:', orderId, newStatus);
+      async ({ orderId, newStatus }) => {
+        // Проверяем, что компонент все еще смонтирован
+        if (!isMounted) {
+          return;
+        }
         
+        // Проверяем наличие обязательных данных
+        if (!orderId || !newStatus) {
+          console.warn('⚠️ HomeScreen: Неполные данные обновления заказа:', { orderId, newStatus });
+          return;
+        }
+
+        const fetchOrder = async () => {
+          const orderData = await apiService.getOrder(orderId);
+          return orderData.order;
+        }
+        const orderData = await fetchOrder();
+        if (!orderData) {
+          console.warn('⚠️ HomeScreen: Не удалось получить данные заказа:', orderId);
+          return;
+        }
+
         // Обновляем состояние заказов
         setOrders(prevOrders => {
-          const orderExists = prevOrders.some(order => order._id === orderId);
+          
+          // Защита от null/undefined
+          if (!prevOrders || !Array.isArray(prevOrders)) {
+            console.warn('⚠️ HomeScreen: prevOrders не является массивом');
+            return orderData ? [orderData] : [];
+          }
+          
+          const orderExists = prevOrders.some(order => order && order._id === orderId);
           
           if (orderExists) {
             // Обновляем существующий заказ
-            return prevOrders.map(order =>
-              order._id === orderId
-                ? { ...order, status: newStatus, updatedAt: orderData.updatedAt }
-                : order
-            );
+            return prevOrders.map(order => {
+              if (!order) return order;
+              return order._id === orderId
+                ? { ...order, courierAggregator: orderData?.courierAggregator, status: newStatus, updatedAt: orderData?.updatedAt || new Date().toISOString() }
+                : order;
+            });
           } else {
             // Добавляем новый заказ в начало списка
-            return [orderData, ...prevOrders];
+            return orderData ? [orderData, ...prevOrders] : prevOrders;
           }
         });
       }
     );
 
     return () => {
+      isMounted = false;
       subscription.remove();
     };
   }, []);
@@ -95,37 +136,30 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         
-        <Header bonus="50" />
+        <Header bonus={user?.balance || 0} showBonus={true} />
         <View style={styles.content}>
           <MainPageBanner navigation={navigation} setIsModalVisible={setIsModalVisible} />
-
-          {/* <TouchableOpacity style={styles.button} onPress={() => {
-            pushNotificationService.initialize();
-            console.log('Тест');
-          }}>
-            <Text style={styles.buttonText}>Тест</Text>
-          </TouchableOpacity> */}
 
           {orders.length > 0 && (
             <View style={styles.activeOrdersContainer}>
               <View style={styles.activeOrdersTitle}>
                 <Text style={styles.activeOrdersTitleText}>Активные заказы ({orders.length})</Text>
-                <TouchableOpacity style={styles.activeOrdersTitleButton}>
+                {/* <TouchableOpacity style={styles.activeOrdersTitleButton}>
                   <Text style={styles.activeOrdersTitleButtonText}>Все заказы</Text>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
               </View>
               {orders.length > 0 && orders.map((order, index) => (
                 <OrderBlock 
                   key={order._id || index} 
-                  _id={order.id} 
-                  date={order.date.d} 
+                  _id={order._id} 
+                  date={order.date} 
                   status={order.status} 
                   products={order.products} 
                   courier={order?.courier}
                   address={order.address}
                   // paymentMethod={order.paymentMethod}
                   // deliveryTime={order.deliveryTime}
-                  totalAmount={order.totalAmount}
+                  totalAmount={order.sum}
                   courierAggregator={order.courierAggregator}
                   // courierLocation={order.courierLocation}
                 />
@@ -133,7 +167,7 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
             </View>
           )}
 
-          <MainPageWallet balance={user?.balance || 0} />
+          {/* <MainPageWallet balance={user?.balance || 0} /> */}
           <Products navigation={navigation} />
           {/* <Marketplace /> */}
           <Image 

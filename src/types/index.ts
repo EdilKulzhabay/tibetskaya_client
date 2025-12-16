@@ -2,7 +2,7 @@
 
 export interface User {
   _id: string;
-  fullName: string;
+  userName: string;
   mail: string;
   avatar?: string;
   phone?: string;
@@ -60,7 +60,7 @@ export interface AppState {
 
 export interface RegisterData {
   mail: string;
-  fullName: string;
+  userName: string;
   phone: string;
   password: string;
   termsAccepted: boolean;

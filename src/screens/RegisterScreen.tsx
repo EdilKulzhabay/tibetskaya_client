@@ -1,13 +1,13 @@
-import { ActivityIndicator, Alert, Dimensions, Image, Linking, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Dimensions, Image, Keyboard, Linking, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import OutlinedFilledLabelInput from "../components/OutlinedFilledLabelInput";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MySwitchToggle } from "../components";
 import { apiService } from "../api/services";
 const screenWidth = Dimensions.get('window').width
 
 const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const [form, setForm] = useState({
-        fullName: "",
+        userName: "",
         mail: "",
         phone: "",
         password: "",
@@ -16,9 +16,32 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         privacyAccepted: false,
     });
     const [loading, setLoading] = useState(false);
+    const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+    
+    // Refs для навигации между полями
+    const nameRef = useRef<TextInput>(null);
+    const mailRef = useRef<TextInput>(null);
+    const phoneRef = useRef<TextInput>(null);
+    const passRef = useRef<TextInput>(null);
+    const confirmRef = useRef<TextInput>(null);
+
+    // Отслеживание состояния клавиатуры
+    useEffect(() => {
+        const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
+            setIsKeyboardVisible(true);
+        });
+        const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+            setIsKeyboardVisible(false);
+        });
+
+        return () => {
+            keyboardDidShowListener.remove();
+            keyboardDidHideListener.remove();
+        };
+    }, []);
 
     const handleRegister = async () => {
-        if (!form.mail || !form.fullName || !form.phone || !form.password || !form.confirmPassword) {
+        if (!form.mail || !form.userName || !form.phone || !form.password || !form.confirmPassword) {
             Alert.alert("Ошибка", "Пожалуйста, заполните все поля");
             return;
         }
@@ -41,7 +64,10 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     }
 
     return (
-        <ScrollView style={styles.container}>
+        <ScrollView 
+            style={styles.container}
+            contentContainerStyle={{ paddingBottom: isKeyboardVisible ? 80 : 40 }}
+        >
             <View style={styles.bannerContainer}>
                 <Image
                     source={require('../assets/loginBanner.png')} 
@@ -62,9 +88,13 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             <View style={styles.contentContainer}>
                 <OutlinedFilledLabelInput
                     label="Имя и фамилия"
-                    value={form.fullName}
-                    onChangeText={(text) => setForm({...form, fullName: text})}
+                    value={form.userName}
+                    onChangeText={(text) => setForm({...form, userName: text})}
                     bgWhite={true}
+                    inputRef={nameRef}
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => mailRef.current?.focus()}
                 />
                 
                 <OutlinedFilledLabelInput
@@ -72,16 +102,26 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     value={form.mail}
                     onChangeText={(text) => setForm({...form, mail: text})}
                     bgWhite={true}
+                    inputRef={mailRef}
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    onSubmitEditing={() => phoneRef.current?.focus()}
                 />
                 
                 <OutlinedFilledLabelInput 
                     label="Номер телефона" 
-                    keyboardType="phone-pad" 
+                    keyboardType="name-phone-pad"
                     value={form.phone} 
                     onChangeText={(text) => setForm({ ...form, phone: text })} 
                     mask="phone"
                     onRightIconPress={() => {}}
                     bgWhite={true}
+                    inputRef={phoneRef}
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => passRef.current?.focus()}
                 />
                 
                 <OutlinedFilledLabelInput
@@ -92,6 +132,10 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     onRightIconPress={() => {}}
                     isPassword={true}
                     autoCapitalize="none"
+                    inputRef={passRef}
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => confirmRef.current?.focus()}
                 />
                 
                 <OutlinedFilledLabelInput
@@ -102,6 +146,10 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     onRightIconPress={() => {}}
                     isPassword={true}
                     autoCapitalize="none"
+                    inputRef={confirmRef}
+                    returnKeyType="done"
+                    blurOnSubmit={true}
+                    onSubmitEditing={handleRegister}
                 />
 
                 <View style={styles.agreementRow}>
@@ -109,7 +157,7 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                         <Text style={styles.agreementText}>
                             Я согласен с{' '}
                         </Text>
-                        <TouchableOpacity onPress={() => Linking.openURL('https://tibetskaya.kz/agreement')}>
+                        <TouchableOpacity onPress={() => Linking.openURL('https://tibetskaya.kz/publicOffer')}>
                             <Text style={styles.agreementLink}>Условиями обслуживания</Text>
                         </TouchableOpacity>
                     </View>

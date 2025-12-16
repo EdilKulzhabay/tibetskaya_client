@@ -18,11 +18,18 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
   
   // Обработка данных заказа
   if (remoteMessage.data) {
-    const { newStatus, order, orderId } = remoteMessage.data;
-    console.log('✅ Статус:', newStatus);
+    const { newStatus, order, orderId, orderStatus } = remoteMessage.data;
+    console.log('✅ Статус (newStatus):', newStatus);
+    console.log('✅ Статус заказа (orderStatus):', orderStatus);
     console.log('✅ ID заказа:', orderId);
     if (order) {
       console.log('✅ Данные заказа получены (длина):', order.length);
+      try {
+        const orderData = typeof order === 'string' ? JSON.parse(order) : order;
+        console.log('✅ Статус из данных заказа:', orderData.status);
+      } catch (error) {
+        console.error('❌ Ошибка парсинга заказа в фоновом обработчике:', error);
+      }
     }
   }
   

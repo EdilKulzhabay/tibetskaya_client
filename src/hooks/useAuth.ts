@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { User, RegisterData, LoadingState } from '../types';
-import { userStorage, tokenStorage } from '../utils/storage';
+import { userStorage, tokenStorage, clearAllData } from '../utils/storage';
 import { apiService } from '../api/services';
 import pushNotificationService from '../services/pushNotifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -48,11 +48,9 @@ export const useAuth = (): UseAuthReturn => {
         // Сохраняем email для push notifications
         await AsyncStorage.setItem('userMail', savedUser.mail);
         
-        // Инициализируем push notifications и отправляем токен на сервер
+        // Инициализируем push notifications (токен отправится автоматически, если есть userMail)
         try {
-          await pushNotificationService.initialize();
-          // Отправляем токен на сервер (теперь userMail уже в AsyncStorage)
-          await pushNotificationService.resendToken();
+          await pushNotificationService.init();
         } catch (pushError) {
           console.error('❌ Ошибка при инициализации push notifications:', pushError);
         }
@@ -80,7 +78,7 @@ export const useAuth = (): UseAuthReturn => {
       // Создаем объект пользователя из серверного ответа
       const userData: User = {
         _id: clientData._id,
-        fullName: clientData.fullName,
+        userName: clientData.userName,
         mail: clientData.mail,
         avatar: '',
         phone: clientData.phone,
@@ -107,10 +105,11 @@ export const useAuth = (): UseAuthReturn => {
       setUser(userData);
       setLoadingState('success');
       
-      // Инициализируем push notifications и отправляем токен на сервер
+      // Инициализируем push notifications (если еще не инициализированы)
+      // Токен отправится автоматически, так как userMail уже сохранен в AsyncStorage
       try {
-        await pushNotificationService.initialize();
-        // Отправляем токен на сервер (userMail уже сохранен в AsyncStorage выше)
+        await pushNotificationService.init();
+        // Если токен уже был получен ранее, отправляем его на сервер
         await pushNotificationService.resendToken();
       } catch (pushError) {
         console.error('❌ Ошибка при инициализации push notifications после логина/регистрации:', pushError);
@@ -135,7 +134,7 @@ export const useAuth = (): UseAuthReturn => {
       // Пример мокового ответа:
       const newUser: User = {
         _id: Date.now().toString(),
-        fullName: registerData.fullName,
+        userName: registerData.userName,
         mail: registerData.mail,
         avatar: '',
         createdAt: new Date().toISOString(),
@@ -169,7 +168,8 @@ export const useAuth = (): UseAuthReturn => {
       setLoadingState('loading');
 
       // Очищаем push notification токен
-      await pushNotificationService.clearToken();
+      // await pushNotificationService.clearToken();
+      await clearAllData();
 
       // Удаляем данные из локального хранилища
       await Promise.all([
@@ -221,11 +221,13 @@ export const useAuth = (): UseAuthReturn => {
     try {
       setLoadingState('loading');
       const response = await apiService.getData(user.mail);
+
+      console.log('response', response);
       
-      if (response.success && response.clientData) {
+      if (response.client) {
         // Обновляем локальное состояние
-        await userStorage.save(response.clientData);
-        setUser(response.clientData);
+        await userStorage.save(response.client);
+        setUser(response.client);
         setLoadingState('success');
       } else {
         throw new Error(response.message || 'Не удалось получить данные пользователя');

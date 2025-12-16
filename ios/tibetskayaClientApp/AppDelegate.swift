@@ -17,27 +17,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
-    // Инициализация Firebase
+    // 1. Инициализация Firebase (должно быть первым)
     FirebaseApp.configure()
     
-    // Настройка push-уведомлений
+    // 2. Настройка делегатов для push-уведомлений
     UNUserNotificationCenter.current().delegate = self
     Messaging.messaging().delegate = self
     
-    // Запрос разрешения на уведомления
-    let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
-    UNUserNotificationCenter.current().requestAuthorization(
-      options: authOptions,
-      completionHandler: { granted, error in
-        if granted {
-          print("✅ Push notifications authorized")
-        } else {
-          print("❌ Push notifications denied")
-        }
-      }
-    )
-    
+    // 3. ⚠️ КРИТИЧЕСКИ ВАЖНО: Регистрация для удаленных уведомлений сразу после Firebase.configure()
+    // Это должно быть вызвано синхронно, не внутри completion handler
     application.registerForRemoteNotifications()
+    print("📱 [AppDelegate] Зарегистрировано для удаленных уведомлений")
     
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
@@ -60,18 +50,46 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
   // MARK: - Push Notifications
   
   func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+    // ⚠️ КРИТИЧЕСКИ ВАЖНО: Устанавливаем APNs токен в Firebase Messaging
+    // Без этого FCM токен не может быть получен
     Messaging.messaging().apnsToken = deviceToken
-    print("📱 APNs token registered")
+    print("✅ [AppDelegate] APNs token registered и установлен в Firebase Messaging")
+    print("📱 [AppDelegate] Теперь можно получить FCM токен через messaging().getToken()")
   }
   
   func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
     print("❌ Failed to register for remote notifications: \(error.localizedDescription)")
+    print("❌ Error details: \(error)")
+    
+    // Дополнительная информация об ошибке
+    if let nsError = error as NSError? {
+      print("❌ Error domain: \(nsError.domain)")
+      print("❌ Error code: \(nsError.code)")
+      print("❌ Error userInfo: \(nsError.userInfo)")
+      
+      // Распространенные ошибки и их решения
+      switch nsError.code {
+      case 3010:
+        print("⚠️ ОШИБКА 3010: Push notifications не поддерживаются на симуляторе!")
+        print("   Решение: Используйте физическое устройство для тестирования")
+      case 3000:
+        print("⚠️ ОШИБКА 3000: Не удалось получить APNs токен")
+        print("   Решение: Проверьте настройки Push Notifications в Xcode")
+      case 3001:
+        print("⚠️ ОШИБКА 3001: Неверный Bundle ID или сертификаты")
+        print("   Решение: Проверьте Bundle ID и APNs сертификаты в Firebase Console")
+      default:
+        print("⚠️ Неизвестная ошибка регистрации push-уведомлений")
+      }
+    }
   }
   
   // Получение FCM токена
   func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
     if let token = fcmToken {
-      print("📱 FCM Token: \(token)")
+      print("📱 FCM Token получен: \(token)")
+    } else {
+      print("⚠️ FCM Token получен, но значение nil")
     }
   }
   

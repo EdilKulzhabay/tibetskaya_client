@@ -1,33 +1,54 @@
-import { SafeAreaView, Text, View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator } from "react-native";
+import { SafeAreaView, Text, View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import { Back } from "../components";
 import { useEffect, useState } from "react";
 import { useAuth } from "../hooks";
 import OutlinedFilledLabelInput from "../components/OutlinedFilledLabelInput";
-
-
+import { apiService } from "../api/services";
 
 const ChangeDataScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const { user } = useAuth();
     const [form, setForm] = useState({
-        fullName: user?.fullName || "",
+        userName: user?.userName || "",
         mail: user?.mail || "",
         phone: user?.phone || "",
-        password: user?.password || "",
-        confirmPassword: user?.password || "",
+        password: "",
+        confirmPassword: "",
     });
 
     useEffect(() => {
         setForm({
-            fullName: user?.fullName || "",
+            userName: user?.userName || "",
             mail: user?.mail || "",
             phone: user?.phone || "",
-            password: user?.password || "",
-            confirmPassword: user?.password || "",
+            password: "",
+            confirmPassword: "",
         });
     }, [user]);
 
     const handleChange = (field: string, value: string) => {
         setForm({ ...form, [field]: value });
+    };
+
+    const handleChangeData = async () => {
+        try {
+            if (form.userName != user?.userName) {
+                await apiService.updateData(user?.mail || '', 'userName', form.userName);
+            }
+            if (form.mail != user?.mail) {
+                await apiService.updateData(user?.mail || '', 'mail', form.mail);
+            }
+            if (form.phone != user?.phone) {
+                await apiService.updateData(user?.mail || '', 'phone', form.phone);
+            }
+            if (form.password != '' && form.password === form.confirmPassword) {
+                await apiService.updateData(user?.mail || '', 'password', form.password);
+            }
+            Alert.alert('Данные успешно изменены');
+            navigation.goBack();
+        } catch (error) {
+            console.log('error', error);
+            Alert.alert('Ошибка при изменении данных');
+        }
     };
 
     return (
@@ -36,8 +57,8 @@ const ChangeDataScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
                     <OutlinedFilledLabelInput
                         label="Имя"
-                        value={form.fullName}
-                        onChangeText={(value) => handleChange('fullName', value)}
+                        value={form.userName}
+                        onChangeText={(value) => handleChange('userName', value)}
                         bgWhite={true}
                     />
                     <OutlinedFilledLabelInput
@@ -64,7 +85,7 @@ const ChangeDataScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                         onChangeText={(value) => handleChange('confirmPassword', value)}
                         bgWhite={true}
                     />
-                <TouchableOpacity style={styles.button}>
+                <TouchableOpacity style={styles.button} onPress={handleChangeData}>
                     <Text style={styles.buttonText}>Изменить данные</Text>
                 </TouchableOpacity>
             </ScrollView>

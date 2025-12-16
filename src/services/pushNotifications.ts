@@ -1,136 +1,245 @@
-import messaging from '@react-native-firebase/messaging';
-import { Platform, DeviceEventEmitter, PermissionsAndroid } from 'react-native';
+import { Alert, Platform, DeviceEventEmitter, PermissionsAndroid } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import messaging from '@react-native-firebase/messaging';
 import notifee, { AndroidImportance } from '@notifee/react-native';
 
 const API_URL = 'https://api.tibetskayacrm.kz';
 
+
 class PushNotificationService {
+  private static instance: PushNotificationService;
   private fcmToken: string | null = null;
-  private isInitialized: boolean = false;
+  private isInitialized: boolean = false; // Защита от повторной инициализации
+  private listenersRegistered: boolean = false; // Защита от повторной регистрации обработчиков
+  private unsubscribeFunctions: Array<() => void> = []; // Функции отписки от обработчиков
+  private notificationsEnabled: boolean = true; // Состояние включения/отключения уведомлений
 
-  // Инициализация сервиса
-  async initialize() {
-    console.log('🔔 Инициализация push-уведомлений...');
+  static getInstance(): PushNotificationService {
+    if (!PushNotificationService.instance) {
+      PushNotificationService.instance = new PushNotificationService();
+    }
+    return PushNotificationService.instance;
+  }
 
-    // Создаем канал уведомлений для notifee
-    await this.createNotificationChannel();
+  /**
+   * Инициализация push-уведомлений
+   */
+  async init() {
+    // Проверяем, включены ли уведомления
+    const enabled = await this.isNotificationsEnabled();
+    if (!enabled) {
+      console.log('⚠️ Уведомления отключены пользователем, пропускаем инициализацию');
+      return;
+    }
 
-    // Запрос разрешения
-    const authStatus = await this.requestPermission();
+    if (this.isInitialized) {
+      console.log('⚠️ Push notifications уже инициализированы, пропускаем');
+      return;
+    }
     
-    if (authStatus) {
-      // Получение FCM токена
-      await this.getFCMToken();
-      
-      // Настройка обработчиков (только один раз)
-      if (!this.isInitialized) {
-        this.setupNotificationHandlers();
-        this.isInitialized = true;
-      } else {
-        console.log('ℹ️ Обработчики уведомлений уже настроены, пропускаем');
+    console.log('🔔 Начало инициализации push notifications...');
+    console.log('📱 Платформа:', Platform.OS, 'Версия:', Platform.Version);
+
+    // 0. Создаем канал уведомлений для Android (должно быть до запроса разрешений)
+    if (Platform.OS === 'android') {
+      await this.createNotificationChannel();
+    }
+
+    // 1. Запрашиваем разрешение пользователя
+    const granted = await this.requestPermission();
+    if (!granted) {
+      console.log('❌ Пользователь отклонил разрешение на уведомления');
+      console.log('💡 Проверьте настройки приложения: Настройки → Приложения → tibetskayaClientApp → Уведомления');
+      return;
+    }
+
+    // 2. Только для iOS: Явная регистрация в APNs
+    if (Platform.OS === 'ios') {
+      try {
+        console.log('⏳ iOS: Регистрируем устройство в APNs...');
+        
+        // Этот метод сам связывается с iOS и ждет получения APNs токена
+        // Если capability "Push Notifications" не включена, он упадет или зависнет
+        await messaging().registerDeviceForRemoteMessages();
+        
+        console.log('✅ iOS: Устройство зарегистрировано в APNs');
+      } catch (error) {
+        console.error('❌ Ошибка регистрации в APNs:', error);
+        // Если здесь ошибка, то getToken дальше 100% не сработает
+        return; 
       }
     }
-  }
 
-  // Создание канала уведомлений для notifee
-  async createNotificationChannel() {
+    // 3. Теперь безопасно получаем FCM токен
     try {
-      const channelId = await notifee.createChannel({
-        id: 'orders_v2', // Новый ID канала - создаст новый канал со звуком
-        name: 'Уведомления о заказах',
-        importance: AndroidImportance.HIGH,
-        sound: 'default', // Системный звук по умолчанию
-        vibration: true,
-        badge: true,
-        lights: true,
-        lightColor: '#EE3F58',
-      });
+      await this.getFCMToken();
+      this.initializeNotificationListeners();
+      this.isInitialized = true;
     } catch (error) {
-      console.error('❌ Ошибка создания канала notifee:', error);
+       console.error('❌ Ошибка инициализации FCM:', error);
     }
   }
 
-  // Запрос разрешения на уведомления
-  async requestPermission(): Promise<boolean> {
+  /**
+   * iOS: Регистрация устройства для удаленных сообщений в Firebase
+   * ВАЖНО: Должна вызываться ПОСЛЕ получения APNs токена (который устанавливается в AppDelegate)
+   */
+  private async registerForRemoteMessages(): Promise<void> {
+    if (Platform.OS !== 'ios') {
+      return; // Только для iOS
+    }
+
     try {
-      // Для Android 13+ (API 33+) нужно явно запросить разрешение
+      // Проверяем, не зарегистрировано ли уже устройство
+      const isRegistered = messaging().isDeviceRegisteredForRemoteMessages;
+      if (isRegistered) {
+        console.log('✅ iOS: Устройство уже зарегистрировано для удаленных сообщений');
+        return;
+      }
+
+      console.log('🔍 iOS: Регистрация устройства для удаленных сообщений в Firebase...');
+      await messaging().registerDeviceForRemoteMessages();
+      console.log('✅ iOS: Устройство успешно зарегистрировано для удаленных сообщений');
+    } catch (error: any) {
+      const errorCode = error?.code || 'unknown';
+      const errorMessage = error?.message || String(error);
+      
+      console.error('❌ iOS: Ошибка регистрации устройства:', errorMessage);
+      console.error('   Код:', errorCode);
+      
+      // Если это ошибка "system did not respond", возможно APNs токен еще не получен
+      if (errorCode === 'messaging/unknown-error') {
+        console.error('   ⚠️ Возможно, APNs токен еще не получен или не установлен в Firebase Messaging');
+        console.error('   Проверьте логи AppDelegate - должен быть "✅ [AppDelegate] APNs token registered"');
+        console.error('   Попробуем получить токен все равно, возможно регистрация произойдет автоматически');
+      }
+      
+      // Не пробрасываем ошибку дальше, пробуем получить токен все равно
+      // Firebase может автоматически зарегистрировать устройство при вызове getToken()
+    }
+  }
+
+  /**
+   * Запрос разрешений
+   */
+  private async requestPermission(): Promise<boolean> {
+    try {
+      // Для Android 13+ нужно запрашивать POST_NOTIFICATIONS отдельно
       if (Platform.OS === 'android' && Platform.Version >= 33) {
-        
+        console.log('📱 Android 13+: Запрашиваем разрешение POST_NOTIFICATIONS');
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
           {
             title: 'Разрешение на уведомления',
             message: 'Приложению нужно разрешение для отправки уведомлений о заказах',
-            buttonNeutral: 'Спросить позже',
-            buttonNegative: 'Отклонить',
-            buttonPositive: 'Разрешить',
+            buttonNeutral: 'Позже',
+            buttonNegative: 'Отмена',
+            buttonPositive: 'OK',
           }
         );
-
-        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-          console.log('✅ Android: Разрешение POST_NOTIFICATIONS получено');
-        } else {
+        
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
           console.log('❌ Android: Разрешение POST_NOTIFICATIONS отклонено');
           return false;
         }
+        console.log('✅ Android: Разрешение POST_NOTIFICATIONS получено');
       }
 
-      // Запрос разрешения через Firebase (для iOS и дополнительная проверка для Android)
-      const authStatus = await messaging().requestPermission();
-      const enabled =
-        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-
-      if (enabled) {
-        console.log('✅ Firebase: Разрешение на уведомления получено');
+      // Запрашиваем разрешение через Firebase Messaging
+      const status = await messaging().requestPermission();
+  
+      if (
+        status === messaging.AuthorizationStatus.AUTHORIZED ||
+        status === messaging.AuthorizationStatus.PROVISIONAL
+      ) {
+        console.log('✅ Firebase: Разрешение на уведомления получено:', status);
         return true;
-      } else {
-        console.log('❌ Firebase: Разрешение на уведомления отклонено');
-        return false;
       }
-    } catch (error) {
-      console.error('❌ Ошибка при запросе разрешения:', error);
+      
+      console.log('❌ Firebase: Разрешение на уведомления отклонено:', status);
+      return false;
+    } catch (e) {
+      console.error('❌ Ошибка запроса разрешений:', e);
       return false;
     }
   }
 
-  // Получение FCM токена
-  async getFCMToken(): Promise<string | null> {
+  /**
+   * Получение токена
+   */
+  private async getFCMToken(): Promise<string | null> {
     try {
-      const token = await messaging().getToken();
+      // В React Native Firebase используем messaging().getToken()
+      // Делаем несколько попыток для iOS, так как регистрация может быть еще не завершена
+      let token: string | null = null;
+      const maxRetries = Platform.OS === 'ios' ? 3 : 1;
+      const retryDelay = 1000;
+
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          token = await messaging().getToken();
+          if (token) {
+            console.log(`✅ FCM токен получен на попытке ${attempt}`);
+            break;
+          }
+        } catch (error: any) {
+          const errorCode = error?.code || 'unknown';
+          
+          // Если это ошибка unregistered и это не последняя попытка
+          if (errorCode === 'messaging/unregistered' && attempt < maxRetries) {
+            console.log(`⚠️ Устройство еще не зарегистрировано, попытка ${attempt}/${maxRetries}`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            continue;
+          }
+          
+          // Если это последняя попытка, пробрасываем ошибку
+          if (attempt === maxRetries) {
+            throw error;
+          }
+        }
+      }
+
+      if (!token) {
+        console.error('❌ FCM токен не получен после всех попыток');
+        return null;
+      }
+
       this.fcmToken = token;
-      
-      // Сохраняем токен локально
       await AsyncStorage.setItem('fcmToken', token);
-      
-      // Проверяем userMail и отправляем токен на сервер
-      const userMail = await AsyncStorage.getItem('userMail');
-      if (userMail) {
+
+      const mail = await AsyncStorage.getItem('userMail');
+      if (mail) {
         await this.sendTokenToServer(token);
-      } else {
-        console.log('⚠️ userMail не найден в AsyncStorage, токен НЕ отправлен на сервер');
+      }
+
+      return token;
+    } catch (error: any) {
+      console.error('❌ Ошибка получения FCM токена:', error);
+      console.error('   Код ошибки:', error?.code);
+      console.error('   Сообщение:', error?.message);
+      
+      if (error?.code === 'messaging/unregistered') {
+        console.error('   ⚠️ Устройство не зарегистрировано для удаленных сообщений');
+        console.error('   Проверьте логи AppDelegate - должен быть "✅ [AppDelegate] APNs token registered"');
       }
       
-      return token;
-    } catch (error) {
-      console.error('❌ Ошибка при получении FCM токена:', error);
       return null;
     }
   }
 
-  // Отправка токена на сервер
-  async sendTokenToServer(token: string): Promise<void> {
+  /**
+   * Отправка токена на сервер
+   */
+  private async sendTokenToServer(token: string): Promise<void> {
     try {
-      // Получаем email пользователя из AsyncStorage
       const userMail = await AsyncStorage.getItem('userMail');
       if (!userMail) {
-        console.log('⚠️ Email пользователя не найден в AsyncStorage, токен не отправлен');
+        console.log('⚠️ Email пользователя не найден, токен не отправлен');
         return;
       }
-      
-      const response = await axios.post(
+
+      await axios.post(
         `${API_URL}/saveFcmToken`,
         {
           mail: userMail,
@@ -138,281 +247,386 @@ class PushNotificationService {
           platform: Platform.OS,
         }
       );
-      
+      console.log('✅ Токен успешно отправлен на сервер');
     } catch (error: any) {
-      console.error('❌ Ошибка при отправке токена на сервер:');
+      console.error('❌ Ошибка отправки токена на сервер:', error);
       if (error.response) {
         console.error('   Статус:', error.response.status);
         console.error('   Данные:', error.response.data);
-      } else if (error.request) {
-        console.error('   Запрос был отправлен, но ответ не получен');
-      } else {
-        console.error('   Ошибка:', error.message);
       }
     }
   }
 
-  // Показать локальное уведомление
-  async displayLocalNotification(title: string, body: string, data?: any) {
+  /**
+   * Создание канала уведомлений для Android
+   */
+  private async createNotificationChannel() {
+    if (Platform.OS === 'android') {
+      try {
+        const channelId = await notifee.createChannel({
+          id: 'orders_v2',
+          name: 'Уведомления о заказах',
+          importance: AndroidImportance.HIGH,
+          sound: 'default',
+          vibration: true,
+        });
+        console.log('✅ Канал уведомлений создан:', channelId);
+      } catch (error) {
+        console.error('❌ Ошибка создания канала уведомлений:', error);
+      }
+    }
+  }
+
+  /**
+   * Показ локального уведомления (для foreground)
+   */
+  private async displayLocalNotification(title: string, body: string, data?: any) {
     try {
+      let channelId = 'orders_v2';
+      
+      // Создаем канал для Android (если еще не создан)
+      if (Platform.OS === 'android') {
+        channelId = await notifee.createChannel({
+          id: 'orders_v2',
+          name: 'Уведомления о заказах',
+          importance: AndroidImportance.HIGH,
+          sound: 'default',
+          vibration: true,
+        });
+      }
+
       await notifee.displayNotification({
         title,
         body,
         data,
         android: {
-          channelId: 'orders_v2', // Используем новый канал со звуком
+          channelId,
           importance: AndroidImportance.HIGH,
           pressAction: {
             id: 'default',
           },
-          sound: 'default', // Системный звук
-          vibrationPattern: [300, 500],
-          smallIcon: 'ic_notification', // Белая иконка колокольчика (маленькая, слева)
-          largeIcon: require('../assets/notificationIcon.png'), // Ваш цветной логотип (большая, справа)
-          color: '#EE3F58', // Цвет акцента (розовый)
-          showTimestamp: true,
-          autoCancel: true,
         },
         ios: {
-          sound: 'default', // Системный звук для iOS
-          badgeCount: 1, // Увеличиваем badge на 1
-          critical: false, // Обычный приоритет
-          interruptionLevel: 'timeSensitive', // Важное уведомление (iOS 15+)
-          attachments: [
-            {
-              url: require('../assets/notificationIcon.png'), // Ваша иконка как вложение
-              thumbnailHidden: false,
-            },
-          ],
+          sound: 'default',
         },
       });
+      
+      console.log('✅ Локальное уведомление показано');
     } catch (error) {
       console.error('❌ Ошибка показа локального уведомления:', error);
+      // Fallback на Alert если notifee не работает
+      Alert.alert(title, body);
     }
   }
 
-  // Обработка данных уведомления
-  private async handleNotificationData(remoteMessage: any) {
-    
-    if (!remoteMessage.data) {
+  /**
+   * Регистрация listeners
+   * В React Native Firebase методы вызываются на экземпляре messaging()
+   * ВАЖНО: Вызывается только один раз при инициализации
+   */
+  private initializeNotificationListeners() {
+    // Защита от повторной регистрации обработчиков
+    if (this.listenersRegistered) {
+      console.log('⚠️ Обработчики уведомлений уже зарегистрированы, пропускаем');
+      console.trace('Стек вызовов:');
       return;
     }
 
-    const { newStatus, order } = remoteMessage.data;
-    
-    // Если это новый заказ
-    if (newStatus === 'newOrder' && order) {
-      try {
-        const orderData = typeof order === 'string' ? JSON.parse(order) : order;
-        // Сохраняем информацию о новом заказе
-        await AsyncStorage.setItem(`order_${orderData._id || orderData.orderId}`, JSON.stringify(orderData));
-      } catch (error) {
-        console.error('❌ Ошибка парсинга данных заказа:', error);
-      }
-    }
-    
-    // Если это обновление статуса существующего заказа
-    if (newStatus && newStatus !== 'newOrder') {
-      try {
-        if (order) {
-          const orderData = typeof order === 'string' ? JSON.parse(order) : order;
-          const orderId = orderData._id || orderData.orderId;
-          
-          if (orderId) {
-            // Обновляем статус заказа в локальном хранилище
-            const existingOrder = await AsyncStorage.getItem(`order_${orderId}`);
-            if (existingOrder) {
-              const parsedOrder = JSON.parse(existingOrder);
-              parsedOrder.status = newStatus;
-              parsedOrder.updatedAt = new Date().toISOString();
-              await AsyncStorage.setItem(`order_${orderId}`, JSON.stringify(parsedOrder));
-              
-              // Уведомляем компоненты приложения об обновлении
-              DeviceEventEmitter.emit('orderStatusUpdated', { 
-                orderId, 
-                newStatus, 
-                orderData: parsedOrder 
-              });
-            } else {
-              // Если заказа нет в локальном хранилище, сохраняем новые данные
-              orderData.status = newStatus;
-              orderData.updatedAt = new Date().toISOString();
-              await AsyncStorage.setItem(`order_${orderId}`, JSON.stringify(orderData));
-              
-              // Уведомляем о новом заказе
-              DeviceEventEmitter.emit('orderStatusUpdated', { 
-                orderId, 
-                newStatus, 
-                orderData 
-              });
-            }
-          }
-        }
-      } catch (error) {
-        console.error('❌ Ошибка обновления статуса заказа:', error);
-      }
-    }
-  }
+    console.log('📝 Регистрация обработчиков уведомлений...');
+    console.trace('Стек вызовов:');
 
-  // Настройка обработчиков уведомлений
-  setupNotificationHandlers() {
-    console.log('⚙️ Настройка обработчиков уведомлений...');
-    
-    // ВАЖНО: Фоновый обработчик должен быть в index.js
-    // Этот вызов оставляем для совместимости, но он не будет работать правильно
-    // messaging().setBackgroundMessageHandler уже зарегистрирован в index.js
-    
-    // Обработчик для уведомлений когда приложение на переднем плане
-    messaging().onMessage(async remoteMessage => {
-      console.log('🟢🟢🟢 УВЕДОМЛЕНИЕ НА ПЕРЕДНЕМ ПЛАНЕ! 🟢🟢🟢');
-      console.log('📨 Полные данные:', JSON.stringify(remoteMessage, null, 2));
-      console.log('📋 Notification title:', remoteMessage.notification?.title);
-      console.log('📋 Notification body:', remoteMessage.notification?.body);
-      console.log('📦 Data payload:', remoteMessage.data);
+    // Отписываемся от старых обработчиков (если есть)
+    this.unsubscribeAllListeners();
+
+    // Создаем канал уведомлений для Android
+    this.createNotificationChannel();
+
+    // Foreground уведомления (приложение открыто)
+    const unsubscribeOnMessage = messaging().onMessage(async (remoteMessage) => {
+      // Проверяем, включены ли уведомления
+      if (!this.notificationsEnabled) {
+        console.log('⚠️ Уведомления отключены, игнорируем сообщение');
+        return;
+      }
+
+      console.log('🟢 Уведомление на переднем плане (messageId:', remoteMessage.messageId, ')');
       
       // Обрабатываем данные уведомления
       await this.handleNotificationData(remoteMessage);
       
-      // Показываем системное уведомление
-      await this.displayLocalNotification(
-        remoteMessage.notification?.title || 'Уведомление',
-        remoteMessage.notification?.body || '',
-        remoteMessage.data
-      );
+      // Показываем локальное уведомление через notifee (выглядит как системное)
+      const title = remoteMessage.notification?.title ?? 'Новое уведомление';
+      const body = remoteMessage.notification?.body ?? 'Сообщение';
+      await this.displayLocalNotification(title, body, remoteMessage.data);
     });
 
-    // Обработчик для клика по уведомлению
-    messaging().onNotificationOpenedApp(async remoteMessage => {
-      console.log('👆 Клик по уведомлению (приложение в фоне):', remoteMessage);
-      
-      // Обрабатываем данные
+    // Уведомление открыто из фона
+    const unsubscribeOnNotificationOpenedApp = messaging().onNotificationOpenedApp(async (remoteMessage) => {
+      console.log('👆 Открыто из фона:', remoteMessage);
       await this.handleNotificationData(remoteMessage);
-      
-      // Здесь можно добавить навигацию к экрану заказа
-      if (remoteMessage.data?.order) {
-        try {
-          const orderData = typeof remoteMessage.data.order === 'string' 
-            ? JSON.parse(remoteMessage.data.order) 
-            : remoteMessage.data.order;
-          const orderId = orderData._id || orderData.orderId;
-          
-          console.log('📱 Навигация к заказу:', orderId);
-          // NavigationService.navigate('OrderStatus', { orderId });
-        } catch (error) {
-          console.error('❌ Ошибка навигации:', error);
-        }
-      }
     });
 
-    // Проверка, было ли приложение открыто через уведомление
+    // Уведомление открыто при холодном старте (вызывается один раз при запуске)
     messaging()
       .getInitialNotification()
-      .then(async remoteMessage => {
+      .then(async (remoteMessage) => {
         if (remoteMessage) {
-          console.log('🚀 Приложение открыто через уведомление:', remoteMessage);
-          
-          // Обрабатываем данные
+          console.log('🚀 Открыто при холодном старте:', remoteMessage);
           await this.handleNotificationData(remoteMessage);
-          
-          // Навигация с задержкой для загрузки приложения
-          if (remoteMessage.data?.order) {
-            setTimeout(() => {
-              try {
-                if (!remoteMessage.data) return;
-                
-                const orderData = typeof remoteMessage.data.order === 'string' 
-                  ? JSON.parse(remoteMessage.data.order) 
-                  : remoteMessage.data.order;
-                const orderId = orderData._id || orderData.orderId;
-                
-                console.log('📱 Навигация к заказу при запуске:', orderId);
-                // NavigationService.navigate('OrderStatus', { orderId });
-              } catch (error) {
-                console.error('❌ Ошибка навигации при запуске:', error);
-              }
-            }, 1000);
-          }
         }
       });
 
-    // Обработчик обновления токена
-    messaging().onTokenRefresh(async token => {
-      console.log('🔄 FCM токен обновлен:', token);
-      this.fcmToken = token;
-      await AsyncStorage.setItem('fcmToken', token);
-      
-      // Проверяем userMail и отправляем токен
+    // Обновление токена
+    const unsubscribeOnTokenRefresh = messaging().onTokenRefresh(async (newToken) => {
+      console.log('🔄 Обновлённый FCM токен:', newToken);
+      this.fcmToken = newToken;
+      await AsyncStorage.setItem('fcmToken', newToken);
+
       const userMail = await AsyncStorage.getItem('userMail');
       if (userMail) {
-        await this.sendTokenToServer(token);
+        await this.sendTokenToServer(newToken);
       }
     });
+
+    // Сохраняем функции отписки
+    this.unsubscribeFunctions.push(
+      unsubscribeOnMessage,
+      unsubscribeOnNotificationOpenedApp,
+      unsubscribeOnTokenRefresh
+    );
+
+    this.listenersRegistered = true;
+    console.log('✅ Обработчики уведомлений зарегистрированы');
   }
 
-  // Повторная отправка токена на сервер (вызывать после логина)
+  /**
+   * Отписка от всех обработчиков
+   */
+  private unsubscribeAllListeners() {
+    this.unsubscribeFunctions.forEach(unsubscribe => {
+      try {
+        unsubscribe();
+      } catch (error) {
+        console.error('Ошибка при отписке от обработчика:', error);
+      }
+    });
+    this.unsubscribeFunctions = [];
+    this.listenersRegistered = false;
+  }
+
+  /**
+   * Обработка данных уведомления
+   */
+  private async handleNotificationData(remoteMessage: any) {
+    if (!remoteMessage.data) {
+      console.log('⚠️ Нет данных в уведомлении');
+      return;
+    }
+
+    console.log('📦 Данные уведомления:', JSON.stringify(remoteMessage.data, null, 2));
+
+    const { newStatus, orderId, message, messageStatus } = remoteMessage.data;
+    const status = newStatus || messageStatus;
+
+    // Обработка сообщений поддержки
+    if (status === 'newSupportMessage' && message) {
+      try {
+        const messageData = typeof message === 'string' ? JSON.parse(message) : message;
+        console.log('💬 Обработка нового сообщения поддержки:', messageData);
+        
+        // Отправляем событие для обновления чата
+        console.log('📢 Отправка события newSupportMessage');
+        DeviceEventEmitter.emit('newSupportMessage', messageData);
+        console.log('✅ Событие newSupportMessage отправлено');
+        return;
+      } catch (error) {
+        console.error('❌ Ошибка обработки сообщения поддержки:', error);
+        console.error('   Данные:', remoteMessage.data);
+        return;
+      }
+    }
+
+    // Обработка уведомлений о заказах
+    if (!status || !orderId) {
+      console.log('⚠️ Нет статуса или данных заказа в уведомлении');
+      return;
+    }
+
+    try {
+      // Парсим данные заказа
+      const finalOrderId = orderId;
+
+      console.log('📋 Обработка заказа:', {
+        orderId,
+        status,
+        isNewOrder: status === 'newOrder',
+      });
+
+      // // Если это новый заказ - сохраняем его
+      // if (status === 'newOrder') {
+      //   await AsyncStorage.setItem(
+      //     `order_${orderId}`,
+      //     JSON.stringify(orderData)
+      //   );
+      //   console.log('✅ Новый заказ сохранен:', orderId);
+      //   return;
+      // }
+
+      // // Если это обновление статуса
+      // const existingOrder = await AsyncStorage.getItem(`order_${finalOrderId}`);
+      // let parsedOrder;
+
+      // if (existingOrder) {
+      //   // Обновляем существующий заказ
+      //   parsedOrder = JSON.parse(existingOrder);
+      //   parsedOrder.status = status;
+      //   parsedOrder.updatedAt = new Date().toISOString();
+      //   // Обновляем данные заказа из уведомления
+      //   Object.assign(parsedOrder, orderData);
+      // } else {
+      //   // Если заказа нет в хранилище, сохраняем новый
+      //   parsedOrder = orderData;
+      //   parsedOrder.status = status;
+      //   parsedOrder.updatedAt = new Date().toISOString();
+      //   console.log('⚠️ Заказ не найден в хранилище, сохраняем новый');
+      // }
+
+      // // Сохраняем обновленный заказ
+      // await AsyncStorage.setItem(`order_${finalOrderId}`, JSON.stringify(parsedOrder));
+
+      // console.log('🔄 Статус заказа обновлен:', {
+      //   orderId: finalOrderId,
+      //   newStatus: status,
+      //   previousStatus: existingOrder ? JSON.parse(existingOrder).status : 'не было',
+      // });
+
+      // // Уведомляем компоненты об обновлении
+      // console.log('📢 Отправка события orderStatusUpdated');
+      DeviceEventEmitter.emit('orderStatusUpdated', {
+        orderId: finalOrderId,
+        newStatus: status,
+      });
+      console.log('✅ Событие orderStatusUpdated отправлено');
+    } catch (error) {
+      console.error('❌ Ошибка обработки данных уведомления:', error);
+      console.error('   Данные:', remoteMessage.data);
+    }
+  }
+
+  /**
+   * Повторная отправка токена на сервер (после логина)
+   */
   async resendToken() {
-    console.log('🔄 Повторная отправка токена на сервер...');
     const userMail = await AsyncStorage.getItem('userMail');
-    
     if (!userMail) {
       console.log('⚠️ userMail не найден, пропускаем отправку токена');
       return;
     }
-    
-    // Если токен уже получен, отправляем его на сервер
+
     if (this.fcmToken) {
       await this.sendTokenToServer(this.fcmToken);
     } else {
-      // Если токена нет, пытаемся получить его
       console.log('⚠️ FCM токен не найден, пытаемся получить');
       await this.getFCMToken();
     }
   }
 
-  // Очистка при выходе
-  async clearToken() {
-    try {
-      if (this.fcmToken) {
-        await messaging().deleteToken();
-        await AsyncStorage.removeItem('fcmToken');
-        this.fcmToken = null;
-        console.log('✅ FCM токен удален');
-      }
-    } catch (error) {
-      console.error('Ошибка при удалении токена:', error);
-    }
-  }
-
-  // Получить текущий токен
+  /**
+   * Получить текущий токен
+   */
   getToken(): string | null {
     return this.fcmToken;
   }
 
-  // Проверить статус разрешения на уведомления
+  /**
+   * Проверка разрешений на уведомления
+   */
   async checkPermission(): Promise<boolean> {
     try {
       if (Platform.OS === 'android' && Platform.Version >= 33) {
-        const result = await PermissionsAndroid.check(
+        const granted = await PermissionsAndroid.check(
           PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
         );
-        console.log('🔍 Статус разрешения POST_NOTIFICATIONS:', result);
-        return result;
+        console.log('📱 Android 13+: Разрешение POST_NOTIFICATIONS:', granted ? '✅' : '❌');
+        if (!granted) {
+          return false;
+        }
       }
-      
-      // Для iOS или старых Android
+
       const authStatus = await messaging().hasPermission();
-      const enabled =
+      const isAuthorized = 
         authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
         authStatus === messaging.AuthorizationStatus.PROVISIONAL;
       
-      console.log('🔍 Статус разрешения Firebase:', enabled);
+      console.log('📱 Firebase разрешение:', isAuthorized ? '✅' : '❌', 'Статус:', authStatus);
+      return isAuthorized;
+    } catch (error) {
+      console.error('❌ Ошибка проверки разрешений:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Включение уведомлений
+   */
+  async enableNotifications(): Promise<boolean> {
+    try {
+      await AsyncStorage.setItem('notificationsEnabled', 'true');
+      this.notificationsEnabled = true;
+      console.log('✅ Уведомления включены');
+      
+      // Если еще не инициализированы, инициализируем
+      if (!this.isInitialized) {
+        await this.init();
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('❌ Ошибка включения уведомлений:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Отключение уведомлений
+   */
+  async disableNotifications(): Promise<boolean> {
+    try {
+      await AsyncStorage.setItem('notificationsEnabled', 'false');
+      this.notificationsEnabled = false;
+      console.log('❌ Уведомления отключены');
+      
+      // Отписываемся от всех обработчиков
+      this.unsubscribeAllListeners();
+      this.isInitialized = false;
+      
+      // Удаляем токен с сервера (опционально)
+      // Можно добавить API endpoint для удаления токена
+      
+      return true;
+    } catch (error) {
+      console.error('❌ Ошибка отключения уведомлений:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Проверка, включены ли уведомления
+   */
+  async isNotificationsEnabled(): Promise<boolean> {
+    try {
+      const stored = await AsyncStorage.getItem('notificationsEnabled');
+      // По умолчанию уведомления включены (если значение не установлено)
+      const enabled = stored !== 'false';
+      this.notificationsEnabled = enabled;
+      console.log('📱 Статус уведомлений:', enabled ? '✅ Включены' : '❌ Отключены');
       return enabled;
     } catch (error) {
-      console.error('❌ Ошибка проверки разрешения:', error);
-      return false;
+      console.error('❌ Ошибка проверки статуса уведомлений:', error);
+      // По умолчанию возвращаем true
+      return true;
     }
   }
 }
 
-export default new PushNotificationService();
-
+export default PushNotificationService.getInstance();

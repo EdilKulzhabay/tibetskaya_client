@@ -11,21 +11,23 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 
 interface HeaderProps {
-  bonus: string;
+  bonus: number;
   showBackButton?: boolean;
   onBackPress?: () => void;
   rightComponent?: React.ReactNode;
+  showBonus?: boolean;
 }
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const Header: React.FC<HeaderProps> = ({
   bonus,
+  showBonus = false,
 }) => {
   const navigation = useNavigation<NavigationProp>();
 
   const onBonusPress = () => {
-    navigation.navigate('Bonus');
+    navigation.navigate('Wallet');
   }
 
   return (
@@ -38,15 +40,17 @@ const Header: React.FC<HeaderProps> = ({
           />
         </View>
 
-        {/* <TouchableOpacity style={styles.bonusContainer} onPress={onBonusPress}>
-          <Text style={styles.bonusText}>
-            {bonus}
-          </Text>
-          <Image
-            source={require('../assets/bonusIcon.png')}
-            style={styles.bonusIcon}
-          />
-        </TouchableOpacity> */}
+        {showBonus && (
+          <TouchableOpacity 
+            style={styles.bonusContainer} 
+            onPress={onBonusPress} 
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.bonusText}>
+              {bonus.toLocaleString()} ₸
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -69,16 +73,9 @@ const styles = StyleSheet.create({
     height: 48,
   },
   bonusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  bonusIcon: {
-    width: 24,
-    height: 24,
   },
   bonusText: {
-    fontSize: 14,
+    fontSize: 20,
     fontWeight: '600',
     color: '#DC1818',
   },

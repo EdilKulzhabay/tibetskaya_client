@@ -18,7 +18,8 @@ interface Props extends TextInputProps {
     mask?: "phone";
     rightIcon?: ReactNode; // 👈 иконка справа
     isPassword?: boolean,
-    bgWhite?: boolean
+    bgWhite?: boolean,
+    inputRef?: React.RefObject<TextInput | null> // 👈 внешний ref для навигации между полями
 }
 
 const formatKzPhone = (text: string) => {
@@ -40,12 +41,16 @@ const OutlinedFilledLabelInput: React.FC<Props> = ({
     rightIcon,
     isPassword = false,
     bgWhite = false,
+    inputRef: externalInputRef, // внешний ref
     ...rest
 }) => {
     const [isFocused, setIsFocused] = useState(false);
     const [isSecure, setIsSecure] = useState(true);
-    const inputRef = useRef<TextInput>(null);
+    const internalInputRef = useRef<TextInput>(null);
     const animatedLabel = useState(new Animated.Value(value ? 1 : 0))[0];
+    
+    // Используем внешний ref если передан, иначе внутренний
+    const inputRef = externalInputRef || internalInputRef;
 
     useEffect(() => {
         Animated.timing(animatedLabel, {

@@ -1,7 +1,7 @@
 import {ApiResponse, User} from '../types';
 
 // Базовый URL для API (замените на ваш)
-const BASE_URL = 'https://api.example.com';
+const BASE_URL = 'https://api.tibetskayacrm.kz';
 
 /**
  * Базовый класс для работы с API
