@@ -10,15 +10,13 @@ import {
   DeviceEventEmitter,
   Image,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Header from '../components/Header';
 import MainPageBanner from '../components/MainPageBanner';
-import MainPageWallet from '../components/MainPageWallet';
 import Products from '../components/Products';
-import Marketplace from '../components/Marketplace';
-import Navigation from '../components/Navigation';
 import SpecialOffer from '../components/SpecialOffer';
 import OrderBlock from '../components/OrderBlock';
 import { RootStackParamList } from '../types/navigation';
@@ -26,18 +24,18 @@ import { useAuth } from '../hooks/useAuth';
 import { apiService } from '../api/services';
 const { tokenStorage } = require('../utils/storage');
 import { useFocusEffect } from '@react-navigation/native';
-import pushNotificationService from '../services/pushNotifications';
 
 interface HomeScreenProps {}
 
-const width = Dimensions.get('window').width;
-
 const HomeScreen: React.FC<HomeScreenProps> = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { user, loadingState } = useAuth();
+  const { user, loadingState, refreshUserData } = useAuth();
   const [token, setToken] = useState<string | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
+  const [lastOrder, setLastOrder] = useState<any>(null);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<any>(null);
 
   useEffect(() => {
     tokenStorage.getAuthToken().then((token: any) => {
@@ -58,16 +56,37 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
   useFocusEffect(
     useCallback(() => {
       // Запрашиваем активные заказы каждый раз при переходе на экран
-      if (user?.mail && loadingState === 'success') {
-        console.log('Запрашиваем активные заказы для:', user.mail);
+      if (user?.mail) {
+        getLastOrder();
+        refreshUserData();
         apiService.getActiveOrders(user.mail).then((res: any) => {
-          console.log("res.orders", res.orders);
           setOrders(res.orders);
         }).catch((error) => {
           console.error('Ошибка при получении активных заказов:', error);
         });
       }
-    }, [user?.mail, loadingState])
+    }, [user?.mail])
+  );
+
+  const getLastOrder = async () => {
+    if (user?.mail) {
+      const lastOrder = await apiService.getLastOrder(user.mail);
+      console.log('lastOrder', lastOrder);
+      if (lastOrder.success) {
+        setLastOrder(lastOrder.order);
+      } else {
+        setLastOrder(null);
+      }
+    }
+  }
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.mail && loadingState === 'success') {
+        
+        refreshUserData();
+      }
+    }, [refreshUserData])
   );
 
   // Подписка на обновления статусов заказов
@@ -132,13 +151,83 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
   }, []);
 
 
+  const reloadOrder = async () => {
+    if (user?.mail && lastOrder) {
+      // Определяем сегодняшнюю дату и время
+      const now = new Date();
+      let orderDate = new Date(now);
+
+      const dayOfWeek = now.getDay(); // 0 - воскресенье, 6 - суббота
+      const hours = now.getHours();
+
+      const pad = (n: number) => n.toString().padStart(2, '0');
+
+      // Проверяем условия: до 19:00 и не воскресенье
+      if (dayOfWeek !== 0 && hours < 19) {
+        // Сегодняшний день, не воскресенье, и время до 19:00
+        // orderDate остается сегодняшним
+      } else {
+        // Следующий рабочий день (не воскресенье)
+        // Если сегодня суббота и уже поздно, следующий не воскресенье -> понедельник
+        orderDate.setDate(orderDate.getDate() + 1);
+        let nextDay = orderDate.getDay();
+        // Если это воскресенье, добавляем еще 1 день (на понедельник)
+        if (nextDay === 0) {
+          orderDate.setDate(orderDate.getDate() + 1);
+        }
+      }
+
+      // Формируем дату в формате ГГГГ-ММ-ДД
+      const formattedOrderDate = `${orderDate.getFullYear()}-${pad(orderDate.getMonth()+1)}-${pad(orderDate.getDate())}`;
+      const orderDateObject = {d: formattedOrderDate, time: ""};
+      const res = await apiService.addOrder(user.mail, lastOrder.address, lastOrder.products, lastOrder.clientNotes, orderDateObject, selectedPayment?.value, lastOrder.needCall, lastOrder.comment);
+      if (res.success) {
+        Alert.alert('Успешно', 'Заказ повторно оформлен');
+        setPaymentModalVisible(false);
+        refreshUserData();
+      } else {
+        Alert.alert('Ошибка', res.message);
+      }
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         
-        <Header bonus={user?.balance || 0} showBonus={true} />
+        <Header bonus={user?.balance || 0} coupon={user?.paidBootles || 0} showBonus={true} />
         <View style={styles.content}>
           <MainPageBanner navigation={navigation} setIsModalVisible={setIsModalVisible} />
+
+          {lastOrder && (
+            <TouchableOpacity
+              onPress={() => {setPaymentModalVisible(true)}}
+              style={{
+                flexDirection: 'row', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                backgroundColor: "white", 
+                padding: 16, 
+                borderRadius: 16, 
+                marginTop: 16,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25, shadowRadius: 3.84, elevation: 5}}>
+              <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+                <Image source={require('../assets/repeat.png')} style={{width: 40, height: 40, borderRadius: 10}} />
+                <View>
+                  <Text style={{fontSize: 14, fontWeight: '600'}}>Повторить{'\n'}последний заказ</Text>
+                  <Text style={{fontSize: 12, fontWeight: '500', color: '#545454'}}>
+                    {lastOrder.products.b12 > 0 ? `${lastOrder.products.b12}x Вода 12,5 л` : ''}{lastOrder.products.b12 > 0 && lastOrder.products.b19 > 0 ? ', ' : ''}{lastOrder.products.b19 > 0 ? `${lastOrder.products.b19}x Вода 18,9л.` : ''}
+                  </Text>
+                  <Text style={{fontSize: 12, fontWeight: '500', color: '#545454'}}>{lastOrder.address.name}</Text>
+                </View>
+              </View>
+              <View style={{backgroundColor: 'white', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: '#E3E3E3'}}>
+                <Text style={{color: '#DC1818', fontSize: 14, fontWeight: '600'}}>Повторить</Text>
+              </View>
+            </TouchableOpacity>
+          )}
 
           {orders.length > 0 && (
             <View style={styles.activeOrdersContainer}>
@@ -218,6 +307,55 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                 </TouchableOpacity>
             </TouchableOpacity>
         </TouchableOpacity>
+      </Modal>
+      <Modal
+          visible={paymentModalVisible}
+          onRequestClose={() => setPaymentModalVisible(false)}
+          transparent={true}
+          animationType="fade"
+      >
+          <TouchableOpacity style={styles.modalOverlayReloadOrder} onPress={() => setPaymentModalVisible(false)}>
+              <TouchableOpacity style={styles.modalContainerReloadOrder} onPress={(e) => e.stopPropagation()}>
+                  <Text style={{fontSize: 24, fontWeight: '600', color: '#101010', marginBottom: 16, textAlign: 'center'}}>Способ оплаты</Text>
+                      <TouchableOpacity style={styles.modalAddress} onPress={() => {
+                          if (selectedPayment?.value === 'fakt') {
+                              setSelectedPayment(null);
+                          } else {
+                              setSelectedPayment({ label: 'Наличными', value: 'fakt' });
+                          }
+                      }}>
+                          <Text style={styles.modalAddressText}>Наличными</Text>
+                          <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: selectedPayment?.value === "fakt" ? '#DC1818' : '#101010' }}>
+                              {selectedPayment?.value === "fakt" && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
+                          </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.modalAddress} onPress={() => {
+                          if (selectedPayment?.value === 'card') {
+                              setSelectedPayment(null);
+                          } else {
+                              setSelectedPayment({ label: 'С баланса', value: 'card' });
+                          }
+                      }}>
+                          {user && user?.paidBootles && user?.paidBootles > 0 ? (
+                              <Text style={styles.modalAddressText}>
+                                  С баланса <Text style={{color: "#46a54f"}}>({Number(user?.paidBootles || 0).toLocaleString("ru-RU")} шт)</Text>
+                              </Text>
+                          ) : (
+                              <Text style={styles.modalAddressText}>
+                                  С баланса <Text style={{color: "#46a54f"}}>({Number(user?.balance || 0).toLocaleString("ru-RU")} ₸)</Text>
+                              </Text>
+                          )}
+                          <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: selectedPayment?.value === "card" ? '#DC1818' : '#101010' }}>
+                              {selectedPayment?.value === "card" && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
+                          </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.button} onPress={() => {
+                          reloadOrder();
+                      }}>
+                          <Text style={styles.buttonText}>Подтвердить</Text>
+                      </TouchableOpacity>
+              </TouchableOpacity>
+          </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
@@ -300,6 +438,33 @@ const styles = StyleSheet.create({
       borderTopLeftRadius: 12,
       borderTopRightRadius: 12,
       paddingBottom: 40,
+  },
+  modalOverlayReloadOrder: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainerReloadOrder: {
+      backgroundColor: 'white',
+      padding: 24,
+      borderRadius: 8,
+      width: '80%',
+  },
+  modalAddress: {
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#EDEDED',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  modalAddressText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#101010',
   },
 });
 

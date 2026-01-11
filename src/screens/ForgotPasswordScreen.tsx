@@ -2,44 +2,21 @@ import React, { useState, useEffect } from "react";
 import { ActivityIndicator, Alert, Dimensions, Image, StatusBar, StyleSheet, Text, TouchableOpacity, View, BackHandler, ScrollView } from "react-native";
 import OutlinedFilledLabelInput from "../components/OutlinedFilledLabelInput";
 import { apiService } from "../api/services";
-import { useAuth } from "../hooks/useAuth";
-import { useFocusEffect } from '@react-navigation/native';
 const screenWidth = Dimensions.get('window').width
 
-const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-    const { saveUserData } = useAuth();
+const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const [mail, setMail] = useState("")
-    const [password, setPassword] = useState("")
     const [loading, setLoading] = useState(false);
 
-    // Обработка кнопки "Назад" на Android
-    useFocusEffect(
-        React.useCallback(() => {
-            const onBackPress = () => {
-                navigation.navigate('Home');
-                return true; // Предотвращаем стандартное поведение
-            };
-
-            const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-
-            return () => subscription.remove();
-        }, [navigation])
-    );
-
-
-    const handleLogin = async () => {
+    const handleForgotPassword = async () => {
         setLoading(true);
-        const res = await apiService.clientLogin({mail: mail.trim(), password: password.trim()});
+        const res = await apiService.sendMailForgotPassword(mail);
         if (res.success) {
-            // Передаем весь ответ сервера (включая токены)
-            setLoading(false);
-            await saveUserData(res);
-            Alert.alert("Успешно", `Добро пожаловать, ${res.clientData.userName}!`);
-            navigation.navigate("Home");
+            navigation.navigate("OtpForgotPassword", {mail});
         } else {
-            setLoading(false);
             Alert.alert("Ошибка", res.message);
         }
+        setLoading(false);
     }
     return (
         <ScrollView style={styles.container}>
@@ -53,10 +30,10 @@ const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
             <View style={styles.headerContainer}>
                 <Text style={styles.title}>
-                    Добро пожаловать!
+                    Восстановление пароля
                 </Text>
                 <Text style={styles.subtitle}>
-                    Введите данные, чтобы продолжить
+                    Введите почту, чтобы восстановить пароль
                 </Text>
             </View>
 
@@ -70,35 +47,14 @@ const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                         onRightIconPress={() => {}}
                         autoCapitalize="none"
                     />
-
-                    <OutlinedFilledLabelInput
-                        label="Введите пароль" 
-                        keyboardType="default" 
-                        value={password} 
-                        onChangeText={(text) => setPassword(text)} 
-                        onRightIconPress={() => {}}
-                        isPassword={true}
-                        autoCapitalize="none"
-                    />
-
-                    <TouchableOpacity onPress={() => {navigation.navigate("ForgotPassword")}} style={styles.forgotPassword}>
-                        <Text style={styles.forgotPasswordText}>Забыли пароль?</Text>
-                    </TouchableOpacity>
                 </View>
 
                 <View style={{ marginTop: 60 }}>
                     <TouchableOpacity
-                        onPress={handleLogin}
+                        onPress={handleForgotPassword}
                         style={styles.loginButton}
                     >
-                        {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.loginButtonText}>Войти</Text>}
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={() => {navigation.navigate("Register")}} 
-                        style={styles.registerContainer}>
-                        <Text style={styles.registerText}>
-                            Еще нет аккаунта? <Text style={styles.registerLink}>Зарегистрироваться</Text>
-                        </Text>
+                        {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.loginButtonText}>Восстановить пароль</Text>}
                     </TouchableOpacity>
                 </View>
             </View>
@@ -170,4 +126,4 @@ const styles = StyleSheet.create({
     }
 });
 
-export default LoginScreen;
+export default ForgotPasswordScreen;

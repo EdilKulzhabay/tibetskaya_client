@@ -12,6 +12,7 @@ import { RootStackParamList } from '../types/navigation';
 
 interface HeaderProps {
   bonus: number;
+  coupon?: number;
   showBackButton?: boolean;
   onBackPress?: () => void;
   rightComponent?: React.ReactNode;
@@ -22,6 +23,7 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const Header: React.FC<HeaderProps> = ({
   bonus,
+  coupon,
   showBonus = false,
 }) => {
   const navigation = useNavigation<NavigationProp>();
@@ -46,9 +48,22 @@ const Header: React.FC<HeaderProps> = ({
             onPress={onBonusPress} 
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={styles.bonusText}>
-              {bonus.toLocaleString()} ₸
-            </Text>
+            {coupon !== undefined && coupon <= 0 && bonus > 0 && (
+              <Text style={styles.bonusText}>
+                {bonus.toLocaleString()} ₸
+              </Text>
+            )}
+
+            {coupon !== undefined && coupon > 0 && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={styles.bonusText}>{coupon.toLocaleString()}</Text>
+                <Image
+                  source={require('../assets/coupon.png')}
+                  style={{ width: 30, height: 30 }}
+                />
+              </View>
+            )}
+
           </TouchableOpacity>
         )}
       </View>

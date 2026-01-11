@@ -35,7 +35,7 @@ const HowToTopUpScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     <View style={[styles.feature, { marginTop: 8 }]}>
                         <Text style={styles.featureNumber}>3.</Text>
                         <Text style={styles.featureText}>
-                            Выберите удобный способ оплаты — банковская карта, Kaspi, QR-код или другой доступный вариант.
+                            Выберите удобный способ оплаты: банковская карта, Kaspi, QR-код или другой доступный вариант.
                         </Text>
                     </View>
 
@@ -72,7 +72,7 @@ const HowToTopUpScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     <Text style={[styles.title, { marginTop: 20 }]}>Забота о вас</Text>
                     <Text style={[styles.subtitle, { marginTop: 8 }]}>
                         Мы стремимся сделать доставку «Тибетской воды» максимально удобной.{'\n'}
-                        Пополните баланс — и свежая, чистая вода будет всегда под рукой, когда вам нужно.
+                        Пополните баланс и свежая, чистая вода будет всегда под рукой, когда вам нужно.
                     </Text>
 
                     <View style={styles.buttonContainer}>

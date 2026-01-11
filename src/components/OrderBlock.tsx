@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, OrderData, OrderProduct, Courier, OrderDate, CourierAggregator } from '../types/navigation';
@@ -51,6 +51,15 @@ const OrderBlock: React.FC<OrderBlockProps> = ({_id, date, status, products, cou
         navigation.navigate('OrderStatus', { order: orderData });
     };
 
+    const handleRepeatOrder = () => {
+        console.log('handleRepeatOrder', orderData);
+        if (orderData && orderData.products && orderData.products.b12 !== undefined && orderData.products.b19 !== undefined) {
+            navigation.navigate('AddOrder', { products: { b12: orderData.products.b12, b19: orderData.products.b19 }, order: orderData });
+        } else {
+            Alert.alert('Ошибка', 'Не удалось повторить заказ');
+        }
+    };
+
     return (
         <TouchableOpacity style={[styles.container, { borderColor: status === "onTheWay" ? "#DC1818" : "#E3E3E3", borderWidth: status === "onTheWay" ? 2 : 0 }]} onPress={handleOrderPress}>
             <View style={styles.orderHeader}>
@@ -65,13 +74,24 @@ const OrderBlock: React.FC<OrderBlockProps> = ({_id, date, status, products, cou
             </View>
             <View style={{height: 1, backgroundColor: '#E3E3E3', marginVertical: 12, width: '100%' }} />
             <View style={styles.orderBody}>
-                <View style={styles.orderProduct}>
-                    {products && products.b12 > 0 && (
-                        <Text>{products.b12}x Вода 12,5 л</Text>
-                    )}
-                    {products && products.b19 > 0 && (
-                        <Text>{products.b19}x Вода 18,9 л</Text>
-                    )}
+                <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+                    <View>
+                        <View style={styles.orderProduct}>
+                            {products && products.b12 > 0 && (
+                                <Text>{products.b12}x Вода 12,5 л</Text>
+                            )}
+                            {products && products.b19 > 0 && (
+                                <Text>{products.b19}x Вода 18,9 л</Text>
+                            )}
+                        </View>
+                        <Text style={styles.orderProduct}>{address.name}</Text>
+                    </View>
+                    {/* <TouchableOpacity 
+                        style={{backgroundColor: '#DC1818', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 10}}
+                        onPress={handleRepeatOrder}
+                    >
+                        <Text style={{color: 'white', fontSize: 14, fontWeight: '600'}}>Повторить</Text>
+                    </TouchableOpacity> */}
                 </View>
 
                 {courierAggregator && typeof courierAggregator === 'object' && courierAggregator.fullName && status !== "awaitingOrder" && (

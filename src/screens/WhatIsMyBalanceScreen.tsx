@@ -16,12 +16,12 @@ const WhatIsMyBalanceScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                 
                 <View style={styles.container}>
                     <Text style={styles.title}>Мой баланс</Text>
-                    <Text style={styles.subtitle}> — это ваш личный счёт в приложении «Тибетская».</Text>
+                    <Text style={styles.subtitle}>Это ваш личный счёт в приложении «Тибетская».</Text>
                     <View style={{height: 1, backgroundColor: '#E3E3E3', marginVertical: 6, width: '100%' }} />
 
                     <Text style={[styles.title, { marginTop: 20 }]}>Как это работает?</Text>
                     <Text style={[styles.subtitle, { marginTop: 8 }]}>
-                        Пополните баланс заранее — и сможете оформить заказ в один клик.{'\n'}
+                        Пополните баланс заранее и сможете оформить заказ в один клик.{'\n'}
                         Средства списываются автоматически при оформлении заказа.{'\n'}
                         Остаток сохраняется и доступен для последующих покупок.
                     </Text>
@@ -38,7 +38,7 @@ const WhatIsMyBalanceScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                     <Text style={[styles.title, { marginTop: 20 }]}>Забота о вашем комфорте</Text>
                     <Text style={[styles.subtitle, { marginTop: 8 }]}>
                         Мы ценим ваше доверие и хотим, чтобы заказ «Тибетской воды» был максимально лёгким.{'\n'}
-                        Следите за балансом, пополняйте при необходимости —{'\n'}
+                        Следите за балансом, пополняйте при необходимости{'\n'}
                         и наслаждайтесь чистотой и свежестью «Тибетской воды» каждый день.
                     </Text>
                 </View>

@@ -54,6 +54,14 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             return;
         }
         setLoading(true);
+        setForm({
+            ...form,
+            mail: form.mail.trim(),
+            userName: form.userName.trim(),
+            phone: form.phone.trim(),
+            password: form.password.trim(),
+            confirmPassword: form.confirmPassword.trim(),
+        })
         const res = await apiService.sendCode(form.mail);
         if (res.success) {
             navigation.navigate("Otp", {data: form});

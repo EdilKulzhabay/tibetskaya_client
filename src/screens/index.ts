@@ -26,7 +26,9 @@ export {default as SettingsScreen} from './SettingsScreen';
 export {default as WhatIsMyBalanceScreen} from './WhatIsMyBalanceScreen';
 export {default as HowToTopUpScreen} from './HowToTopUpScreen';
 export {default as DeleteAccountScreen} from './DeleteAccountScreen';
-
+export {default as ForgotPasswordScreen} from './ForgotPasswordScreen';
+export {default as OtpForgotPasswordScreen} from './OtpForgotPasswordScreen';
+export {default as NewPasswordScreen} from './NewPasswordScreen';
 // Добавляйте новые экраны здесь
 // export {default as SettingsScreen} from './SettingsScreen';
 // export {default as AboutScreen} from './AboutScreen';

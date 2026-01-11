@@ -16,7 +16,7 @@ const calls = [
 ];
 
 const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation, route }) => {
-    const { products } = route.params;
+    const { products, order } = route.params;
     const { user, refreshUserData } = useAuth();
 
     const [price12, setPrice12] = useState(user?.price12 || 900);
@@ -28,10 +28,11 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
     const [paymentModalVisible, setPaymentModalVisible] = useState(false);
     const [callModalVisible, setCallModalVisible] = useState(false);
     const [dateModalVisible, setDateModalVisible] = useState(false);
+    const [notEnoughBalanceModalVisible, setNotEnoughBalanceModalVisible] = useState(false);
 
-    const [selectedAddress, setSelectedAddress] = useState<any>(null);
-    const [selectedPayment, setSelectedPayment] = useState<any>(null);
-    const [selectedCall, setSelectedCall] = useState<any>(calls[0]);
+    const [selectedAddress, setSelectedAddress] = useState<any>(order?.address || null);
+    const [selectedPayment, setSelectedPayment] = useState<any>(order?.payment || null);
+    const [selectedCall, setSelectedCall] = useState<any>(order?.call || calls[0]);
     const [selectedDate, setSelectedDate] = useState<any>(null);
     const [availableDates, setAvailableDates] = useState<any[]>([]);
     const [comment, setComment] = useState('');
@@ -177,6 +178,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
             if (res.success) {
                 Alert.alert('Успешно', 'Заказ оформлен');
                 setLoading(false);
+                refreshUserData();
                 navigation.navigate('Home');
             } else {
                 Alert.alert('Ошибка', res.message);
@@ -188,12 +190,16 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
     }
 
     useEffect(() => {
+        
         if (selectedPayment && selectedPayment.value === 'card') {
+            
             const totalAmount = count12 * price12 + count19 * price19;
+            console.log('🔄 AddOrderScreen: totalAmount', totalAmount);
             if (user && user.balance !== undefined && user.balance !== null && user.balance < totalAmount) {
+                console.log('🔄 AddOrderScreen: не хватает средств', user.balance, totalAmount);
                 setSelectedPayment(null);
-                Alert.alert('Недостаточно средств', 'У вас недостаточно на балансе для оплаты заказа');
-                navigation.navigate('Wallet');
+                setNotEnoughBalanceModalVisible(true);
+                // navigation.navigate('Wallet');
                 return;
             }
         }
@@ -340,7 +346,13 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                         <Image source={require('../assets/arrowDown.png')} style={{width: 24, height: 24}} />
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={[styles.additionalInfo, {marginTop: 24}]} onPress={() => setPaymentModalVisible(true)}>
+                    <TouchableOpacity style={[styles.additionalInfo, {marginTop: 24}]} onPress={() => {
+                        if (user?.balance !== undefined && user?.balance !== null && user?.balance < count12 * price12 + count19 * price19) {
+                            setNotEnoughBalanceModalVisible(true);
+                            return;
+                        }
+                        setPaymentModalVisible(true);
+                    }}>
                         <View>
                             <Text style={{
                                 fontWeight: '500',
@@ -468,21 +480,40 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                 <TouchableOpacity style={styles.modalOverlay} onPress={() => setPaymentModalVisible(false)}>
                     <TouchableOpacity style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
                         <Text style={{fontSize: 24, fontWeight: '600', color: '#101010', marginBottom: 16, textAlign: 'center'}}>Способ оплаты</Text>
-                        {payments.map((payment) => (
-                            <TouchableOpacity key={payment.value} style={styles.modalAddress} onPress={() => {
-                                if (selectedPayment?.value === payment?.value) {
+                            <TouchableOpacity style={styles.modalAddress} onPress={() => {
+                                if (selectedPayment?.value === 'fakt') {
                                     setSelectedPayment(null);
                                 } else {
-                                    setSelectedPayment(payment);
+                                    setSelectedPayment({ label: 'Наличными', value: 'fakt' });
                                     setPaymentModalVisible(false);
                                 }
                             }}>
-                                <Text style={styles.modalAddressText}>{payment?.label}</Text>
-                                <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: selectedPayment?.value === payment?.value ? '#DC1818' : '#101010' }}>
-                                    {selectedPayment?.value === payment?.value && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
+                                <Text style={styles.modalAddressText}>Наличными</Text>
+                                <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: selectedPayment?.value === "fakt" ? '#DC1818' : '#101010' }}>
+                                    {selectedPayment?.value === "fakt" && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
                                 </View>
                             </TouchableOpacity>
-                        ))}
+                            <TouchableOpacity style={styles.modalAddress} onPress={() => {
+                                if (selectedPayment?.value === 'card') {
+                                    setSelectedPayment(null);
+                                } else {
+                                    setSelectedPayment({ label: 'С баланса', value: 'card' });
+                                    setPaymentModalVisible(false);
+                                }
+                            }}>
+                                {user && user?.paidBootles && user?.paidBootles > 0 ? (
+                                    <Text style={styles.modalAddressText}>
+                                        С баланса <Text style={{color: "#46a54f"}}>({Number(user?.paidBootles || 0).toLocaleString("ru-RU")} шт)</Text>
+                                    </Text>
+                                ) : (
+                                    <Text style={styles.modalAddressText}>
+                                        С баланса <Text style={{color: "#46a54f"}}>({Number(user?.balance || 0).toLocaleString("ru-RU")} ₸)</Text>
+                                    </Text>
+                                )}
+                                <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: selectedPayment?.value === "card" ? '#DC1818' : '#101010' }}>
+                                    {selectedPayment?.value === "card" && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
+                                </View>
+                            </TouchableOpacity>
                     </TouchableOpacity>
                 </TouchableOpacity>
             </Modal>
@@ -533,6 +564,43 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
+
+            <Modal
+                visible={notEnoughBalanceModalVisible}
+                onRequestClose={() => setNotEnoughBalanceModalVisible(false)}
+                transparent={true}
+                animationType="fade"
+            >
+                <TouchableOpacity style={styles.modalOverlay} onPress={() => setNotEnoughBalanceModalVisible(false)}>
+                    <TouchableOpacity style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
+                        <Image source={require('../assets/wallet.png')} style={{width: 60, height: 60, marginBottom: 12, alignSelf: 'center'}} />
+                        <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Не хватает {count12 * price12 + count19 * price19 - (user?.balance || 0)} ₸</Text>
+                        <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>Ваш текущий баланс: {user?.balance || 0} ₸.</Text>
+                        <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>Для оформления заказа необходимо пополнить счет.</Text>
+                        <TouchableOpacity 
+                            style={{
+                                backgroundColor: '#0d74d0',
+                                padding: 16,
+                                borderRadius: 8,
+                                marginTop: 40,
+                            }} 
+                            onPress={() => {
+                                setNotEnoughBalanceModalVisible(false)
+                                setSelectedPayment(null)
+                                navigation.navigate('Wallet')
+                            }
+                        }>
+                            <Text style={styles.buttonText}>Пополнить на {count12 * price12 + count19 * price19 - (user?.balance || 0)} ₸</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.modalButton, {marginTop: 10}]} onPress={() => {
+                            setNotEnoughBalanceModalVisible(false)
+                            setSelectedPayment({ label: 'Наличными', value: 'fakt' })
+                        }}>
+                            <Text style={styles.modalButtonText}>Оплатить наличными</Text>
+                        </TouchableOpacity>
                     </TouchableOpacity>
                 </TouchableOpacity>
             </Modal>
@@ -673,6 +741,16 @@ const styles = StyleSheet.create({
     },
     buttonText: {
         color: 'white',
+        fontSize: 16,
+        fontWeight: '600',
+        textAlign: 'center',
+    },
+    modalButton: {
+        padding: 16,
+        borderRadius: 8,
+    },
+    modalButtonText: {
+        color: '#0d74d0',
         fontSize: 16,
         fontWeight: '600',
         textAlign: 'center',

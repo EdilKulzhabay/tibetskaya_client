@@ -39,7 +39,10 @@ import {
   SettingsScreen,
   WhatIsMyBalanceScreen,
   HowToTopUpScreen,
-  DeleteAccountScreen
+  DeleteAccountScreen,
+  ForgotPasswordScreen,
+  OtpForgotPasswordScreen,
+  NewPasswordScreen
 } from './src/screens';
 import { RootStackParamList } from './src/types/navigation';
 import { ScreenLayout } from './src/components';
@@ -131,6 +134,9 @@ function App() {
               <Stack.Screen name="WhatIsMyBalance" component={withLayout(WhatIsMyBalanceScreen)} />
               <Stack.Screen name="HowToTopUp" component={withLayout(HowToTopUpScreen)} />
               <Stack.Screen name="DeleteAccount" component={withLayout(DeleteAccountScreen)} />
+              <Stack.Screen name="ForgotPassword" component={withLayout(ForgotPasswordScreen)} />
+              <Stack.Screen name="OtpForgotPassword" component={withLayout(OtpForgotPasswordScreen)} />
+              <Stack.Screen name="NewPassword" component={withLayout(NewPasswordScreen)} />
             </Stack.Navigator>
           </NavigationContainer>
         </AuthWrapper>

@@ -2,42 +2,29 @@ import React, { useState, useEffect } from "react";
 import { ActivityIndicator, Alert, Dimensions, Image, StatusBar, StyleSheet, Text, TouchableOpacity, View, BackHandler, ScrollView } from "react-native";
 import OutlinedFilledLabelInput from "../components/OutlinedFilledLabelInput";
 import { apiService } from "../api/services";
-import { useAuth } from "../hooks/useAuth";
-import { useFocusEffect } from '@react-navigation/native';
 const screenWidth = Dimensions.get('window').width
 
-const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-    const { saveUserData } = useAuth();
-    const [mail, setMail] = useState("")
-    const [password, setPassword] = useState("")
+const NewPasswordScreen: React.FC<{ navigation: any, route: { params: { mail: string } } }> = ({ navigation, route }: { navigation: any, route: { params: { mail: string } } }) => {
+    const mail = route?.params?.mail;
+    if (!mail) {
+        Alert.alert("Ошибка", "Некорректный email");
+        return;
+    }
+    const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
     const [loading, setLoading] = useState(false);
 
-    // Обработка кнопки "Назад" на Android
-    useFocusEffect(
-        React.useCallback(() => {
-            const onBackPress = () => {
-                navigation.navigate('Home');
-                return true; // Предотвращаем стандартное поведение
-            };
-
-            const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-
-            return () => subscription.remove();
-        }, [navigation])
-    );
-
-
-    const handleLogin = async () => {
+    const handleNewPassword = async () => {
         setLoading(true);
-        const res = await apiService.clientLogin({mail: mail.trim(), password: password.trim()});
+        if (password !== confirmPassword) {
+            Alert.alert("Ошибка", "Пароли не совпадают");
+            setLoading(false);
+            return;
+        }
+        const res = await apiService.updateForgottenPassword(mail, password);
         if (res.success) {
-            // Передаем весь ответ сервера (включая токены)
-            setLoading(false);
-            await saveUserData(res);
-            Alert.alert("Успешно", `Добро пожаловать, ${res.clientData.userName}!`);
-            navigation.navigate("Home");
+            navigation.navigate("Login");
         } else {
-            setLoading(false);
             Alert.alert("Ошибка", res.message);
         }
     }
@@ -53,24 +40,15 @@ const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
             <View style={styles.headerContainer}>
                 <Text style={styles.title}>
-                    Добро пожаловать!
+                    Установка нового пароля
                 </Text>
                 <Text style={styles.subtitle}>
-                    Введите данные, чтобы продолжить
+                    Введите новый пароль
                 </Text>
             </View>
 
             <View style={styles.contentContainer}>
                 <View>
-                    <OutlinedFilledLabelInput
-                        label="Введите почту" 
-                        keyboardType="email-address" 
-                        value={mail} 
-                        onChangeText={(text) => setMail(text)} 
-                        onRightIconPress={() => {}}
-                        autoCapitalize="none"
-                    />
-
                     <OutlinedFilledLabelInput
                         label="Введите пароль" 
                         keyboardType="default" 
@@ -80,25 +58,23 @@ const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                         isPassword={true}
                         autoCapitalize="none"
                     />
-
-                    <TouchableOpacity onPress={() => {navigation.navigate("ForgotPassword")}} style={styles.forgotPassword}>
-                        <Text style={styles.forgotPasswordText}>Забыли пароль?</Text>
-                    </TouchableOpacity>
+                    <OutlinedFilledLabelInput
+                        label="Подтвердите пароль" 
+                        keyboardType="default" 
+                        value={confirmPassword} 
+                        onChangeText={(text) => setConfirmPassword(text)} 
+                        onRightIconPress={() => {}}
+                        isPassword={true}
+                        autoCapitalize="none"
+                    />
                 </View>
 
                 <View style={{ marginTop: 60 }}>
                     <TouchableOpacity
-                        onPress={handleLogin}
+                        onPress={handleNewPassword}
                         style={styles.loginButton}
                     >
-                        {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.loginButtonText}>Войти</Text>}
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={() => {navigation.navigate("Register")}} 
-                        style={styles.registerContainer}>
-                        <Text style={styles.registerText}>
-                            Еще нет аккаунта? <Text style={styles.registerLink}>Зарегистрироваться</Text>
-                        </Text>
+                        {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.loginButtonText}>Сохранить пароль</Text>}
                     </TouchableOpacity>
                 </View>
             </View>
@@ -170,4 +146,4 @@ const styles = StyleSheet.create({
     }
 });
 
-export default LoginScreen;
+export default NewPasswordScreen;

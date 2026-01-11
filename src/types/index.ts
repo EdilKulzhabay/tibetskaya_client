@@ -10,6 +10,7 @@ export interface User {
   notificationPushToken?: string;
   balance?: number;
   bonus?: number;
+  paidBootles?: number;
   price12?: number;
   price19?: number;
   status?: string;

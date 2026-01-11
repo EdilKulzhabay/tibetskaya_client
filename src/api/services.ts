@@ -168,4 +168,57 @@ export const apiService = {
             };
         }
     },
+    createPaymentLink: async (sum: any) => {
+        try {
+            const response = await api.post('/api/payment/create', {sum});
+            return response.data;
+        } catch (error) {
+            return {
+                success: false,
+                message: "Не удалось обновить данные заказа",
+            };
+        }
+    },
+    getLastOrder: async (mail: string) => {
+        try {
+            const response = await api.post('/getLastOrderMobile', {mail});
+            return response.data;
+        } catch (error) {
+            throw error;
+        }
+    },
+    sendMailForgotPassword: async (mail: string) => {
+        try {
+            const response = await api.post('/sendMailForgotPassword', {mail});
+            return response.data;
+        } catch (error) {
+            return {
+                success: false,
+                message: "Не удалось отправить письмо",
+            };
+        }
+    },
+    codeConfirmForgotPassword: async (mail: string, code: string) => {
+        try {
+            const response = await api.post('/codeConfirmForgotPassword', {mail, code});
+            return response.data;
+        } catch (error) {
+            return {
+                success: false,
+                message: "Не удалось подтвердить код",
+            };
+        }
+    },
+
+    updateForgottenPassword: async (mail: string, password: string) => {
+        try {
+            const response = await api.post('/updateForgottenPassword', {mail, password});
+            return response.data;
+        } catch (error) {
+            return {
+                success: false,
+                message: "Не удалось установить новый пароль",
+            };
+        }
+    },
 };

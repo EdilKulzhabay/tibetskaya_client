@@ -16,7 +16,7 @@ const Products: React.FC<{ navigation: any }> = ({ navigation }) => {
         console.log('🧭 navigation:', navigation);
         
         try {
-            navigation.navigate('AddOrder', { products: { b12: count12, b19: count19 } });
+            navigation.navigate('AddOrder', { products: { b12: count12, b19: count19 }, order: null });
             console.log('✅ navigate вызван успешно');
         } catch (error) {
             console.error('❌ Ошибка навигации:', error);

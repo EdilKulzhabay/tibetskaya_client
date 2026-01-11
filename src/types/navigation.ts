@@ -169,11 +169,21 @@ export type RootStackParamList = {
   TakePartInvite: undefined;
   StartHydration: undefined;
   StartHydration2: undefined;
-  AddOrder: undefined;
+  AddOrder: {
+    products: OrderProduct;
+    order: OrderData | null;
+  };
   Settings: undefined;
   WhatIsMyBalance: undefined;
   HowToTopUp: undefined;
   DeleteAccount: undefined;
+  ForgotPassword: undefined;
+  OtpForgotPassword: {
+    mail: string;
+  };
+  NewPassword: {
+    mail: string;
+  };
 };
 
 export type TabParamList = {
