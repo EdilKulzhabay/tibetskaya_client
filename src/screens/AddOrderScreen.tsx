@@ -347,7 +347,11 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                     </TouchableOpacity>
 
                     <TouchableOpacity style={[styles.additionalInfo, {marginTop: 24}]} onPress={() => {
-                        if (user?.balance !== undefined && user?.balance !== null && user?.balance < count12 * price12 + count19 * price19) {
+                        if (user?.paymentMethod === "balance" && user?.balance !== undefined && user?.balance !== null && user?.balance < count12 * price12 + count19 * price19) {
+                            setNotEnoughBalanceModalVisible(true);
+                            return;
+                        }
+                        if (user?.paymentMethod === "coupon" && user?.paidBootles !== undefined && user?.paidBootles !== null && user?.paidBootles < count12 + count19) {
                             setNotEnoughBalanceModalVisible(true);
                             return;
                         }
@@ -501,7 +505,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                     setPaymentModalVisible(false);
                                 }
                             }}>
-                                {user && user?.paidBootles && user?.paidBootles > 0 ? (
+                                {user && user?.paymentMethod === "coupon"? (
                                     <Text style={styles.modalAddressText}>
                                         С баланса <Text style={{color: "#46a54f"}}>({Number(user?.paidBootles || 0).toLocaleString("ru-RU")} шт)</Text>
                                     </Text>
@@ -577,9 +581,22 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                 <TouchableOpacity style={styles.modalOverlay} onPress={() => setNotEnoughBalanceModalVisible(false)}>
                     <TouchableOpacity style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
                         <Image source={require('../assets/wallet.png')} style={{width: 60, height: 60, marginBottom: 12, alignSelf: 'center'}} />
-                        <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Не хватает {count12 * price12 + count19 * price19 - (user?.balance || 0)} ₸</Text>
+                        {user?.paymentMethod === "balance" ? (
+                            <>
+                                <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Не хватает {count12 * price12 + count19 * price19 - (user?.balance || 0)} ₸</Text>
+                                <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>Ваш текущий баланс: {user?.balance || 0} ₸.</Text>
+                                <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>Для оформления заказа необходимо пополнить счет.</Text>
+                            </>
+                        ) : (
+                            <>
+                                <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Не хватает {count12 + count19 - (user?.paidBootles || 0)} шт</Text>
+                                <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>Ваш текущий баланс: {user?.paidBootles || 0} шт.</Text>
+                                <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>Для оформления заказа необходимо пополнить баланс.</Text>
+                            </>
+                        )}
+                        {/* <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Не хватает {count12 * price12 + count19 * price19 - (user?.balance || 0)} ₸</Text>
                         <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>Ваш текущий баланс: {user?.balance || 0} ₸.</Text>
-                        <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>Для оформления заказа необходимо пополнить счет.</Text>
+                        <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>Для оформления заказа необходимо пополнить счет.</Text> */}
                         <TouchableOpacity 
                             style={{
                                 backgroundColor: '#0d74d0',
@@ -593,7 +610,11 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                 navigation.navigate('Wallet')
                             }
                         }>
-                            <Text style={styles.buttonText}>Пополнить на {count12 * price12 + count19 * price19 - (user?.balance || 0)} ₸</Text>
+                            {user?.paymentMethod === "balance" ? (
+                                <Text style={styles.buttonText}>Пополнить на {count12 * price12 + count19 * price19 - (user?.balance || 0)} ₸</Text>
+                            ) : (
+                                <Text style={styles.buttonText}>Пополнить на {count12 + count19 - (user?.paidBootles || 0)} шт</Text>
+                            )}
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.modalButton, {marginTop: 10}]} onPress={() => {
                             setNotEnoughBalanceModalVisible(false)

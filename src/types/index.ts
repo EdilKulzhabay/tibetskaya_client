@@ -36,6 +36,7 @@ export interface User {
     isRead: boolean;
   }[];
   createdAt: string;
+  paymentMethod?: string;
 }
 
 export interface ApiResponse<T> {
