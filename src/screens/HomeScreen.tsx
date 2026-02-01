@@ -196,7 +196,16 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         
-        <Header bonus={user?.balance || 0} paymentMethod={user?.paymentMethod || 'balance'} coupon={user?.paidBootles || 0} showBonus={true} />
+        <Header 
+          bonus={user?.balance || 0} 
+          paymentMethod={user?.paymentMethod || 'balance'} 
+          coupon={user?.paidBootles || 0} 
+          paidBootlesFor19={user?.paidBootlesFor19 || 0}
+          paidBootlesFor12={user?.paidBootlesFor12 || 0}
+          doesItTake19Bottles={user?.doesItTake19Bottles}
+          doesItTake12Bottles={user?.doesItTake12Bottles}
+          showBonus={true} 
+        />
         <View style={styles.content}>
           <MainPageBanner navigation={navigation} setIsModalVisible={setIsModalVisible} />
 
@@ -207,8 +216,18 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                 console.log('lastOrder?.sum', lastOrder?.sum);
                 if (user?.paymentMethod === 'balance' && user?.balance !== undefined && user?.balance !== null && user?.balance < lastOrder?.sum) {
                   setNotEnoughBalanceModalVisible(true);
-                } else if (user?.paymentMethod === 'coupon' && user?.paidBootles !== undefined && user?.paidBootles !== null && user?.paidBootles < lastOrder?.products.b12 + lastOrder?.products.b19) {
-                  setNotEnoughBalanceModalVisible(true);
+                } else if (user?.paymentMethod === 'coupon') {
+                  // Проверяем баланс бутылок раздельно для 19л и 12л
+                  const needed19 = lastOrder?.products?.b19 || 0;
+                  const needed12 = lastOrder?.products?.b12 || 0;
+                  const available19 = user?.paidBootlesFor19 || 0;
+                  const available12 = user?.paidBootlesFor12 || 0;
+                  
+                  if (needed19 > available19 || needed12 > available12) {
+                    setNotEnoughBalanceModalVisible(true);
+                  } else {
+                    setPaymentModalVisible(true);
+                  }
                 } else {
                   setPaymentModalVisible(true);
                 }
@@ -224,14 +243,19 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.25, shadowRadius: 3.84, elevation: 5}}>
-              <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+              <View style={{flexDirection: 'row', maxWidth: '50%', alignItems: 'center', gap: 8}}>
                 <Image source={require('../assets/repeat.png')} style={{width: 40, height: 40, borderRadius: 10}} />
                 <View>
-                  <Text style={{fontSize: 14, fontWeight: '600'}}>Повторить{'\n'}последний заказ</Text>
-                  <Text style={{fontSize: 12, fontWeight: '500', color: '#545454'}}>
-                    {lastOrder.products.b12 > 0 ? `${lastOrder.products.b12}x Вода 12,5 л` : ''}{lastOrder.products.b12 > 0 && lastOrder.products.b19 > 0 ? ', ' : ''}{lastOrder.products.b19 > 0 ? `${lastOrder.products.b19}x Вода 18,9л.` : ''}
-                  </Text>
-                  <Text style={{fontSize: 12, fontWeight: '500', color: '#545454'}}>{lastOrder.address.name}</Text>
+                  <View>
+                    <Text style={{fontSize: 14, fontWeight: '600'}}>Повторить{'\n'}последний заказ</Text>
+                    <Text style={{fontSize: 12, fontWeight: '500', color: '#545454'}}>
+                      {lastOrder.products.b12 > 0 ? `${lastOrder.products.b12}x Вода 12,5 л` : ''}{lastOrder.products.b12 > 0 && lastOrder.products.b19 > 0 ? `\n` : ''}{lastOrder.products.b19 > 0 ? `${lastOrder.products.b19}x Вода 18,9л.` : ''}
+                    </Text>
+                  </View>
+                  <View style={{flexDirection: "row", gap: 6, marginTop: 4, alignItems: 'center'}}>
+                    <Image source={require('../assets/pin.png')} style={{width: 16, height: 16}} />
+                    <Text style={{fontSize: 12, fontWeight: '500', color: '#545454'}}>{lastOrder.address.name}</Text>
+                  </View>
                 </View>
               </View>
               <View style={{backgroundColor: 'white', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: '#E3E3E3'}}>
@@ -257,6 +281,7 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                   products={order.products} 
                   courier={order?.courier}
                   address={order.address}
+                  opForm={order.opForm || 'fakt'}
                   // paymentMethod={order.paymentMethod}
                   // deliveryTime={order.deliveryTime}
                   totalAmount={order.sum}
@@ -268,7 +293,7 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
           )}
 
           {/* <MainPageWallet balance={user?.balance || 0} /> */}
-          <Products navigation={navigation} />
+          <Products navigation={navigation} price19={user?.price19 || 1300} price12={user?.price12 || 900} />
           {/* <Marketplace /> */}
           <Image 
             source={require('../assets/marketPlace.png')} 
@@ -341,23 +366,42 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                           </View>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.modalAddress} onPress={() => {
-                          if (selectedPayment?.value === 'card') {
+                          // Определяем правильное значение opForm в зависимости от paymentMethod пользователя
+                          const balanceValue = user?.paymentMethod === "coupon" ? 'coupon' : 'credit';
+                          if (selectedPayment?.value === balanceValue) {
                               setSelectedPayment(null);
                           } else {
-                              setSelectedPayment({ label: 'С баланса', value: 'card' });
+                              setSelectedPayment({ label: 'С баланса', value: balanceValue });
                           }
                       }}>
                           {user && user?.paymentMethod === "coupon" ? (
-                              <Text style={styles.modalAddressText}>
-                                  С баланса <Text style={{color: "#46a54f"}}>({Number(user?.paidBootles || 0).toLocaleString("ru-RU")} шт)</Text>
-                              </Text>
+                              <View>
+                                  <Text style={styles.modalAddressText}>С баланса</Text>
+                                  {user?.doesItTake19Bottles && user?.doesItTake12Bottles ? (
+                                      <Text style={{color: "#46a54f", fontSize: 12, marginTop: 4}}>
+                                          ({user?.paidBootlesFor19 || 0} шт 18,9л, {user?.paidBootlesFor12 || 0} шт 12,5л)
+                                      </Text>
+                                  ) : user?.doesItTake19Bottles ? (
+                                      <Text style={{color: "#46a54f", fontSize: 12, marginTop: 4}}>
+                                          ({user?.paidBootlesFor19 || 0} шт 18,9л)
+                                      </Text>
+                                  ) : user?.doesItTake12Bottles ? (
+                                      <Text style={{color: "#46a54f", fontSize: 12, marginTop: 4}}>
+                                          ({user?.paidBootlesFor12 || 0} шт 12,5л)
+                                      </Text>
+                                  ) : (
+                                      <Text style={{color: "#46a54f", fontSize: 12, marginTop: 4}}>
+                                          ({(user?.paidBootlesFor19 || 0) + (user?.paidBootlesFor12 || 0)} шт)
+                                      </Text>
+                                  )}
+                              </View>
                           ) : (
                               <Text style={styles.modalAddressText}>
                                   С баланса <Text style={{color: "#46a54f"}}>({Number(user?.balance || 0).toLocaleString("ru-RU")} ₸)</Text>
                               </Text>
                           )}
-                          <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: selectedPayment?.value === "card" ? '#DC1818' : '#101010' }}>
-                              {selectedPayment?.value === "card" && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
+                          <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: (selectedPayment?.value === "credit" || selectedPayment?.value === "coupon") ? '#DC1818' : '#101010' }}>
+                              {(selectedPayment?.value === "credit" || selectedPayment?.value === "coupon") && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
                           </View>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.button} onPress={() => {
@@ -385,9 +429,18 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                       </>
                   ) : (
                       <>
-                          <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Не хватает {lastOrder?.products.b12 + lastOrder?.products.b19 - (user?.paidBootles || 0)} шт</Text>
-                          <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>Ваш текущий баланс: {user?.paidBootles || 0} шт.</Text>
-                          <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>Для оформления заказа необходимо пополнить баланс.</Text>
+                          <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Недостаточно бутылок</Text>
+                          {(lastOrder?.products?.b19 || 0) > (user?.paidBootlesFor19 || 0) && (
+                              <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>
+                                  18,9л: нужно {lastOrder?.products?.b19 || 0}, у вас {user?.paidBootlesFor19 || 0} шт
+                              </Text>
+                          )}
+                          {(lastOrder?.products?.b12 || 0) > (user?.paidBootlesFor12 || 0) && (
+                              <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>
+                                  12,5л: нужно {lastOrder?.products?.b12 || 0}, у вас {user?.paidBootlesFor12 || 0} шт
+                              </Text>
+                          )}
+                          <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center', marginTop: 8}}>Для оформления заказа необходимо пополнить баланс.</Text>
                       </>
                   )}
                   {/* <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Не хватает {count12 * price12 + count19 * price19 - (user?.balance || 0)} ₸</Text>
@@ -409,7 +462,7 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                       {user?.paymentMethod === "balance" ? (
                           <Text style={styles.buttonText}>Пополнить на {lastOrder?.sum - (user?.balance || 0)} ₸</Text>
                       ) : (
-                          <Text style={styles.buttonText}>Пополнить на {lastOrder?.products.b12 + lastOrder?.products.b19 - (user?.paidBootles || 0)} шт</Text>
+                          <Text style={styles.buttonText}>Пополнить баланс</Text>
                       )}
                   </TouchableOpacity>
                   <TouchableOpacity style={[styles.modalButton, {marginTop: 10}]} onPress={() => {

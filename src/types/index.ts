@@ -10,6 +10,12 @@ export interface User {
   notificationPushToken?: string;
   balance?: number;
   bonus?: number;
+  // Новые поля для раздельного учета бутылок
+  paidBootlesFor19?: number;
+  paidBootlesFor12?: number;
+  doesItTake19Bottles?: boolean;
+  doesItTake12Bottles?: boolean;
+  // Старое поле для обратной совместимости
   paidBootles?: number;
   price12?: number;
   price19?: number;

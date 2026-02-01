@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import StableImage from './StableImage';
 
-const Products: React.FC<{ navigation: any }> = ({ navigation }) => {
+const Products: React.FC<{ navigation: any, price19: number, price12: number}> = ({ navigation, price19 }) => {
     const [count12, setCount12] = useState(0);
     const [count19, setCount19] = useState(0);
 
@@ -117,8 +117,8 @@ const Products: React.FC<{ navigation: any }> = ({ navigation }) => {
                         <Text>Итого:</Text>
                     </View>
                     <View style={styles.productBottomSum}>
-                        <Text>1300 ₸</Text>
-                        <Text>{count19 * 1300} ₸</Text>
+                        <Text>{price19} ₸</Text>
+                        <Text>{count19 * price19} ₸</Text>
                     </View>
                 </View>
             </View>

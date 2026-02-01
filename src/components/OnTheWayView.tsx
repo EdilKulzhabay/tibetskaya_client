@@ -254,6 +254,10 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
             <Text style={styles.label}>Время доставки: </Text>
             {order?.date?.d || 'Не указано'}
           </Text>
+          <Text style={styles.deliveryText}>
+            <Text style={styles.label}>Способ оплаты: </Text>
+            {order.opForm === "fakt" ? "Нал_Карта_QR" : (order.opForm === "credit" || order.opForm === "coupon") ? "С баланса" : 'Нал_Карта_QR'}
+          </Text>
           {(order.comment || order.customerNotes) && (
             <Text style={styles.deliveryText}>
               <Text style={styles.label}>Примечания: </Text>

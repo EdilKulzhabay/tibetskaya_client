@@ -305,6 +305,13 @@ const OrderStatusScreen: React.FC = () => {
                 </View>
               )}
 
+              <View style={styles.infoCard}>
+                <Text style={styles.infoLabel}>Способ оплаты:</Text>
+                <Text style={styles.infoValue}>
+                  {order.opForm === "fakt" ? "Нал_Карта_QR" : (order.opForm === "credit" || order.opForm === "coupon") ? "С баланса" : 'Нал_Карта_QR'}
+                </Text>
+              </View>
+
               <View style={styles.productsCard}>
                 <Text style={styles.cardTitle}>Товары в заказе:</Text>
                 {order && order.products && order.products.b12 && order.products.b12 > 0 && (

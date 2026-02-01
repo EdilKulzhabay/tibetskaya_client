@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Platform } from 'react-native';
 import { useNavigation, useNavigationState } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../types/navigation';
 import { useAuth } from '../hooks';
 
@@ -10,6 +11,7 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 const Navigation: React.FC = () => {
     const navigation = useNavigation<NavigationProp>();
     const { user, isAuthenticated, loadingState } = useAuth();
+    const insets = useSafeAreaInsets();
     
     // Получаем текущий маршрут из состояния навигации
     const currentScreen = useNavigationState(state => {
@@ -40,8 +42,13 @@ const Navigation: React.FC = () => {
         }
     }
 
+    // Вычисляем нижний отступ с учетом системной навигации
+    const bottomPadding = Platform.OS === 'android' 
+        ? Math.max(insets.bottom, 15) 
+        : Math.max(insets.bottom, 30);
+
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { paddingBottom: bottomPadding }]}>
             <TouchableOpacity 
                 style={styles.navBlock} 
                 onPress={() => navigateToScreen('Home')}
@@ -123,7 +130,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: 16,
-        paddingBottom: Platform.OS === 'android' ? 15 : 30,
         backgroundColor: 'white',
     },
     navBlock: {

@@ -9,6 +9,7 @@ import {
   Alert,
   TouchableOpacity,
   Modal,
+  Image,
 } from 'react-native';
 import { Header, Navigation, OrderBlock } from '../components';
 import { useFocusEffect } from '@react-navigation/native';
@@ -175,7 +176,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
               </View>
               <View style={{height: 1, backgroundColor: '#E3E3E3', marginVertical: 12, width: '100%' }} />
               <View style={orderBlockStyles.orderBody}>
-                  <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+                  <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end'}}>
                       <View>
                           <View style={orderBlockStyles.orderProduct}>
                               {order.products && order.products.b12 > 0 && (
@@ -185,7 +186,11 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
                                   <Text>{order.products.b19}x Вода 18,9 л</Text>
                               )}
                           </View>
-                          <Text style={orderBlockStyles.orderProduct}>{order.address.name}</Text>
+                          <View style={{flexDirection: "row", gap: 6, marginTop: 4, alignItems: 'center'}}>
+                            <Image source={require('../assets/pin.png')} style={{width: 16, height: 16}} />
+                            <Text style={orderBlockStyles.orderProduct}>{order.address.name}</Text>
+                          </View>
+                          
                       </View>
                       <TouchableOpacity 
                           style={{backgroundColor: '#DC1818', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 10}}
@@ -209,8 +214,10 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
                       </View>
                   )}
               </View>
+              
           </TouchableOpacity>
         ))}
+        <View style={{height: 40}}></View>
       </ScrollView>
       <Modal
           visible={paymentModalVisible}

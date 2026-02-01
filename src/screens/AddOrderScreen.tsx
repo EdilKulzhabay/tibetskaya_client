@@ -190,20 +190,33 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
     }
 
     useEffect(() => {
-        
-        if (selectedPayment && selectedPayment.value === 'card') {
+        // Проверяем оплату с баланса (credit или coupon)
+        if (selectedPayment && (selectedPayment.value === 'credit' || selectedPayment.value === 'coupon')) {
             
             const totalAmount = count12 * price12 + count19 * price19;
             console.log('🔄 AddOrderScreen: totalAmount', totalAmount);
-            if (user && user.balance !== undefined && user.balance !== null && user.balance < totalAmount) {
-                console.log('🔄 AddOrderScreen: не хватает средств', user.balance, totalAmount);
-                setSelectedPayment(null);
-                setNotEnoughBalanceModalVisible(true);
-                // navigation.navigate('Wallet');
-                return;
+            
+            // Для coupon проверяем количество бутылок раздельно, для credit - баланс в тенге
+            if (selectedPayment.value === 'coupon') {
+                const available19 = user?.paidBootlesFor19 || 0;
+                const available12 = user?.paidBootlesFor12 || 0;
+                
+                if (count19 > available19 || count12 > available12) {
+                    console.log('🔄 AddOrderScreen: не хватает бутылок', { count19, available19, count12, available12 });
+                    setSelectedPayment(null);
+                    setNotEnoughBalanceModalVisible(true);
+                    return;
+                }
+            } else {
+                if (user && user.balance !== undefined && user.balance !== null && user.balance < totalAmount) {
+                    console.log('🔄 AddOrderScreen: не хватает средств', user.balance, totalAmount);
+                    setSelectedPayment(null);
+                    setNotEnoughBalanceModalVisible(true);
+                    return;
+                }
             }
         }
-    }, [selectedPayment, count12, count19, price12, price19, user?.balance]);
+    }, [selectedPayment, count12, count19, price12, price19, user?.balance, user?.paidBootlesFor19, user?.paidBootlesFor12]);
 
     return (
         <SafeAreaView style={styles.safeArea}>
@@ -351,9 +364,15 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                             setNotEnoughBalanceModalVisible(true);
                             return;
                         }
-                        if (user?.paymentMethod === "coupon" && user?.paidBootles !== undefined && user?.paidBootles !== null && user?.paidBootles < count12 + count19) {
-                            setNotEnoughBalanceModalVisible(true);
-                            return;
+                        if (user?.paymentMethod === "coupon") {
+                            // Проверяем баланс бутылок раздельно для 19л и 12л
+                            const available19 = user?.paidBootlesFor19 || 0;
+                            const available12 = user?.paidBootlesFor12 || 0;
+                            
+                            if (count19 > available19 || count12 > available12) {
+                                setNotEnoughBalanceModalVisible(true);
+                                return;
+                            }
                         }
                         setPaymentModalVisible(true);
                     }}>
@@ -498,24 +517,43 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                 </View>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.modalAddress} onPress={() => {
-                                if (selectedPayment?.value === 'card') {
+                                // Определяем правильное значение opForm в зависимости от paymentMethod пользователя
+                                const balanceValue = user?.paymentMethod === "coupon" ? 'coupon' : 'credit';
+                                if (selectedPayment?.value === balanceValue) {
                                     setSelectedPayment(null);
                                 } else {
-                                    setSelectedPayment({ label: 'С баланса', value: 'card' });
+                                    setSelectedPayment({ label: 'С баланса', value: balanceValue });
                                     setPaymentModalVisible(false);
                                 }
                             }}>
                                 {user && user?.paymentMethod === "coupon"? (
-                                    <Text style={styles.modalAddressText}>
-                                        С баланса <Text style={{color: "#46a54f"}}>({Number(user?.paidBootles || 0).toLocaleString("ru-RU")} шт)</Text>
-                                    </Text>
+                                    <View>
+                                        <Text style={styles.modalAddressText}>С баланса</Text>
+                                        {user?.doesItTake19Bottles && user?.doesItTake12Bottles ? (
+                                            <Text style={{color: "#46a54f", fontSize: 12, marginTop: 4}}>
+                                                ({user?.paidBootlesFor19 || 0} шт 18,9л, {user?.paidBootlesFor12 || 0} шт 12,5л)
+                                            </Text>
+                                        ) : user?.doesItTake19Bottles ? (
+                                            <Text style={{color: "#46a54f", fontSize: 12, marginTop: 4}}>
+                                                ({user?.paidBootlesFor19 || 0} шт 18,9л)
+                                            </Text>
+                                        ) : user?.doesItTake12Bottles ? (
+                                            <Text style={{color: "#46a54f", fontSize: 12, marginTop: 4}}>
+                                                ({user?.paidBootlesFor12 || 0} шт 12,5л)
+                                            </Text>
+                                        ) : (
+                                            <Text style={{color: "#46a54f", fontSize: 12, marginTop: 4}}>
+                                                ({(user?.paidBootlesFor19 || 0) + (user?.paidBootlesFor12 || 0)} шт)
+                                            </Text>
+                                        )}
+                                    </View>
                                 ) : (
                                     <Text style={styles.modalAddressText}>
                                         С баланса <Text style={{color: "#46a54f"}}>({Number(user?.balance || 0).toLocaleString("ru-RU")} ₸)</Text>
                                     </Text>
                                 )}
-                                <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: selectedPayment?.value === "card" ? '#DC1818' : '#101010' }}>
-                                    {selectedPayment?.value === "card" && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
+                                <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: (selectedPayment?.value === "credit" || selectedPayment?.value === "coupon") ? '#DC1818' : '#101010' }}>
+                                    {(selectedPayment?.value === "credit" || selectedPayment?.value === "coupon") && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
                                 </View>
                             </TouchableOpacity>
                     </TouchableOpacity>
@@ -589,9 +627,18 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                             </>
                         ) : (
                             <>
-                                <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Не хватает {count12 + count19 - (user?.paidBootles || 0)} шт</Text>
-                                <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>Ваш текущий баланс: {user?.paidBootles || 0} шт.</Text>
-                                <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>Для оформления заказа необходимо пополнить баланс.</Text>
+                                <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Недостаточно бутылок</Text>
+                                {count19 > (user?.paidBootlesFor19 || 0) && (
+                                    <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>
+                                        18,9л: нужно {count19}, у вас {user?.paidBootlesFor19 || 0} шт
+                                    </Text>
+                                )}
+                                {count12 > (user?.paidBootlesFor12 || 0) && (
+                                    <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>
+                                        12,5л: нужно {count12}, у вас {user?.paidBootlesFor12 || 0} шт
+                                    </Text>
+                                )}
+                                <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center', marginTop: 8}}>Для оформления заказа необходимо пополнить баланс.</Text>
                             </>
                         )}
                         {/* <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Не хватает {count12 * price12 + count19 * price19 - (user?.balance || 0)} ₸</Text>
@@ -613,7 +660,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                             {user?.paymentMethod === "balance" ? (
                                 <Text style={styles.buttonText}>Пополнить на {count12 * price12 + count19 * price19 - (user?.balance || 0)} ₸</Text>
                             ) : (
-                                <Text style={styles.buttonText}>Пополнить на {count12 + count19 - (user?.paidBootles || 0)} шт</Text>
+                                <Text style={styles.buttonText}>Пополнить баланс</Text>
                             )}
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.modalButton, {marginTop: 10}]} onPress={() => {

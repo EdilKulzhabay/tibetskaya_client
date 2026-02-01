@@ -20,6 +20,7 @@ const AwaitingOrderView: React.FC<AwaitingOrderViewProps> = ({ order, onCancelOr
   const [timeRemaining, setTimeRemaining] = useState(25 * 60); // 25 минут в секундах
 
   useEffect(() => {
+    console.log("order in AwaitingScreen = ", order)
     const timer = setInterval(() => {
       setTimeRemaining(prev => Math.max(0, prev - 1));
     }, 1000);
@@ -118,7 +119,7 @@ const AwaitingOrderView: React.FC<AwaitingOrderViewProps> = ({ order, onCancelOr
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Способ оплаты</Text>
             <Text style={styles.infoValue}>
-              {order.opForm === "fakt" ? "Наличные" : order.opForm === "card" ? "Карта" : order.opForm === "qr" ? "QR" : 'Нал/карта/QR'}
+              {order.opForm === "fakt" ? "Нал_Карта_QR" : (order.opForm === "credit" || order.opForm === "coupon") ? "С баланса" : 'Нал_Карта_QR'}
             </Text>
           </View>
           

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, OrderData, OrderProduct, Courier, OrderDate, CourierAggregator } from '../types/navigation';
@@ -16,9 +16,10 @@ interface OrderBlockProps {
     address: OrderAddress;
     totalAmount: number;
     courierAggregator?: CourierAggregator | string;
+    opForm: string;
 }
 
-const OrderBlock: React.FC<OrderBlockProps> = ({_id, date, status, products, courier, address, totalAmount, courierAggregator}) => {
+const OrderBlock: React.FC<OrderBlockProps> = ({_id, date, status, products, courier, opForm, address, totalAmount, courierAggregator}) => {
     const navigation = useNavigation<NavigationProp>();
     
     // Создаем объект заказа для передачи
@@ -36,6 +37,7 @@ const OrderBlock: React.FC<OrderBlockProps> = ({_id, date, status, products, cou
         transferred: false,
         clientReview: 0,
         clientNotes: [],
+        opForm,
         income: 0,
         aquaMarketAddress: '',
         reason: '',
@@ -52,7 +54,6 @@ const OrderBlock: React.FC<OrderBlockProps> = ({_id, date, status, products, cou
     };
 
     const handleRepeatOrder = () => {
-        console.log('handleRepeatOrder', orderData);
         if (orderData && orderData.products && orderData.products.b12 !== undefined && orderData.products.b19 !== undefined) {
             navigation.navigate('AddOrder', { products: { b12: orderData.products.b12, b19: orderData.products.b19 }, order: orderData });
         } else {
@@ -84,7 +85,10 @@ const OrderBlock: React.FC<OrderBlockProps> = ({_id, date, status, products, cou
                                 <Text>{products.b19}x Вода 18,9 л</Text>
                             )}
                         </View>
-                        <Text style={styles.orderProduct}>{address.name}</Text>
+                        <View style={{flexDirection: "row", gap: 6, marginTop: 4, alignItems: 'center'}}>
+                            <Image source={require('../assets/pin.png')} style={{width: 16, height: 16}} />
+                            <Text style={styles.orderProduct}>{address.name}</Text>
+                        </View>
                     </View>
                     {/* <TouchableOpacity 
                         style={{backgroundColor: '#DC1818', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 10}}
