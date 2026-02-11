@@ -43,6 +43,11 @@ export interface User {
   }[];
   createdAt: string;
   paymentMethod?: string;
+  savedCard?: {
+    cardToken?: string;
+    cardId?: string;
+    cardPan?: string; // последние 4 цифры карты
+  };
 }
 
 export interface ApiResponse<T> {

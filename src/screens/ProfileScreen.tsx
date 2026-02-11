@@ -114,6 +114,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         quality: 0.8,
         maxWidth: 500,
         maxHeight: 500,
+        presentationStyle: 'photoPicker', // Использует Android Photo Picker API (не требует READ_MEDIA_* разрешений)
       },
       async (response: ImagePickerResponse) => {
         if (response.didCancel) {

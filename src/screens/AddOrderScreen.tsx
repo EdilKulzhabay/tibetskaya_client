@@ -42,6 +42,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
     
     const scrollViewRef = useRef<ScrollView>(null);
     const commentInputRef = useRef<TextInput>(null);
+    const isSubmittingRef = useRef(false); // Защита от двойного нажатия
 
     useEffect(() => {
         console.log('🔄 AddOrderScreen: selectedDate', selectedDate);
@@ -113,33 +114,44 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
     }, [user, user?.price12, user?.price19]);
 
     const handleOrder = async () => {
+        // Защита от двойного нажатия (синхронная проверка)
+        if (isSubmittingRef.current) {
+            return;
+        }
+        isSubmittingRef.current = true;
         setLoading(true);
+        
         if (!selectedAddress) {
             Alert.alert('Ошибка', 'Пожалуйста, выберите адрес доставки');
             setLoading(false);
+            isSubmittingRef.current = false;
             return;
         }
         if (!selectedPayment) {
             Alert.alert('Ошибка', 'Пожалуйста, выберите способ оплаты');
             setLoading(false);
+            isSubmittingRef.current = false;
             return;
         }
 
         if (count12 + count19 < 2) {
             Alert.alert('Ошибка', 'Пожалуйста, выберите хотя бы 2 бутыля воды');
             setLoading(false);
+            isSubmittingRef.current = false;
             return;
         }
 
         if (!selectedCall) {
             Alert.alert('Ошибка', 'Пожалуйста, выберите нужен ли звонок от курьера');
             setLoading(false);
+            isSubmittingRef.current = false;
             return;
         }
 
         if (!selectedDate) {
             Alert.alert('Ошибка', 'Пожалуйста, выберите дату доставки');
             setLoading(false);
+            isSubmittingRef.current = false;
             return;
         }
 
@@ -177,7 +189,6 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
 
             if (res.success) {
                 Alert.alert('Успешно', 'Заказ оформлен');
-                setLoading(false);
                 refreshUserData();
                 navigation.navigate('Home');
             } else {
@@ -185,8 +196,10 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
             }
         } catch (error) {
             console.error('Ошибка при оформлении заказа:', error);
+        } finally {
+            setLoading(false);
+            isSubmittingRef.current = false;
         }
-        setLoading(false);
     }
 
     useEffect(() => {
@@ -364,16 +377,16 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                             setNotEnoughBalanceModalVisible(true);
                             return;
                         }
-                        if (user?.paymentMethod === "coupon") {
-                            // Проверяем баланс бутылок раздельно для 19л и 12л
-                            const available19 = user?.paidBootlesFor19 || 0;
-                            const available12 = user?.paidBootlesFor12 || 0;
+                        // if (user?.paymentMethod === "coupon") {
+                        //     // Проверяем баланс бутылок раздельно для 19л и 12л
+                        //     const available19 = user?.paidBootlesFor19 || 0;
+                        //     const available12 = user?.paidBootlesFor12 || 0;
                             
-                            if (count19 > available19 || count12 > available12) {
-                                setNotEnoughBalanceModalVisible(true);
-                                return;
-                            }
-                        }
+                        //     if (count19 > available19 || count12 > available12) {
+                        //         setNotEnoughBalanceModalVisible(true);
+                        //         return;
+                        //     }
+                        // }
                         setPaymentModalVisible(true);
                     }}>
                         <View>

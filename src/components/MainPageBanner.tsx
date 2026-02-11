@@ -50,7 +50,7 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
 
   // Объявляем bannerComponents и extendedData после функций баннеров, но до useEffect
   const bannerComponents = [
-    // { id: '1', Component: firstBanner },
+    { id: '1', Component: firstBanner },
     { id: '1', Component: secondBanner },
     { id: '2', Component: thirdBanner },
   ];

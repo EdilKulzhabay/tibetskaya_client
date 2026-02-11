@@ -23,6 +23,7 @@ interface HeaderProps {
   onBackPress?: () => void;
   rightComponent?: React.ReactNode;
   showBonus?: boolean;
+  onBonusPress?: () => void;
 }
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -36,11 +37,16 @@ const Header: React.FC<HeaderProps> = ({
   doesItTake19Bottles,
   doesItTake12Bottles,
   showBonus = false,
+  onBonusPress: onBonusPressExternal,
 }) => {
   const navigation = useNavigation<NavigationProp>();
 
   const onBonusPress = () => {
-    navigation.navigate('Wallet');
+    if (onBonusPressExternal) {
+      onBonusPressExternal();
+    } else {
+      navigation.navigate('Wallet');
+    }
   }
 
   // Функция для отображения баланса бутылок с учетом литража

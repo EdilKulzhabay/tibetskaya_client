@@ -168,9 +168,12 @@ export const apiService = {
             };
         }
     },
-    createPaymentLink: async (sum: any) => {
+    createPaymentLink: async (sum: any, email?: string, phone?: string) => {
         try {
-            const response = await api.post('/api/payment/create', {sum});
+            const body: any = { sum };
+            if (email) { body.email = email; }
+            if (phone) { body.phone = phone.replace(/\D/g, ''); }
+            const response = await api.post('/api/payment/create', body);
             return response.data;
         } catch (error) {
             return {
@@ -218,6 +221,46 @@ export const apiService = {
             return {
                 success: false,
                 message: "Не удалось установить новый пароль",
+            };
+        }
+    },
+
+    // Оплата сохранённой картой (рекуррентный платёж)
+    chargeSavedCard: async (clientId: string, amount: number) => {
+        try {
+            const response = await api.post('/api/payment/charge-saved-card', { clientId, amount });
+            return response.data;
+        } catch (error) {
+            return {
+                success: false,
+                message: "Не удалось выполнить оплату",
+            };
+        }
+    },
+
+    // Получение данных сохранённой карты
+    getSavedCard: async (clientId: string) => {
+        try {
+            const response = await api.post('/api/payment/saved-card', { clientId });
+            return response.data;
+        } catch (error) {
+            return {
+                success: false,
+                hasCard: false,
+                card: null,
+            };
+        }
+    },
+
+    // Удаление сохранённой карты
+    deleteSavedCard: async (clientId: string) => {
+        try {
+            const response = await api.post('/api/payment/delete-card', { clientId });
+            return response.data;
+        } catch (error) {
+            return {
+                success: false,
+                message: "Не удалось удалить карту",
             };
         }
     },
