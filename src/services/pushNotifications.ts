@@ -1,4 +1,12 @@
-import { Alert, Platform, DeviceEventEmitter, PermissionsAndroid } from 'react-native';
+import {
+  Alert,
+  Platform,
+  DeviceEventEmitter,
+  PermissionsAndroid,
+  InteractionManager,
+  AppState,
+  type AppStateStatus,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import messaging from '@react-native-firebase/messaging';
@@ -41,7 +49,13 @@ class PushNotificationService {
     console.log('🔔 Начало инициализации push notifications...');
     console.log('📱 Платформа:', Platform.OS, 'Версия:', Platform.Version);
 
-    // 0. Создаем канал уведомлений для Android (должно быть до запроса разрешений)
+    // Android: не вызываем нативный код, пока MainActivity не готова (useAuth стартует очень рано)
+    if (Platform.OS === 'android') {
+      await new Promise<void>((resolve) => setTimeout(resolve, 1200));
+      await this.waitUntilActivityReadyForPermissions();
+    }
+
+    // 0. Создаем канал уведомлений для Android (после ожидания Activity)
     if (Platform.OS === 'android') {
       await this.createNotificationChannel();
     }
@@ -121,29 +135,83 @@ class PushNotificationService {
   }
 
   /**
+   * На Android запрос разрешений через PermissionsAndroid / системные диалоги
+   * возможен только когда Activity уже прикреплена. Ранний вызов из useAuth даёт:
+   * IllegalStateException: Tried to use permissions API while not attached to an Activity.
+   */
+  private async waitUntilActivityReadyForPermissions(): Promise<void> {
+    if (Platform.OS === 'android' && AppState.currentState !== 'active') {
+      await Promise.race([
+        new Promise<void>((resolve) => {
+          const sub = AppState.addEventListener(
+            'change',
+            (next: AppStateStatus) => {
+              if (next === 'active') {
+                sub.remove();
+                resolve();
+              }
+            }
+          );
+        }),
+        new Promise<void>((resolve) => setTimeout(resolve, 10000)),
+      ]);
+    }
+
+    await new Promise<void>((resolve) => {
+      InteractionManager.runAfterInteractions(() => {
+        // После первого кадра MainActivity обычно уже прикреплена
+        setTimeout(() => resolve(), Platform.OS === 'android' ? 1200 : 0);
+      });
+    });
+  }
+
+  /**
    * Запрос разрешений
    */
   private async requestPermission(): Promise<boolean> {
     try {
+      await this.waitUntilActivityReadyForPermissions();
+
       // Для Android 13+ нужно запрашивать POST_NOTIFICATIONS отдельно
       if (Platform.OS === 'android' && Platform.Version >= 33) {
         console.log('📱 Android 13+: Запрашиваем разрешение POST_NOTIFICATIONS');
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
-          {
-            title: 'Разрешение на уведомления',
-            message: 'Приложению нужно разрешение для отправки уведомлений о заказах',
-            buttonNeutral: 'Позже',
-            buttonNegative: 'Отмена',
-            buttonPositive: 'OK',
+        let granted: string = PermissionsAndroid.RESULTS.DENIED;
+        const maxAttempts = 4;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          try {
+            await this.waitUntilActivityReadyForPermissions();
+            granted = await PermissionsAndroid.request(
+              PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+              {
+                title: 'Разрешение на уведомления',
+                message: 'Приложению нужно разрешение для отправки уведомлений о заказах',
+                buttonNeutral: 'Позже',
+                buttonNegative: 'Отмена',
+                buttonPositive: 'OK',
+              }
+            );
+            break;
+          } catch (err: unknown) {
+            const msg = String((err as Error)?.message ?? err);
+            const isActivity =
+              msg.includes('Activity') || msg.includes('IllegalStateException');
+            if (isActivity && attempt < maxAttempts) {
+              console.warn(
+                `[Push] POST_NOTIFICATIONS попытка ${attempt}/${maxAttempts}, ждём Activity...`
+              );
+              await new Promise<void>((r) => setTimeout(r, 400 * attempt));
+              continue;
+            }
+            throw err;
           }
-        );
-        
+        }
+
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
           console.log('❌ Android: Разрешение POST_NOTIFICATIONS отклонено');
           return false;
         }
         console.log('✅ Android: Разрешение POST_NOTIFICATIONS получено');
+        await new Promise<void>((r) => setTimeout(r, 300));
       }
 
       // Запрашиваем разрешение через Firebase Messaging

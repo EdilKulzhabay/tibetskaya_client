@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Platform } from 'react-native';
 import { User, RegisterData, LoadingState } from '../types';
 import { userStorage, tokenStorage, clearAllData } from '../utils/storage';
 import { apiService } from '../api/services';
@@ -48,9 +49,15 @@ export const useAuth = (): UseAuthReturn => {
         // Сохраняем email для push notifications
         await AsyncStorage.setItem('userMail', savedUser.mail);
         
-        // Инициализируем push notifications (токен отправится автоматически, если есть userMail)
+        // Push: на Android init() сам ждёт Activity; не блокируем загрузку профиля дольше необходимого
         try {
-          await pushNotificationService.init();
+          if (Platform.OS === 'android') {
+            void pushNotificationService.init().catch((pushError) => {
+              console.error('❌ Ошибка при инициализации push notifications:', pushError);
+            });
+          } else {
+            await pushNotificationService.init();
+          }
         } catch (pushError) {
           console.error('❌ Ошибка при инициализации push notifications:', pushError);
         }
@@ -92,6 +99,7 @@ export const useAuth = (): UseAuthReturn => {
         addresses: clientData.addresses || [],
         createdAt: clientData.createdAt,
         isStartedHydration: clientData.isStartedHydration || false,
+        showRepairMasterInApp: clientData.showRepairMasterInApp !== false,
       };
 
       // Сохраняем пользователя и токены из сервера
@@ -109,7 +117,6 @@ export const useAuth = (): UseAuthReturn => {
       // Токен отправится автоматически, так как userMail уже сохранен в AsyncStorage
       try {
         await pushNotificationService.init();
-        // Если токен уже был получен ранее, отправляем его на сервер
         await pushNotificationService.resendToken();
       } catch (pushError) {
         console.error('❌ Ошибка при инициализации push notifications после логина/регистрации:', pushError);

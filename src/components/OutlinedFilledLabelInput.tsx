@@ -22,14 +22,72 @@ interface Props extends TextInputProps {
     inputRef?: React.RefObject<TextInput | null> // 👈 внешний ref для навигации между полями
 }
 
-const formatKzPhone = (text: string) => {
-    const digits = text.replace(/\D/g, "").slice(0, 11);
+const extractPhoneDigits = (text: string) => text.replace(/\D/g, "").slice(0, 11);
+
+/** Нормализация: 8→7, ведущая 7 для кода страны */
+const normalizeKzDigits = (digits: string): string => {
+    let d = extractPhoneDigits(digits);
+    if (d.length === 0) {
+        return "";
+    }
+    if (d[0] === "8") {
+        d = "7" + d.slice(1);
+    }
+    if (d[0] !== "7") {
+        d = ("7" + d).slice(0, 11);
+    }
+    return d;
+};
+
+/** Отображение +7 (XXX) XXX-XX-XX только из нормализованных цифр */
+const formatKzPhoneDisplay = (normalizedDigits: string): string => {
+    const digits = normalizeKzDigits(normalizedDigits);
+    if (digits.length === 0) {
+        return "";
+    }
     let result = "+7";
-    if (digits.length > 1) result += ` (${digits.slice(1, 4)}`;
-    if (digits.length >= 4) result += `) ${digits.slice(4, 7)}`;
-    if (digits.length >= 7) result += `-${digits.slice(7, 9)}`;
-    if (digits.length >= 9) result += `-${digits.slice(9, 11)}`;
+    if (digits.length > 1) {
+        result += ` (${digits.slice(1, 4)}`;
+    }
+    if (digits.length >= 4) {
+        result += `) ${digits.slice(4, 7)}`;
+    }
+    if (digits.length >= 7) {
+        result += `-${digits.slice(7, 9)}`;
+    }
+    if (digits.length >= 9) {
+        result += `-${digits.slice(9, 11)}`;
+    }
     return result;
+};
+
+/**
+ * Обработка ввода: если пользователь стирает скобку/пробел/тире, количество цифр не меняется —
+ * тогда считаем, что нужно убрать последнюю цифру (иначе маска мгновенно вернёт скобки).
+ */
+const resolvePhoneDigitsOnChange = (text: string, prevFormatted: string): string => {
+    const prevDigits = extractPhoneDigits(prevFormatted);
+    const incomingDigits = extractPhoneDigits(text);
+
+    if (incomingDigits.length === 0) {
+        return "";
+    }
+
+    // Стерли «+» из «+7», осталась одна «7» в поле
+    if (text === "7" && prevFormatted === "+7") {
+        return "";
+    }
+
+    if (text.length < prevFormatted.length) {
+        if (incomingDigits.length < prevDigits.length) {
+            return normalizeKzDigits(incomingDigits);
+        }
+        if (incomingDigits.length === prevDigits.length && prevDigits.length > 0) {
+            return normalizeKzDigits(prevDigits.slice(0, -1));
+        }
+    }
+
+    return normalizeKzDigits(incomingDigits);
 };
 
 const OutlinedFilledLabelInput: React.FC<Props> = ({
@@ -47,6 +105,8 @@ const OutlinedFilledLabelInput: React.FC<Props> = ({
     const [isFocused, setIsFocused] = useState(false);
     const [isSecure, setIsSecure] = useState(true);
     const internalInputRef = useRef<TextInput>(null);
+    /** Предыдущее отформатированное значение телефона (для корректного стирания +7) */
+    const prevPhoneValueRef = useRef<string>("");
     const animatedLabel = useState(new Animated.Value(value ? 1 : 0))[0];
     
     // Используем внешний ref если передан, иначе внутренний
@@ -59,6 +119,12 @@ const OutlinedFilledLabelInput: React.FC<Props> = ({
             useNativeDriver: false,
         }).start();
     }, [isFocused, value]);
+
+    useEffect(() => {
+        if (mask === "phone") {
+            prevPhoneValueRef.current = value ?? "";
+        }
+    }, [mask, value]);
 
     const labelStyle = {
         top: animatedLabel.interpolate({
@@ -98,7 +164,10 @@ const OutlinedFilledLabelInput: React.FC<Props> = ({
                             secureTextEntry={isPassword && isSecure}
                             onChangeText={(text) => {
                             if (mask === "phone") {
-                                const formatted = formatKzPhone(text);
+                                const prev = prevPhoneValueRef.current;
+                                const resolvedDigits = resolvePhoneDigitsOnChange(text, prev);
+                                const formatted = formatKzPhoneDisplay(resolvedDigits);
+                                prevPhoneValueRef.current = formatted;
                                 onChangeText(formatted);
                             } else {
                                 onChangeText(text);

@@ -1,6 +1,7 @@
 import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, Image, Modal, ActivityIndicator, Alert, ScrollView, TextInput } from "react-native";
 import Back from "../components/Back";
 import { useAuth } from "../hooks";
+import { useTopUpBalance } from "../context/TopUpBalanceContext";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { apiService } from "../api/services";
 import { useFocusEffect } from "@react-navigation/native";
@@ -18,6 +19,7 @@ const calls = [
 const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation, route }) => {
     const { products, order } = route.params;
     const { user, refreshUserData } = useAuth();
+    const { openTopUpModal } = useTopUpBalance();
 
     const [price12, setPrice12] = useState(user?.price12 || 900);
     const [price19, setPrice19] = useState(user?.price19 || 1300);
@@ -155,6 +157,24 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
             return;
         }
 
+        if (selectedPayment.value === 'credit' && user?.paymentMethod === 'balance') {
+            const totalAmount = count12 * price12 + count19 * price19;
+            if (user?.balance !== undefined && user.balance < totalAmount) {
+                setLoading(false);
+                isSubmittingRef.current = false;
+                setNotEnoughBalanceModalVisible(true);
+                return;
+            }
+        }
+        if (selectedPayment.value === 'coupon' && user?.paymentMethod === 'coupon') {
+            if (count19 > (user?.paidBootlesFor19 || 0) || count12 > (user?.paidBootlesFor12 || 0)) {
+                setLoading(false);
+                isSubmittingRef.current = false;
+                setNotEnoughBalanceModalVisible(true);
+                return;
+            }
+        }
+
         let actualAddress = selectedAddress.street;
         if (selectedAddress.floor) {
             actualAddress += `, этаж ${selectedAddress.floor}`;
@@ -277,12 +297,12 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                             <View style={{height: 1, backgroundColor: '#E3E3E3', marginVertical: 12, width: '100%' }} />
                             <View style={styles.productBottom}>
                                 <View style={styles.productBottomTitle}>
-                                    <Text>Цена:</Text>
-                                    <Text>Итого:</Text>
+                                    <Text style={styles.productBottomTitleText}>Цена:</Text>
+                                    <Text style={styles.productBottomTitleText}>Итого:</Text>
                                 </View>
                                 <View style={styles.productBottomSum}>
-                                    <Text>{price12} ₸</Text>
-                                    <Text style={{color: "#DC1818"}}>{count12 * price12} ₸</Text>
+                                    <Text style={styles.productBottomSumText}>{price12} ₸</Text>
+                                    <Text style={[styles.productBottomSumText, {color: "#DC1818"}]}>{count12 * price12} ₸</Text>
                                 </View>
                             </View>
                         </View>
@@ -323,12 +343,12 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                             <View style={{height: 1, backgroundColor: '#E3E3E3', marginVertical: 12, width: '100%' }} />
                             <View style={styles.productBottom}>
                                 <View style={styles.productBottomTitle}>
-                                    <Text>Цена:</Text>
-                                    <Text>Итого:</Text>
+                                    <Text style={styles.productBottomTitleText}>Цена:</Text>
+                                    <Text style={styles.productBottomTitleText}>Итого:</Text>
                                 </View>
                                 <View style={styles.productBottomSum}>
-                                    <Text>{price19} ₸</Text>
-                                    <Text style={{color: "#DC1818"}}>{count19 * price19} ₸</Text>
+                                    <Text style={styles.productBottomSumText}>{price19} ₸</Text>
+                                    <Text style={[styles.productBottomSumText, {color: "#DC1818"}]}>{count19 * price19} ₸</Text>
                                 </View>
                             </View>
                         </View>
@@ -377,16 +397,15 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                             setNotEnoughBalanceModalVisible(true);
                             return;
                         }
-                        // if (user?.paymentMethod === "coupon") {
-                        //     // Проверяем баланс бутылок раздельно для 19л и 12л
-                        //     const available19 = user?.paidBootlesFor19 || 0;
-                        //     const available12 = user?.paidBootlesFor12 || 0;
+                        if (user?.paymentMethod === "coupon") {
+                            const available19 = user?.paidBootlesFor19 || 0;
+                            const available12 = user?.paidBootlesFor12 || 0;
                             
-                        //     if (count19 > available19 || count12 > available12) {
-                        //         setNotEnoughBalanceModalVisible(true);
-                        //         return;
-                        //     }
-                        // }
+                            if (count19 > available19 || count12 > available12) {
+                                setNotEnoughBalanceModalVisible(true);
+                                return;
+                            }
+                        }
                         setPaymentModalVisible(true);
                     }}>
                         <View>
@@ -487,8 +506,8 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                 }
                             }}>
                                 <Text style={styles.modalAddressText}>{address.name}</Text>
-                                <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: selectedAddress?._id === address._id ? '#DC1818' : '#101010' }}>
-                                    {selectedAddress?.name === address.name && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
+                                <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: selectedAddress?._id === address._id ? '#DC1818' : '#101010' }}>
+                                    {selectedAddress?.name === address.name && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
                                 </View>
                             </TouchableOpacity>
                         ))}
@@ -525,8 +544,8 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                 }
                             }}>
                                 <Text style={styles.modalAddressText}>Наличными</Text>
-                                <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: selectedPayment?.value === "fakt" ? '#DC1818' : '#101010' }}>
-                                    {selectedPayment?.value === "fakt" && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
+                                <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: selectedPayment?.value === "fakt" ? '#DC1818' : '#101010' }}>
+                                    {selectedPayment?.value === "fakt" && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
                                 </View>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.modalAddress} onPress={() => {
@@ -565,8 +584,8 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                         С баланса <Text style={{color: "#46a54f"}}>({Number(user?.balance || 0).toLocaleString("ru-RU")} ₸)</Text>
                                     </Text>
                                 )}
-                                <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: (selectedPayment?.value === "credit" || selectedPayment?.value === "coupon") ? '#DC1818' : '#101010' }}>
-                                    {(selectedPayment?.value === "credit" || selectedPayment?.value === "coupon") && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
+                                <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: (selectedPayment?.value === "credit" || selectedPayment?.value === "coupon") ? '#DC1818' : '#101010' }}>
+                                    {(selectedPayment?.value === "credit" || selectedPayment?.value === "coupon") && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
                                 </View>
                             </TouchableOpacity>
                     </TouchableOpacity>
@@ -588,8 +607,8 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                 setCallModalVisible(false)
                             }}>
                                 <Text style={styles.modalAddressText}>{call.label}</Text>
-                                <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: selectedCall?.value === call?.value ? '#DC1818' : '#101010' }}>
-                                    {selectedCall?.value === call?.value && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
+                                <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: selectedCall?.value === call?.value ? '#DC1818' : '#101010' }}>
+                                    {selectedCall?.value === call?.value && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
                                 </View>
                             </TouchableOpacity>
                         ))}
@@ -613,8 +632,8 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                     setDateModalVisible(false);
                                 }}>
                                     <Text style={styles.modalAddressText}>{date.label}</Text>
-                                    <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: selectedDate?.value === date?.value ? '#DC1818' : '#101010' }}>
-                                        {selectedDate?.value === date?.value && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
+                                    <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: selectedDate?.value === date?.value ? '#DC1818' : '#101010' }}>
+                                        {selectedDate?.value === date?.value && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
                                     </View>
                                 </TouchableOpacity>
                             ))}
@@ -667,7 +686,12 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                             onPress={() => {
                                 setNotEnoughBalanceModalVisible(false)
                                 setSelectedPayment(null)
-                                navigation.navigate('Wallet')
+                                if (user?.paymentMethod === "balance") {
+                                    const deficit = count12 * price12 + count19 * price19 - (user?.balance || 0);
+                                    openTopUpModal(String(Math.max(0, Math.ceil(deficit))));
+                                } else {
+                                    openTopUpModal();
+                                }
                             }
                         }>
                             {user?.paymentMethod === "balance" ? (
@@ -763,6 +787,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+    },
+    productBottomTitleText: {
         fontSize: 14,
         fontWeight: '500',
         color: '#545454',
@@ -772,6 +798,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+    },
+    productBottomSumText: {
         fontSize: 16,
         fontWeight: '600',
         color: '#101010',

@@ -11,9 +11,8 @@ import {
   Image,
   Dimensions,
   Alert,
+  Platform,
   ActivityIndicator,
-  Linking,
-  TextInput,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -27,12 +26,14 @@ import { useAuth } from '../hooks/useAuth';
 import { apiService } from '../api/services';
 const { tokenStorage } = require('../utils/storage');
 import { useFocusEffect } from '@react-navigation/native';
+import { useTopUpBalance } from '../context/TopUpBalanceContext';
 
 interface HomeScreenProps {}
 
 const HomeScreen: React.FC<HomeScreenProps> = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user, loadingState, refreshUserData } = useAuth();
+  const { openTopUpModal } = useTopUpBalance();
   const [token, setToken] = useState<string | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
@@ -40,18 +41,26 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
   const [notEnoughBalanceModalVisible, setNotEnoughBalanceModalVisible] = useState(false);
+  const [masterCallConfirmModalVisible, setMasterCallConfirmModalVisible] = useState(false);
+  const [masterCallSuccessModalVisible, setMasterCallSuccessModalVisible] = useState(false);
+  const [masterCallLoading, setMasterCallLoading] = useState(false);
 
-  // Bottom sheet пополнения баланса
-  const [topUpVisible, setTopUpVisible] = useState(false);
-  const [topUpSum, setTopUpSum] = useState('');
-  const [topUpLoading, setTopUpLoading] = useState(false);
-  const topUpSubmittingRef = useRef(false);
+  const platformSentRef = useRef(false);
 
   useEffect(() => {
     tokenStorage.getAuthToken().then((token: any) => {
       setToken(token);
     });
   }, []);
+
+  useEffect(() => {
+    if (user?.mail && !platformSentRef.current) {
+      platformSentRef.current = true;
+      apiService.updateData(user.mail, 'platform', Platform.OS);
+      const APP_VERSION = "1.1.0";
+      apiService.updateData(user.mail, 'appVersion', APP_VERSION.toString());
+    }
+  }, [user?.mail]);
 
   // Очистка заказов при выходе из системы
   useFocusEffect(
@@ -89,6 +98,62 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
       }
     }
   }
+
+  const openMasterCallConfirmModal = () => {
+    if (!user?.mail) {
+      Alert.alert('Вход в аккаунт', 'Войдите в аккаунт, чтобы вызвать мастера');
+      return;
+    }
+    const fullName = user.userName?.trim() || (user as { fullName?: string }).fullName?.trim() || '';
+    const phone = user.phone?.trim() || '';
+    if (!fullName || !phone) {
+      Alert.alert(
+        'Данные профиля',
+        'Укажите имя и телефон в разделе «Мои данные».',
+        [
+          { text: 'Отмена', style: 'cancel' },
+          { text: 'Перейти', onPress: () => navigation.navigate('ChangeData') },
+        ]
+      );
+      return;
+    }
+    setMasterCallConfirmModalVisible(true);
+  };
+
+  const handleRequestMasterCall = async () => {
+    if (!user?.mail) {
+      Alert.alert('Вход в аккаунт', 'Войдите в аккаунт, чтобы вызвать мастера');
+      return;
+    }
+    const fullName = user.userName?.trim() || (user as { fullName?: string }).fullName?.trim() || '';
+    const phone = user.phone?.trim() || '';
+    if (!fullName || !phone) {
+      setMasterCallConfirmModalVisible(false);
+      Alert.alert(
+        'Данные профиля',
+        'Укажите имя и телефон в разделе «Мои данные».',
+        [
+          { text: 'Отмена', style: 'cancel' },
+          { text: 'Перейти', onPress: () => navigation.navigate('ChangeData') },
+        ]
+      );
+      return;
+    }
+    setMasterCallLoading(true);
+    try {
+      const res = await apiService.requestMasterCall({ fullName, phone, mail: user?.mail || '' });
+      if (res?.success) {
+        setMasterCallConfirmModalVisible(false);
+        setMasterCallSuccessModalVisible(true);
+      } else {
+        Alert.alert('Ошибка', (res as { message?: string })?.message || 'Не удалось отправить заявку');
+      }
+    } catch {
+      Alert.alert('Ошибка', 'Не удалось отправить заявку');
+    } finally {
+      setMasterCallLoading(false);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -163,6 +228,24 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
 
   const reloadOrder = async () => {
     if (user?.mail && lastOrder) {
+      if (selectedPayment?.value === 'card' || selectedPayment?.value === 'credit' || selectedPayment?.value === 'coupon') {
+        if (user?.paymentMethod === 'balance') {
+          if (user?.balance !== undefined && user.balance < lastOrder.sum) {
+            setPaymentModalVisible(false);
+            setNotEnoughBalanceModalVisible(true);
+            return;
+          }
+        } else if (user?.paymentMethod === 'coupon') {
+          const needed19 = lastOrder?.products?.b19 || 0;
+          const needed12 = lastOrder?.products?.b12 || 0;
+          if (needed19 > (user?.paidBootlesFor19 || 0) || needed12 > (user?.paidBootlesFor12 || 0)) {
+            setPaymentModalVisible(false);
+            setNotEnoughBalanceModalVisible(true);
+            return;
+          }
+        }
+      }
+
       // Определяем сегодняшнюю дату и время
       const now = new Date();
       let orderDate = new Date(now);
@@ -201,68 +284,8 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
     }
   }
 
-  // Оплата новой картой (через виджет + сохранение карты)
-  const handleTopUpNewCard = async () => {
-    if (topUpSubmittingRef.current) return;
-    const sum = topUpSum.trim();
-    if (!sum || sum === '0' || isNaN(Number(sum))) {
-      Alert.alert('Ошибка', 'Введите корректную сумму');
-      return;
-    }
-    topUpSubmittingRef.current = true;
-    setTopUpLoading(true);
-    try {
-      const response = await apiService.createPaymentLink(
-        sum,
-        user?.mail || '',
-        user?.phone || '',
-      );
-      if (response.success) {
-        setTopUpVisible(false);
-        setTopUpSum('');
-        Linking.openURL(response.paymentUrl);
-      } else {
-        Alert.alert('Ошибка', response.message || 'Не удалось создать ссылку оплаты');
-      }
-    } catch (error) {
-      Alert.alert('Ошибка', 'Произошла ошибка при создании платежа');
-    } finally {
-      setTopUpLoading(false);
-      topUpSubmittingRef.current = false;
-    }
-  };
-
-  // Оплата сохранённой картой
-  const handleTopUpSavedCard = async () => {
-    if (topUpSubmittingRef.current) return;
-    const sum = topUpSum.trim();
-    if (!sum || sum === '0' || isNaN(Number(sum))) {
-      Alert.alert('Ошибка', 'Введите корректную сумму');
-      return;
-    }
-    if (!user?._id) return;
-    topUpSubmittingRef.current = true;
-    setTopUpLoading(true);
-    try {
-      const response = await apiService.chargeSavedCard(user._id, Number(sum));
-      if (response.success) {
-        Alert.alert('Успешно', `Баланс пополнен на ${sum} ₸`);
-        setTopUpVisible(false);
-        setTopUpSum('');
-        refreshUserData();
-      } else {
-        Alert.alert('Ошибка', response.message || 'Оплата не прошла');
-      }
-    } catch (error) {
-      Alert.alert('Ошибка', 'Произошла ошибка при оплате');
-    } finally {
-      setTopUpLoading(false);
-      topUpSubmittingRef.current = false;
-    }
-  };
-
-  const hasSavedCard = !!(user?.savedCard?.cardToken && user?.savedCard?.cardId);
-  const cardLast4 = user?.savedCard?.cardPan || '****';
+  const showRepairMasterBlock =
+    !!user && user.showRepairMasterInApp === true;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -277,7 +300,7 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
           doesItTake19Bottles={user?.doesItTake19Bottles}
           doesItTake12Bottles={user?.doesItTake12Bottles}
           showBonus={true}
-          onBonusPress={() => setTopUpVisible(true)}
+          onBonusPress={openTopUpModal}
         />
         <View style={styles.content}>
           <MainPageBanner navigation={navigation} setIsModalVisible={setIsModalVisible} />
@@ -311,7 +334,12 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                 alignItems: 'center', 
                 backgroundColor: "white", 
                 padding: 16, 
-                borderRadius: 16, 
+                borderTopLeftRadius: 16,
+                borderTopRightRadius: 16,
+                ...(showRepairMasterBlock ? {} : {
+                  borderBottomLeftRadius: 16,
+                  borderBottomRightRadius: 16,
+                }),
                 marginTop: 16,
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 2 },
@@ -335,6 +363,68 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                 <Text style={{color: '#DC1818', fontSize: 14, fontWeight: '600'}}>Повторить</Text>
               </View>
             </TouchableOpacity>
+          )}
+
+          {showRepairMasterBlock && (
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              backgroundColor: '#e6e6e6',
+              padding: 16,
+              borderBottomLeftRadius: 16,
+              borderBottomRightRadius: 16,
+              marginTop: 6,
+              borderWidth: 1,
+              borderColor: '#cdcdcd',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.25,
+              shadowRadius: 3.84,
+              elevation: 2,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                gap: 4,
+                alignItems: 'center',
+              }}
+            >
+              <Image source={require('../assets/mainFix.png')} style={{width: 32, height: 32}} />
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: '700',
+                  color: '#DC1818',
+                }}
+              >Ремонт техники</Text>
+
+            </View>
+
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#DC1818',
+                paddingHorizontal: 8,
+                paddingVertical: 8,
+                borderRadius: 10,
+                minWidth: 130,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: masterCallLoading ? 0.7 : 1,
+              }}
+              onPress={openMasterCallConfirmModal}
+              disabled={masterCallLoading}
+            >
+              <Text style={{
+                fontSize: 12,
+                fontWeight: '600',
+                color: 'white',
+              }}>Вызвать мастера</Text>
+            </TouchableOpacity>
+            
+          </View>
           )}
 
           {orders.length > 0 && (
@@ -434,8 +524,8 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                           }
                       }}>
                           <Text style={styles.modalAddressText}>Наличными</Text>
-                          <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: selectedPayment?.value === "fakt" ? '#DC1818' : '#101010' }}>
-                              {selectedPayment?.value === "fakt" && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
+                          <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: selectedPayment?.value === "fakt" ? '#DC1818' : '#101010' }}>
+                              {selectedPayment?.value === "fakt" && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
                           </View>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.modalAddress} onPress={() => {
@@ -473,8 +563,8 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                                   С баланса <Text style={{color: "#46a54f"}}>({Number(user?.balance || 0).toLocaleString("ru-RU")} ₸)</Text>
                               </Text>
                           )}
-                          <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: (selectedPayment?.value === "credit" || selectedPayment?.value === "coupon") ? '#DC1818' : '#101010' }}>
-                              {(selectedPayment?.value === "credit" || selectedPayment?.value === "coupon") && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
+                          <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: (selectedPayment?.value === "credit" || selectedPayment?.value === "coupon") ? '#DC1818' : '#101010' }}>
+                              {(selectedPayment?.value === "credit" || selectedPayment?.value === "coupon") && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
                           </View>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.button} onPress={() => {
@@ -529,7 +619,12 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                       onPress={() => {
                           setNotEnoughBalanceModalVisible(false)
                           setSelectedPayment(null)
-                          navigation.navigate('Wallet')
+                          if (user?.paymentMethod === 'balance' && lastOrder?.sum != null) {
+                            const deficit = lastOrder.sum - (user?.balance || 0);
+                            openTopUpModal(String(Math.max(0, Math.ceil(deficit))));
+                          } else {
+                            openTopUpModal();
+                          }
                       }
                   }>
                       {user?.paymentMethod === "balance" ? (
@@ -538,112 +633,182 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                           <Text style={styles.buttonText}>Пополнить баланс</Text>
                       )}
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.modalButton, {marginTop: 10}]} onPress={() => {
-                      setNotEnoughBalanceModalVisible(false)
-                      setSelectedPayment({ label: 'Наличными', value: 'fakt' })
-                      reloadOrder();
-                  }}>
-                      <Text style={styles.modalButtonText}>Оплатить наличными</Text>
+                  <TouchableOpacity
+                      style={{
+                          backgroundColor: '#DC1818',
+                          padding: 16,
+                          borderRadius: 8,
+                          marginTop: 12,
+                      }}
+                      onPress={() => {
+                          setNotEnoughBalanceModalVisible(false);
+                          setSelectedPayment({ label: 'Наличными', value: 'fakt' });
+                          setPaymentModalVisible(true);
+                      }}
+                  >
+                      <Text style={styles.buttonText}>Оплатить наличными</Text>
                   </TouchableOpacity>
               </TouchableOpacity>
           </TouchableOpacity>
       </Modal>
-      {/* Bottom Sheet пополнения баланса */}
       <Modal
-        visible={topUpVisible}
-        onRequestClose={() => setTopUpVisible(false)}
+        visible={masterCallConfirmModalVisible}
+        onRequestClose={() => !masterCallLoading && setMasterCallConfirmModalVisible(false)}
         transparent={true}
-        animationType="slide"
+        animationType="fade"
       >
         <TouchableOpacity
-          style={styles.bottomSheetOverlay}
+          style={styles.modalOverlayReloadOrder}
           activeOpacity={1}
-          onPress={() => setTopUpVisible(false)}
+          onPress={() => !masterCallLoading && setMasterCallConfirmModalVisible(false)}
         >
           <TouchableOpacity
-            style={styles.bottomSheetContainer}
+            style={{
+              backgroundColor: 'white',
+              borderRadius: 8,
+              width: '80%',
+              paddingTop: 24,
+            }}
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
           >
-            <View style={styles.bottomSheetHandle} />
-            <Text style={styles.bottomSheetTitle}>Пополнение баланса</Text>
 
-            <View style={styles.bottomSheetBalanceRow}>
-              <Text style={styles.bottomSheetBalanceLabel}>Текущий баланс:</Text>
-              <Text style={styles.bottomSheetBalanceValue}>{Number(user?.balance || 0).toLocaleString('ru-RU')} ₸</Text>
-            </View>
 
-            <TextInput
-              style={styles.bottomSheetInput}
-              value={topUpSum}
-              onChangeText={setTopUpSum}
-              placeholder="Сумма пополнения"
-              keyboardType="numeric"
-              placeholderTextColor="#99A3B3"
-            />
+            <Image source={require('../assets/mainFix.png')} style={{width: 100, height: 100, marginBottom: 12, alignSelf: 'center'}} />
+            <Text
+              style={{
+                fontSize: 20,
+                fontWeight: '700',
+                color: '#101010',
+                marginBottom: 12,
+                textAlign: 'center',
+              }}
+            >
+              Заявка принята!
+            </Text>
+            <Text
+              style={{
+                fontSize: 14,
+                fontWeight: '500',
+                color: '#545454',
+                textAlign: 'center',
+                paddingHorizontal: 24,
+              }}
+            >
+              Спасибо! Мастер свяжется с вами в течении 5 минут.
+            </Text>
 
-            <View style={styles.bottomSheetQuickAmounts}>
-              {[2600, 5000, 10000].map((amount) => (
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: 24,
+                borderTopWidth: 1,
+                borderTopColor: '#EDEDED',
+                paddingVertical: 12,
+              }}
+            >
+              <View style={{ 
+                justifyContent: 'center',
+                alignItems: 'center',
+                borderRightWidth: 1,
+                borderRightColor: '#EDEDED',
+                width: "50%",
+               }}>
                 <TouchableOpacity
-                  key={amount}
-                  onPress={() => setTopUpSum(amount.toString())}
-                  style={[
-                    styles.bottomSheetQuickBtn,
-                    topUpSum === amount.toString() && styles.bottomSheetQuickBtnActive,
-                  ]}
+                  style={{
+                    backgroundColor: '#DC1818',
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: masterCallLoading ? 0.7 : 1,
+                  }}
+                  onPress={handleRequestMasterCall}
+                  disabled={masterCallLoading}
                 >
-                  <Text style={[
-                    styles.bottomSheetQuickBtnText,
-                    topUpSum === amount.toString() && styles.bottomSheetQuickBtnTextActive,
-                  ]}>
-                    {amount.toLocaleString('ru-RU')} ₸
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {hasSavedCard ? (
-              <>
-                <TouchableOpacity
-                  style={styles.bottomSheetPayBtn}
-                  onPress={handleTopUpSavedCard}
-                  disabled={topUpLoading}
-                >
-                  {topUpLoading ? (
+                  {masterCallLoading ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
-                    <Text style={styles.bottomSheetPayBtnText}>
-                      Оплатить картой •••• {cardLast4}
-                    </Text>
+                    <Text style={{
+                      color: 'white',
+                      fontSize: 14,
+                      fontWeight: '500',
+                    }}>Жду звонка</Text>
                   )}
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.bottomSheetNewCardBtn}
-                  onPress={handleTopUpNewCard}
-                  disabled={topUpLoading}
-                >
-                  <Text style={styles.bottomSheetNewCardBtnText}>Оплатить другой картой</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <TouchableOpacity
-                style={styles.bottomSheetPayBtn}
-                onPress={handleTopUpNewCard}
-                disabled={topUpLoading}
-              >
-                {topUpLoading ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.bottomSheetPayBtnText}>Привязать карту и оплатить</Text>
-                )}
-              </TouchableOpacity>
-            )}
+              </View>
 
-            <TouchableOpacity
-              style={styles.bottomSheetCashBtn}
-              onPress={() => setTopUpVisible(false)}
+              <View style={{ 
+                justifyContent: 'center',
+                alignItems: 'center',
+                width: "50%",
+               }}>
+                
+                <TouchableOpacity
+                  style={{
+                    padding: 14,
+                    alignItems: 'center',
+                  }}
+                  onPress={() => !masterCallLoading && setMasterCallConfirmModalVisible(false)}
+                  disabled={masterCallLoading}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: '500', color: '#545454' }}>Отмена</Text>
+                </TouchableOpacity>
+              </View>
+
+            </View>
+            
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+      <Modal
+        visible={masterCallSuccessModalVisible}
+        onRequestClose={() => setMasterCallSuccessModalVisible(false)}
+        transparent={true}
+        animationType="fade"
+      >
+        <TouchableOpacity
+          style={styles.modalOverlayReloadOrder}
+          onPress={() => setMasterCallSuccessModalVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalContainerReloadOrder}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text
+              style={{
+                fontSize: 20,
+                fontWeight: '600',
+                color: '#101010',
+                marginBottom: 12,
+                textAlign: 'center',
+              }}
             >
-              <Text style={styles.bottomSheetCashBtnText}>Оплатить наличными</Text>
+              Заявка отправлена
+            </Text>
+            <Text
+              style={{
+                fontSize: 14,
+                fontWeight: '500',
+                color: '#545454',
+                textAlign: 'center',
+              }}
+            >
+              В ближайшее время с вами свяжется мастер.
+            </Text>
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#DC1818',
+                padding: 16,
+                borderRadius: 8,
+                marginTop: 24,
+              }}
+              onPress={() => setMasterCallSuccessModalVisible(false)}
+            >
+              <Text style={styles.buttonText}>Понятно</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -766,125 +931,6 @@ const styles = StyleSheet.create({
       fontSize: 16,
       fontWeight: '600',
       textAlign: 'center',
-  },
-  // Bottom Sheet стили
-  bottomSheetOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  bottomSheetContainer: {
-    backgroundColor: 'white',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
-    paddingBottom: 40,
-  },
-  bottomSheetHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#E3E3E3',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  bottomSheetTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#101010',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  bottomSheetBalanceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FEDBDB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 16,
-  },
-  bottomSheetBalanceLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-  },
-  bottomSheetBalanceValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#DC1818',
-  },
-  bottomSheetInput: {
-    borderWidth: 1,
-    borderColor: '#E3E3E3',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#101010',
-    backgroundColor: '#F8F8F8',
-    marginBottom: 12,
-  },
-  bottomSheetQuickAmounts: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 10,
-    marginBottom: 20,
-  },
-  bottomSheetQuickBtn: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#E3E3E3',
-  },
-  bottomSheetQuickBtnActive: {
-    backgroundColor: '#DC1818',
-    borderColor: '#DC1818',
-  },
-  bottomSheetQuickBtnText: {
-    color: '#111',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  bottomSheetQuickBtnTextActive: {
-    color: '#fff',
-  },
-  bottomSheetPayBtn: {
-    backgroundColor: '#DC1818',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  bottomSheetPayBtnText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  bottomSheetNewCardBtn: {
-    borderWidth: 1,
-    borderColor: '#DC1818',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  bottomSheetNewCardBtnText: {
-    color: '#DC1818',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  bottomSheetCashBtn: {
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  bottomSheetCashBtnText: {
-    color: '#0d74d0',
-    fontSize: 15,
-    fontWeight: '600',
   },
 });
 

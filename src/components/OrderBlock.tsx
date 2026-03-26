@@ -79,15 +79,15 @@ const OrderBlock: React.FC<OrderBlockProps> = ({_id, date, status, products, cou
                     <View>
                         <View style={styles.orderProduct}>
                             {products && products.b12 > 0 && (
-                                <Text>{products.b12}x Вода 12,5 л</Text>
+                                <Text style={styles.orderProductText}>{products.b12}x Вода 12,5 л</Text>
                             )}
                             {products && products.b19 > 0 && (
-                                <Text>{products.b19}x Вода 18,9 л</Text>
+                                <Text style={styles.orderProductText}>{products.b19}x Вода 18,9 л</Text>
                             )}
                         </View>
                         <View style={{flexDirection: "row", gap: 6, marginTop: 4, alignItems: 'center'}}>
                             <Image source={require('../assets/pin.png')} style={{width: 16, height: 16}} />
-                            <Text style={styles.orderProduct}>{address.name}</Text>
+                            <Text style={styles.orderProductText}>{address.name}</Text>
                         </View>
                     </View>
                     {/* <TouchableOpacity 
@@ -137,18 +137,17 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     orderProduct: {
+        gap: 8
+    },
+    orderProductText: {
         fontSize: 14,
         color: '#545454',
         fontWeight: '500',
-        gap: 8
     },
     orderCourier: {
         marginTop: 12,
         flexDirection: 'row',
         alignItems: 'center',
-        fontSize: 14,
-        color: '#545454',
-        fontWeight: '500',
         gap: 8
     },
     orderCourierName: {

@@ -1,564 +1,362 @@
-import crypto from 'crypto';
-import axios from 'axios';
-import Order from '../Models/Order.js';
-import { SECRET_KEY, MERCHANT_ID, generateSignature } from '../utils/hillstar.js';
-import 'dotenv/config';
-import Client from '../Models/Client.js';
-
 /**
- * Проверка подписи для callback от Hillstarpay
+ * Payplus.kz — контроллер платежей
+ * Документация: https://payplus.kz/docs/en/
+ *
+ * Endpoints:
+ * - POST /api/payment/create — создание платежа, возврат URL формы Payplus
+ * - POST /api/payment/payplus-callback — callback от Payplus (process_url)
+ * - GET  /api/payment/widget-page?sessionId=xxx — HTML-страница для WebView
+ * - POST /api/payment/widget-config — конфиг для мобильного приложения (sessionId, widgetPageUrl)
  */
-function verifySignature(params, secretKey, scriptName) {
-    // Исключаем pg_sig из параметров для проверки
-    const { pg_sig, ...paramsWithoutSig } = params;
-    
-    // Сортируем ключи по алфавиту
-    const sortedKeys = Object.keys(paramsWithoutSig).sort();
-    
-    // Формируем массив значений: имя скрипта + значения параметров + секретный ключ
-    const signatureArray = [scriptName];
-    
-    for (const key of sortedKeys) {
-        signatureArray.push(paramsWithoutSig[key]);
-    }
-    
-    signatureArray.push(secretKey);
-    
-    // Соединяем через ';' и берем MD5
-    const signString = signatureArray.join(';');
-    const calculatedSig = crypto.createHash('md5').update(signString).digest('hex');
-    
-    // Отладочный вывод
-    console.log('Проверка подписи:');
-    console.log('Строка для подписи:', signString);
-    console.log('Рассчитанная подпись:', calculatedSig);
-    console.log('Полученная подпись:', pg_sig);
-    console.log('Совпадает:', calculatedSig === pg_sig);
-    
-    return calculatedSig === pg_sig;
+
+import "dotenv/config";
+import Client from "./Client.js";
+import PaymentSession from "./PaymentSession.js";
+import { buildPaymentFormSign, verifyCallbackSign } from "./payplusUtils.js";
+
+const PAYPLUS_BASE_URL = process.env.PAYPLUS_BASE_URL || "https://payplus.kz";
+const PAYPLUS_MERCHANT = process.env.PAYPLUS_MERCHANT || "";
+const PAYPLUS_SECRET = process.env.PAYPLUS_SECRET || "";
+const API_BASE_URL = process.env.API_BASE_URL || "https://api.tibetskayacrm.kz";
+
+function generateOrderId() {
+    return `PP${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
 }
 
 /**
- * Обработка callback от Hillstarpay (result_url)
- * POST /api/payment/callback
- * Может принимать form-data, x-www-form-urlencoded или JSON
- */
-export const handlePaymentCallback = async (req, res) => {
-    try {
-        // Получаем данные из запроса
-        const callbackData = req.body;
-        const scriptName = (req.path || '').split('/').filter(Boolean).pop() || 'result';
-        
-        console.log('Callback received:', callbackData);
-        
-        // Проверяем формат запроса (новый JSON формат или старый form-data)
-        let orderId, paymentId, result, amount, currency;
-        let clientMail = callbackData.pg_user_contact_email;
-        if (callbackData.order && callbackData.status) {
-            // Новый JSON формат
-            orderId = callbackData.order.toString();
-            paymentId = callbackData.id?.toString();
-            result = callbackData.status?.code === 'success' ? 1 : 0;
-            amount = callbackData.amount;
-            currency = callbackData.currency;
-            
-            // Для нового формата проверяем подпись по-другому
-            // sig формируется из всех полей кроме sig, отсортированных по алфавиту
-            const { sig, ...dataWithoutSig } = callbackData;
-            const sortedKeys = Object.keys(dataWithoutSig).sort();
-            const signatureArray = sortedKeys.map(key => {
-                if (typeof dataWithoutSig[key] === 'object') {
-                    return JSON.stringify(dataWithoutSig[key]);
-                }
-                return dataWithoutSig[key];
-            });
-            signatureArray.push(SECRET_KEY);
-            const calculatedSig = crypto.createHash('md5').update(signatureArray.join(';')).digest('hex');
-            
-            if (calculatedSig !== sig) {
-                console.error('Неверная подпись в JSON callback');
-                return res.status(400).json({ status: 'error' });
-            }
-            
-            // Для нового формата проверяем заказ и возвращаем JSON
-            const order = await Order.findById(orderId);
-            if (!order) {
-                console.error('Заказ не найден:', orderId);
-                return res.status(400).json({ status: 'error' });
-            }
-            
-            if (result === 1) {
-                console.log('Платеж успешно обработан для заказа:', orderId);
-                // Здесь можно обновить статус заказа
-                return res.json({ status: 'ok' });
-            } else {
-                console.log('Платеж не прошел для заказа:', orderId);
-                return res.json({ status: 'ok' });
-            }
-        } else {
-            // Старый формат (form-data или URL-encoded)
-            // Проверяем подпись для старого формата
-            const isValidSignature = verifySignature(callbackData, SECRET_KEY, scriptName);
-            
-            if (!isValidSignature) {
-                console.error('Неверная подпись в callback');
-                console.error('SECRET_KEY используется:', SECRET_KEY ? 'есть' : 'нет');
-                // ВАЖНО: В тестовом режиме можно временно пропустить проверку подписи для отладки
-                // В продакшене это нужно обязательно вернуть!
-                console.warn('⚠️ ВНИМАНИЕ: Проверка подписи пропущена! Это нужно исправить в продакшене!');
-                // return res.status(400).send(`<?xml version="1.0" encoding="utf-8"?>
-                // <response>
-                //     <pg_status>error</pg_status>
-                //     <pg_description>Неверная подпись</pg_description>
-                //     <pg_salt>${crypto.randomBytes(8).toString('hex')}</pg_salt>
-                //     <pg_sig></pg_sig>
-                // </response>`);
-            }
-
-            orderId = callbackData.pg_order_id;
-            paymentId = callbackData.pg_payment_id;
-            result = callbackData.pg_result; // 1 - успех, 0 - неудача
-            amount = callbackData.pg_amount;
-            currency = callbackData.pg_currency;
-        }
-
-        console.log('Payment callback received:', { orderId, paymentId, result, amount, currency, clientMail });
-
-        // Примечание: если orderId - это timestamp, а не ID из базы, то проверку заказа можно пропустить
-        // Или можно найти заказ по другому полю, если оно было сохранено
-        // const order = await Order.findOne({ /* какое-то поле, связанное с этим платежом */ });
-
-        // Если платеж успешен (pg_result = 1)
-        if (result == 1) {
-            // Здесь можно обновить статус заказа или выполнить другие действия
-            // Например, обновить баланс клиента, создать транзакцию и т.д.
-            
-            // Опционально: обновить заказ, если нужно
-            // await Order.findByIdAndUpdate(orderId, { 
-            //     paymentStatus: 'paid',
-            //     paymentId: paymentId
-            // });
-
-            console.log('Платеж успешно обработан для заказа:', orderId);
-
-            if (clientMail) {
-                const updateData = {
-                    $inc: {
-                        balance: Number(amount),
-                    }
-                };
-
-                // Сохраняем данные карты, если они пришли в callback
-                const cardToken = callbackData.pg_card_token;
-                const cardId = callbackData.pg_card_id;
-                const cardPan = callbackData.pg_card_pan; // например "4111-11XX-XXXX-1111"
-
-                if (cardToken && cardId) {
-                    // Извлекаем последние 4 цифры из маскированного номера карты
-                    let last4 = null;
-                    if (cardPan) {
-                        const digits = cardPan.replace(/\D/g, '');
-                        last4 = digits.slice(-4);
-                    }
-
-                    updateData.$set = {
-                        'savedCard.cardToken': cardToken,
-                        'savedCard.cardId': cardId,
-                        'savedCard.cardPan': last4
-                    };
-
-                    console.log('Сохраняем карту для клиента:', { cardToken, cardId, last4 });
-                }
-
-                await Client.findOneAndUpdate(
-                    { mail: clientMail.toLowerCase().trim() },
-                    updateData
-                );
-            }
-
-            // Генерируем ответ со статусом ok
-            const salt = crypto.randomBytes(8).toString('hex');
-            const responseParams = {
-                pg_status: 'ok',
-                pg_description: 'Платеж принят',
-                pg_salt: salt
-            };
-
-            // Генерируем подпись для ответа
-            const sortedKeys = Object.keys(responseParams).sort();
-            const signatureArray = [scriptName, ...sortedKeys.map(key => responseParams[key]), SECRET_KEY];
-            const signString = signatureArray.join(';');
-            const responseSig = crypto.createHash('md5').update(signString).digest('hex');
-            responseParams.pg_sig = responseSig;
-
-            return res.send(`<?xml version="1.0" encoding="utf-8"?>
-<response>
-    <pg_status>${responseParams.pg_status}</pg_status>
-    <pg_description>${responseParams.pg_description}</pg_description>
-    <pg_salt>${responseParams.pg_salt}</pg_salt>
-    <pg_sig>${responseParams.pg_sig}</pg_sig>
-</response>`);
-        } else {
-            // Платеж не прошел
-            console.log('Платеж не прошел для заказа:', orderId);
-            
-            // Генерируем ответ со статусом ok (все равно нужно подтвердить получение)
-            const salt = crypto.randomBytes(8).toString('hex');
-            const responseParams = {
-                pg_status: 'ok',
-                pg_description: 'Платеж отклонен',
-                pg_salt: salt
-            };
-
-            const sortedKeys = Object.keys(responseParams).sort();
-            const signatureArray = [scriptName, ...sortedKeys.map(key => responseParams[key]), SECRET_KEY];
-            const signString = signatureArray.join(';');
-            const responseSig = crypto.createHash('md5').update(signString).digest('hex');
-            responseParams.pg_sig = responseSig;
-
-            return res.send(`<?xml version="1.0" encoding="utf-8"?>
-<response>
-    <pg_status>${responseParams.pg_status}</pg_status>
-    <pg_description>${responseParams.pg_description}</pg_description>
-    <pg_salt>${responseParams.pg_salt}</pg_salt>
-    <pg_sig>${responseParams.pg_sig}</pg_sig>
-</response>`);
-        }
-    } catch (error) {
-        console.error('Ошибка при обработке callback:', error);
-        return res.status(500).send(`<?xml version="1.0" encoding="utf-8"?>
-<response>
-    <pg_status>error</pg_status>
-    <pg_description>Внутренняя ошибка сервера</pg_description>
-    <pg_salt>${crypto.randomBytes(8).toString('hex')}</pg_salt>
-    <pg_sig></pg_sig>
-</response>`);
-    }
-};
-
-/**
- * Обработка успешного платежа (success_url)
- * GET /api/payment/success
- */
-export const handlePaymentSuccess = async (req, res) => {
-    try {
-        const { pg_order_id, pg_payment_id } = req.query;
-        
-        // Получаем URL frontend приложения из переменной окружения или используем базовый URL
-        const frontendUrl = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://tibetskayacrm.kz';
-        
-        // Перенаправляем на страницу успеха во frontend
-        const redirectUrl = `${frontendUrl}/payment/success?orderId=${pg_order_id || ''}&paymentId=${pg_payment_id || ''}`;
-        console.log('Redirecting to:', redirectUrl);
-        res.redirect(redirectUrl);
-    } catch (error) {
-        console.error('Ошибка при обработке success URL:', error);
-        const frontendUrl = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://tibetskayacrm.kz';
-        res.redirect(`${frontendUrl}/payment/error?message=Ошибка обработки платежа`);
-    }
-};
-
-/**
- * Обработка неуспешного платежа (failure_url)
- * GET /api/payment/error
- */
-export const handlePaymentError = async (req, res) => {
-    try {
-        const { pg_order_id, pg_error_code, pg_error_description } = req.query;
-        
-        // Получаем URL frontend приложения из переменной окружения или используем базовый URL
-        const frontendUrl = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://tibetskayacrm.kz';
-        
-        // Перенаправляем на страницу ошибки во frontend
-        const errorMessage = pg_error_description || 'Ошибка при обработке платежа';
-        const redirectUrl = `${frontendUrl}/payment/error?orderId=${pg_order_id || ''}&message=${encodeURIComponent(errorMessage)}`;
-        console.log('Redirecting to:', redirectUrl);
-        res.redirect(redirectUrl);
-    } catch (error) {
-        console.error('Ошибка при обработке error URL:', error);
-        const frontendUrl = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://tibetskayacrm.kz';
-        res.redirect(`${frontendUrl}/payment/error?message=Ошибка обработки платежа`);
-    }
-};
-
-/**
- * Создание ссылки для оплаты заказа
  * POST /api/payment/create
- * Body: { orderId: string }
+ * Body: { sum, email?, phone?, clientId? }
+ * Создаёт сессию и возвращает URL формы Payplus
  */
-export const createPaymentLink = async (req, res) => {
+export const createPayment = async (req, res) => {
     try {
-        const { sum, email, phone } = req.body;
+        const { sum, email, phone, clientId } = req.body;
 
-        // Определяем базовый URL
-        const baseUrl = process.env.BASE_URL || 'https://api.tibetskayacrm.kz';
-
-        // Параметры платежа
-        const paymentData = {
-            pg_order_id: new Date().getTime().toString(),
-            pg_merchant_id: MERCHANT_ID,
-            pg_amount: sum.toString(),
-            pg_description: `Balance replenishment`,
-            pg_salt: crypto.randomBytes(8).toString('hex'), // Случайная строка
-            pg_currency: 'KZT',
-            pg_result_url: `${baseUrl}/api/payment/callback`,
-            pg_success_url: `https://tibetskayacrm.kz/api/payment/success`,
-            pg_failure_url: `https://tibetskayacrm.kz/api/payment/error`,
-            pg_request_method: 'POST',
-            pg_success_url_method: 'GET',
-            pg_failure_url_method: 'GET',
-        };
-
-        // Добавляем телефон и email, если переданы
-        if (phone) {
-            // Убираем все нецифровые символы и убеждаемся что начинается с кода страны
-            const cleanPhone = phone.replace(/\D/g, '');
-            paymentData.pg_user_phone = cleanPhone;
-        }
-        if (email) {
-            paymentData.pg_user_contact_email = email.toLowerCase().trim();
-        }
-
-        // Генерируем подпись
-        // Важно: в PHP примере используется имя файла 'init_payment.php' как первый элемент
-        paymentData.pg_sig = generateSignature('init_payment.php', paymentData, SECRET_KEY);
-
-        try {
-            // Отправляем POST запрос (в формате multipart/form-data или x-www-form-urlencoded)
-            const formData = new URLSearchParams();
-            for (const key in paymentData) {
-                formData.append(key, paymentData[key]);
-            }
-
-            const response = await axios.post('https://api.hillstarpay.com/init_payment.php', formData, {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
-            });
-
-            // API возвращает XML, нужно извлечь pg_redirect_url
-            const xmlResponse = response.data;
-            const redirectUrlMatch = xmlResponse.match(/<pg_redirect_url>(.*?)<\/pg_redirect_url>/);
-            
-            if (redirectUrlMatch && redirectUrlMatch[1]) {
-                return res.json({
-                    success: true,
-                    paymentUrl: redirectUrlMatch[1],
-                    orderId: new Date().getTime().toString(),
-                    amount: sum,
-                    message: 'Ссылка для оплаты успешно создана'
-                });
-            } else {
-                console.error('Не удалось получить URL для редиректа из ответа API:', xmlResponse);
-                return res.status(500).json({
-                    success: false,
-                    message: 'Не удалось получить ссылку для оплаты от платежного сервиса'
-                });
-            }
-
-        } catch (error) {
-            console.error('Ошибка при инициализации платежа:', error.message);
-            if (error.response) {
-                console.error('Ответ от сервера:', error.response.data);
-            }
-            return res.status(500).json({
-                success: false,
-                message: 'Ошибка при создании ссылки для оплаты',
-                error: error.message
-            });
-        }
-
-    } catch (error) {
-        console.error('Ошибка при создании ссылки для оплаты:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Внутренняя ошибка сервера',
-            error: error.message
-        });
-    }
-};
-
-/**
- * Оплата сохранённой картой (рекуррентный платёж)
- * POST /api/payment/charge-saved-card
- * Body: { clientId: string, amount: number }
- */
-export const chargeWithSavedCard = async (req, res) => {
-    try {
-        const { clientId, amount } = req.body;
-
-        if (!clientId || !amount) {
-            return res.status(400).json({ success: false, message: 'clientId и amount обязательны' });
-        }
-
-        const client = await Client.findById(clientId);
-        if (!client) {
-            return res.status(404).json({ success: false, message: 'Клиент не найден' });
-        }
-
-        if (!client.savedCard?.cardToken) {
-            return res.status(400).json({ success: false, message: 'У клиента нет сохранённой карты' });
-        }
-
-        const baseUrl = process.env.BASE_URL || 'https://api.tibetskayacrm.kz';
-        const orderId = Date.now().toString();
-
-        // Шаг 1: card/init — инициация платежа по сохранённой карте
-        const initParams = {
-            pg_merchant_id: MERCHANT_ID,
-            pg_amount: amount.toString(),
-            pg_order_id: orderId,
-            pg_user_id: clientId,
-            pg_card_token: client.savedCard.cardToken,
-            pg_description: 'Balance replenishment',
-            pg_salt: crypto.randomBytes(8).toString('hex'),
-            pg_result_url: `${baseUrl}/api/payment/callback`,
-            pg_currency: 'KZT',
-        };
-
-        initParams.pg_sig = generateSignature('card/init', initParams, SECRET_KEY);
-
-        const initFormData = new URLSearchParams();
-        for (const key in initParams) {
-            initFormData.append(key, initParams[key]);
-        }
-
-        console.log('card/init запрос:', initParams);
-
-        const initResponse = await axios.post(
-            `https://api.hillstarpay.com/v1/merchant/${MERCHANT_ID}/card/init`,
-            initFormData,
-            { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-        );
-
-        const initXml = initResponse.data;
-        console.log('card/init ответ:', initXml);
-
-        const statusMatch = initXml.match(/<pg_status>(.*?)<\/pg_status>/);
-        if (!statusMatch || statusMatch[1] !== 'ok') {
-            const errorDesc = initXml.match(/<pg_error_description>(.*?)<\/pg_error_description>/);
+        if (!sum || Number(sum) <= 0) {
             return res.status(400).json({
                 success: false,
-                message: 'Ошибка инициации платежа',
-                error: errorDesc ? errorDesc[1] : initXml
+                message: "Укажите корректную сумму",
             });
         }
 
-        const paymentIdMatch = initXml.match(/<pg_payment_id>(.*?)<\/pg_payment_id>/);
-        if (!paymentIdMatch) {
-            return res.status(500).json({ success: false, message: 'Не получен payment_id' });
+        let client = null;
+        if (clientId) {
+            client = await Client.findById(clientId);
         }
-
-        const paymentId = paymentIdMatch[1];
-
-        // Шаг 2: card/direct — подтверждение платежа
-        const directParams = {
-            pg_merchant_id: MERCHANT_ID,
-            pg_payment_id: paymentId,
-            pg_salt: crypto.randomBytes(8).toString('hex'),
-        };
-
-        directParams.pg_sig = generateSignature('card/direct', directParams, SECRET_KEY);
-
-        const directFormData = new URLSearchParams();
-        for (const key in directParams) {
-            directFormData.append(key, directParams[key]);
-        }
-
-        console.log('card/direct запрос:', directParams);
-
-        const directResponse = await axios.post(
-            `https://api.hillstarpay.com/v1/merchant/${MERCHANT_ID}/card/direct`,
-            directFormData,
-            { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-        );
-
-        const directXml = directResponse.data;
-        console.log('card/direct ответ:', directXml);
-
-        const txStatusMatch = directXml.match(/<pg_transaction_status>(.*?)<\/pg_transaction_status>/);
-
-        if (txStatusMatch && txStatusMatch[1] === 'ok') {
-            // Обновляем баланс клиента
-            await Client.findByIdAndUpdate(clientId, {
-                $inc: { balance: Number(amount) }
-            });
-
-            return res.json({
-                success: true,
-                message: 'Оплата прошла успешно',
-                paymentId,
-                amount: Number(amount)
-            });
-        } else {
-            const errorDesc = directXml.match(/<pg_error_description>(.*?)<\/pg_error_description>/);
+        const mail = client?.mail || email;
+        if (!mail) {
             return res.status(400).json({
                 success: false,
-                message: 'Оплата не прошла',
-                error: errorDesc ? errorDesc[1] : directXml
+                message: "Укажите email или clientId",
             });
         }
-    } catch (error) {
-        console.error('Ошибка оплаты сохранённой картой:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Внутренняя ошибка сервера',
-            error: error.message
-        });
-    }
-};
 
-/**
- * Получение данных сохранённой карты клиента
- * POST /api/payment/saved-card
- * Body: { clientId: string }
- */
-export const getSavedCard = async (req, res) => {
-    try {
-        const { clientId } = req.body;
-
-        const client = await Client.findById(clientId, { savedCard: 1 });
         if (!client) {
-            return res.status(404).json({ success: false, message: 'Клиент не найден' });
+            client = await Client.findOne({ mail: mail.toLowerCase() });
+        }
+        if (!client) {
+            return res.status(404).json({
+                success: false,
+                message: "Клиент не найден",
+            });
         }
 
-        const hasCard = !!(client.savedCard?.cardToken && client.savedCard?.cardId);
+        const orderId = generateOrderId();
+        const amount = Number(sum).toFixed(2);
+        const currency = "KZT";
+
+        await PaymentSession.create({
+            orderId,
+            clientId: client._id,
+            amount: Number(sum),
+            currency,
+        });
+
+        const params = {
+            merchant: PAYPLUS_MERCHANT,
+            order: orderId,
+            amount,
+            currency,
+            item_name: "Пополнение баланса Тибетская",
+            first_name: (client.fullName || "Client").split(" ")[0].replace(/[^a-zA-Z]/g, "A") || "Client",
+            last_name: (client.fullName || "User").split(" ")[1]?.replace(/[^a-zA-Z]/g, "U") || "User",
+            user_id: String(client._id),
+            payment_url: API_BASE_URL,
+            country: "KZ",
+            ip: req.ip || req.connection?.remoteAddress || "127.0.0.1",
+            custom: "",
+            email: client.mail || email || "",
+            phone: (client.phone || phone || "").replace(/\D/g, "").slice(0, 15),
+            lang: "ru",
+        };
+
+        const sign = buildPaymentFormSign(params, PAYPLUS_SECRET);
+        params.sign = sign;
+
+        const query = new URLSearchParams(params).toString();
+        const paymentUrl = `${PAYPLUS_BASE_URL}/payment/form?${query}`;
 
         return res.json({
             success: true,
-            hasCard,
-            card: hasCard ? {
-                cardPan: client.savedCard.cardPan,  // последние 4 цифры
-                cardId: client.savedCard.cardId
-            } : null
+            paymentUrl,
+            orderId,
         });
-    } catch (error) {
-        console.error('Ошибка получения карты:', error);
-        return res.status(500).json({ success: false, message: 'Внутренняя ошибка сервера' });
+    } catch (err) {
+        console.error("[createPayment]", err);
+        return res.status(500).json({
+            success: false,
+            message: "Ошибка создания платежа",
+        });
     }
 };
 
 /**
- * Удаление сохранённой карты клиента
- * POST /api/payment/delete-card
- * Body: { clientId: string }
+ * POST /api/payment/payplus-callback
+ * Callback от Payplus при успехе/ошибке платежа
+ * Должен вернуть "OK"
  */
-export const deleteSavedCard = async (req, res) => {
+export const payplusCallback = async (req, res) => {
     try {
-        const { clientId } = req.body;
+        const data = req.body && Object.keys(req.body).length ? req.body : req.query;
 
-        const client = await Client.findById(clientId);
-        if (!client) {
-            return res.status(404).json({ success: false, message: 'Клиент не найден' });
+        if (!verifyCallbackSign(data, PAYPLUS_SECRET)) {
+            console.error("[payplusCallback] Invalid sign");
+            return res.status(400).send("Sign error");
         }
 
-        client.savedCard = { cardToken: null, cardId: null, cardPan: null };
-        await client.save();
+        const orderNo = data.co_order_no;
+        const status = (data.co_inv_st || "").toLowerCase();
+        const amount = parseFloat(data.co_amount || 0);
 
-        return res.json({ success: true, message: 'Карта удалена' });
-    } catch (error) {
-        console.error('Ошибка удаления карты:', error);
-        return res.status(500).json({ success: false, message: 'Внутренняя ошибка сервера' });
+        const session = await PaymentSession.findOne({ orderId: orderNo });
+        if (!session) {
+            console.error("[payplusCallback] Session not found:", orderNo);
+            return res.send("OK");
+        }
+
+        if (session.status !== "pending") {
+            return res.send("OK");
+        }
+
+        if (status === "success") {
+            session.status = "success";
+            session.coInvId = data.co_inv_id;
+            await session.save();
+
+            const client = await Client.findById(session.clientId);
+            if (client) {
+                client.balance = (client.balance || 0) + amount;
+                await client.save();
+            }
+        } else {
+            session.status = "fail";
+            await session.save();
+        }
+
+        return res.send("OK");
+    } catch (err) {
+        console.error("[payplusCallback]", err);
+        return res.send("OK");
     }
 };
 
+/**
+ * POST /api/payment/widget-config
+ * Для мобильного приложения: создаёт сессию и возвращает URL страницы виджета
+ * Body: { userId, amount, email?, phone? }
+ */
+export const getWidgetConfig = async (req, res) => {
+    try {
+        const { userId, amount, email, phone } = req.body;
+
+        if (!userId || !amount || Number(amount) <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Укажите userId и сумму",
+            });
+        }
+
+        const client = await Client.findById(userId);
+        if (!client) {
+            return res.status(404).json({
+                success: false,
+                message: "Клиент не найден",
+            });
+        }
+
+        const orderId = generateOrderId();
+        const amountNum = Number(amount).toFixed(2);
+        const currency = "KZT";
+
+        await PaymentSession.create({
+            orderId,
+            clientId: client._id,
+            amount: Number(amount),
+            currency,
+        });
+
+        const params = {
+            merchant: PAYPLUS_MERCHANT,
+            order: orderId,
+            amount: amountNum,
+            currency,
+            item_name: "Popolnenie balansa Tibetskaya",
+            first_name: (client.fullName || "Client").split(" ")[0].replace(/[^a-zA-Z]/g, "A") || "Client",
+            last_name: (client.fullName || "User").split(" ")[1]?.replace(/[^a-zA-Z]/g, "U") || "User",
+            user_id: String(client._id),
+            payment_url: API_BASE_URL,
+            country: "KZ",
+            ip: req.ip || "127.0.0.1",
+            custom: "",
+            email: client.mail || email || "",
+            phone: (client.phone || phone || "").replace(/\D/g, "").slice(0, 15),
+            lang: "ru",
+        };
+
+        const sign = buildPaymentFormSign(params, PAYPLUS_SECRET);
+        params.sign = sign;
+
+        const query = new URLSearchParams(params).toString();
+        const paymentUrl = `${PAYPLUS_BASE_URL}/payment/form?${query}`;
+
+        const widgetPageUrl = `${API_BASE_URL}/api/payment/widget-page?sessionId=${orderId}`;
+
+        return res.json({
+            success: true,
+            widgetPageUrl,
+            paymentUrl,
+            orderId,
+        });
+    } catch (err) {
+        console.error("[getWidgetConfig]", err);
+        return res.status(500).json({
+            success: false,
+            message: "Ошибка получения конфигурации",
+        });
+    }
+};
+
+/**
+ * GET /api/payment/widget-page?sessionId=xxx
+ * HTML-страница для WebView: редирект на Payplus или iframe
+ */
+export const getWidgetPage = async (req, res) => {
+    const { sessionId } = req.query;
+
+    if (!sessionId) {
+        return res.status(400).send("Missing sessionId");
+    }
+
+    const session = await PaymentSession.findOne({ orderId: sessionId });
+    if (!session) {
+        return res.status(404).send("Session not found");
+    }
+
+    const params = {
+        merchant: PAYPLUS_MERCHANT,
+        order: session.orderId,
+        amount: session.amount.toFixed(2),
+        currency: session.currency || "KZT",
+        item_name: "Popolnenie balansa Tibetskaya",
+        first_name: "Client",
+        last_name: "User",
+        user_id: String(session.clientId),
+        payment_url: API_BASE_URL,
+        country: "KZ",
+        ip: "127.0.0.1",
+        custom: "",
+        email: "",
+        phone: "",
+        lang: "ru",
+    };
+
+    const client = await Client.findById(session.clientId);
+    if (client) {
+        params.first_name = (client.fullName || "Client").split(" ")[0].replace(/[^a-zA-Z]/g, "A") || "Client";
+        params.last_name = (client.fullName || "User").split(" ")[1]?.replace(/[^a-zA-Z]/g, "U") || "User";
+        params.email = client.mail || "";
+        params.phone = (client.phone || "").replace(/\D/g, "").slice(0, 15);
+    }
+
+    const sign = buildPaymentFormSign(params, PAYPLUS_SECRET);
+    params.sign = sign;
+
+    const query = new URLSearchParams(params).toString();
+    const paymentUrl = `${PAYPLUS_BASE_URL}/payment/form?${query}`;
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Оплата</title>
+  <script>
+    window.addEventListener('load', function() {
+      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'widget-loaded' }));
+      }
+      window.location.href = ${JSON.stringify(paymentUrl)};
+    });
+  </script>
+</head>
+<body>
+  <p>Загрузка...</p>
+</body>
+</html>`;
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(html);
+};
+
+/**
+ * GET /api/payment/success
+ * Страница успешной оплаты (success_url в настройках мерчанта Payplus)
+ */
+export const paymentSuccessPage = (req, res) => {
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Оплата успешна</title>
+  <script>
+    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'payment-success' }));
+    }
+    setTimeout(function() { window.close(); }, 2000);
+  </script>
+</head>
+<body style="font-family:sans-serif;text-align:center;padding:40px;">
+  <h2>Оплата успешна</h2>
+  <p>Спасибо за пополнение баланса.</p>
+</body>
+</html>`;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(html);
+};
+
+/**
+ * GET /api/payment/error
+ * Страница ошибки оплаты (fail_url в настройках мерчанта Payplus)
+ */
+export const paymentErrorPage = (req, res) => {
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ошибка оплаты</title>
+  <script>
+    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'payment-error', message: 'Payment failed' }));
+    }
+  </script>
+</head>
+<body style="font-family:sans-serif;text-align:center;padding:40px;">
+  <h2>Ошибка оплаты</h2>
+  <p>Платёж не прошёл. Попробуйте снова.</p>
+</body>
+</html>`;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(html);
+};

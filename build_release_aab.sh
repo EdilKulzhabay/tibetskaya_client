@@ -13,6 +13,8 @@ cd android
 echo "🧹 Очистка предыдущих сборок..."
 ./gradlew clean
 
+# Нужно поменять версию в build.gradle в папке android/app/build.gradle и в src/screens/HomeScreen.tsx
+
 # Собираем release AAB
 echo "🔨 Сборка release AAB..."
 ./gradlew bundleRelease

@@ -113,12 +113,12 @@ const Products: React.FC<{ navigation: any, price19: number, price12: number}> =
                 <View style={{height: 1, backgroundColor: '#E3E3E3', marginVertical: 12, width: '100%' }} />
                 <View style={styles.productBottom}>
                     <View style={styles.productBottomTitle}>
-                        <Text>Цена:</Text>
-                        <Text>Итого:</Text>
+                        <Text style={styles.productBottomTitleText}>Цена:</Text>
+                        <Text style={styles.productBottomTitleText}>Итого:</Text>
                     </View>
                     <View style={styles.productBottomSum}>
-                        <Text>{price19} ₸</Text>
-                        <Text>{count19 * price19} ₸</Text>
+                        <Text style={styles.productBottomSumText}>{price19} ₸</Text>
+                        <Text style={styles.productBottomSumText}>{count19 * price19} ₸</Text>
                     </View>
                 </View>
             </View>
@@ -240,6 +240,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+    },
+    productBottomTitleText: {
         fontSize: 14,
         fontWeight: '500',
         color: '#545454',
@@ -249,6 +251,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+    },
+    productBottomSumText: {
         fontSize: 16,
         fontWeight: '600',
         color: '#101010',

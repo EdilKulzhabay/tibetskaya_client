@@ -54,19 +54,27 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             return;
         }
         setLoading(true);
-        setForm({
+        const nextForm = {
             ...form,
             mail: form.mail.trim(),
             userName: form.userName.trim(),
             phone: form.phone.trim(),
             password: form.password.trim(),
             confirmPassword: form.confirmPassword.trim(),
-        })
-        const res = await apiService.sendCode(form.mail);
-        if (res.success) {
-            navigation.navigate("Otp", {data: form});
-        } else {
-            Alert.alert("Ошибка", res.message);
+        };
+        setForm(nextForm);
+        try {
+            const res = await apiService.sendCode(nextForm.mail, nextForm.phone);
+            if (res.success) {
+                navigation.navigate("Otp", { data: nextForm });
+            } else {
+                Alert.alert("Ошибка", (res as { message?: string }).message || "Не удалось отправить код");
+            }
+        } catch (err: unknown) {
+            const msg =
+                (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+                "Не удалось отправить код";
+            Alert.alert("Ошибка", msg);
         }
         setLoading(false);
     }

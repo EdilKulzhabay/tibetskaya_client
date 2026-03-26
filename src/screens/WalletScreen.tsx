@@ -2,29 +2,38 @@ import { SafeAreaView, StyleSheet, View, Text, ScrollView, Image, TouchableOpaci
 import { Back } from '../components';
 import { useAuth } from '../hooks/useAuth';
 import { useState } from 'react';
-import { apiService } from '../api/services';
 import OutlinedFilledLabelInput from '../components/OutlinedFilledLabelInput';
-import { Linking } from 'react-native';
+import PaymentWebView from '../components/PaymentWebView';
 
 const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { user } = useAuth();
-  const [modal, setModal] = useState(false)
-  const [sum, setSum] = useState("0")
+  const { user, refreshUserData } = useAuth();
+  const [modal, setModal] = useState(false);
+  const [sum, setSum] = useState("0");
+  const [paymentWebViewVisible, setPaymentWebViewVisible] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState(0);
 
-  const handlePayment = async() => {
+  const handlePayment = () => {
     if (sum === "0" || sum === "" || isNaN(Number(sum))) {
-      Alert.alert('Ошибка', 'Сумма пополнения не может быть 0 или не числом')
-      return
+      Alert.alert('Ошибка', 'Сумма пополнения не может быть 0 или не числом');
+      return;
     }
-    const response = await apiService.createPaymentLink(sum)
-    if (response.success) {
-      Linking.openURL(response.paymentUrl)
-      setModal(false)
-    } else {
-      Alert.alert('Ошибка', response.message)
-      setModal(false)
+    const amount = Number(sum);
+    if (amount < 100) {
+      Alert.alert('Ошибка', 'Минимальная сумма пополнения 100 ₸');
+      return;
     }
-  }
+    setModal(false);
+    setPaymentAmount(amount);
+    setPaymentWebViewVisible(true);
+  };
+
+  const handlePaymentWebViewClose = (paymentCompleted: boolean) => {
+    setPaymentWebViewVisible(false);
+    setSum("0");
+    if (paymentCompleted) {
+      refreshUserData();
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -39,7 +48,7 @@ const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </View>
         </View>
 
-        <TouchableOpacity onPress={() => {setModal(true)}} style={styles.giveMoreButton}>
+        <TouchableOpacity onPress={() => setModal(true)} style={styles.giveMoreButton}>
             <Text style={styles.giveMoreButtonText}>Пополнить</Text>
         </TouchableOpacity>
 
@@ -98,6 +107,15 @@ const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      <PaymentWebView
+        visible={paymentWebViewVisible}
+        onClose={handlePaymentWebViewClose}
+        amount={paymentAmount}
+        userId={user?._id || ''}
+        userEmail={user?.mail}
+        userPhone={user?.phone}
+      />
     </SafeAreaView>
   );
 };

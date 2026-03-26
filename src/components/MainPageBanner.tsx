@@ -27,7 +27,7 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
   const firstBanner = () => {
     return (
       <View style={styles.imageContainer}>
-        <StableImage source={require('../assets/newBanner.png')} style={styles.image} />
+        <StableImage source={require('../assets/newBanner1.png')} style={styles.image} />
       </View>
     )
   }
@@ -48,11 +48,20 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
     )
   }
 
+  const fourthBanner = () => {
+    return (
+      <View style={styles.imageContainer}>
+        <StableImage source={require('../assets/newBanner4.png')} style={styles.image} />
+      </View>
+    )
+  }
+
   // Объявляем bannerComponents и extendedData после функций баннеров, но до useEffect
   const bannerComponents = [
     { id: '1', Component: firstBanner },
     { id: '1', Component: secondBanner },
     { id: '2', Component: thirdBanner },
+    { id: '3', Component: fourthBanner },
   ];
   
   const extendedData = [

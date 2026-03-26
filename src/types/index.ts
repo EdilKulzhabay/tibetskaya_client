@@ -48,6 +48,8 @@ export interface User {
     cardId?: string;
     cardPan?: string; // последние 4 цифры карты
   };
+  /** Показывать блок «Ремонт техники / Вызвать мастера» в приложении (управляется в CRM) */
+  showRepairMasterInApp?: boolean;
 }
 
 export interface ApiResponse<T> {

@@ -1,18 +1,16 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types/navigation';
-import { useNavigation } from '@react-navigation/native';
 import StableImage from './StableImage';
+import { useTopUpBalance } from '../context/TopUpBalanceContext';
 
 interface MainPageWalletProps {
   balance: number;
 }
 
 const MainPageWallet: React.FC<MainPageWalletProps> = ({ balance }) => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { openTopUpModal } = useTopUpBalance();
   return (
-    <TouchableOpacity style={styles.container} onPress={() => navigation.navigate('Wallet')}>
+    <TouchableOpacity style={styles.container} onPress={() => openTopUpModal()}>
       <Text style={styles.title}>Мой кошелек:</Text>
       <View style={styles.balanceContainer}>
         <Text style={styles.balanceText}>{balance} ₸</Text>

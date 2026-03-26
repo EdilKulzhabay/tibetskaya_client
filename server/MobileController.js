@@ -654,6 +654,14 @@ export const clientLogin = async (req, res) => {
             status: candidate._doc.status,
             cart: candidate._doc.cart,
             bonus: candidate._doc.bonus,
+            balance: candidate._doc.balance,
+            price12: candidate._doc.price12,
+            price19: candidate._doc.price19,
+            paymentMethod: candidate._doc.paymentMethod,
+            paidBootlesFor19: candidate._doc.paidBootlesFor19,
+            paidBootlesFor12: candidate._doc.paidBootlesFor12,
+            doesItTake19Bottles: candidate._doc.doesItTake19Bottles,
+            doesItTake12Bottles: candidate._doc.doesItTake12Bottles,
             subscription: candidate._doc.subscription,
             chooseTime: candidate._doc.chooseTime,
             expoPushToken: candidate._doc.expoPushToken,
@@ -663,6 +671,8 @@ export const clientLogin = async (req, res) => {
             clientBottleCredit: candidate._doc.clientBottleCredit,
             verify: candidate._doc.verify,
             haveCompletedOrder: candidate._doc.haveCompletedOrder,
+            savedCard: candidate._doc.savedCard,
+            isStartedHydration: candidate._doc.isStartedHydration,
             createdAt: candidate._doc.createdAt,
             updatedAt: candidate._doc.updatedAt,
         };
@@ -724,9 +734,16 @@ export const updateClientDataMobile = async (req, res) => {
             balance: updatedClient._doc.balance,
             price12: updatedClient._doc.price12,
             price19: updatedClient._doc.price19,
+            paymentMethod: updatedClient._doc.paymentMethod,
+            paidBootlesFor19: updatedClient._doc.paidBootlesFor19,
+            paidBootlesFor12: updatedClient._doc.paidBootlesFor12,
+            doesItTake19Bottles: updatedClient._doc.doesItTake19Bottles,
+            doesItTake12Bottles: updatedClient._doc.doesItTake12Bottles,
             status: updatedClient._doc.status,
             cart: updatedClient._doc.cart,
             addresses: updatedClient._doc.addresses,
+            savedCard: updatedClient._doc.savedCard,
+            isStartedHydration: updatedClient._doc.isStartedHydration,
             createdAt: updatedClient._doc.createdAt,
         }
 
@@ -967,6 +984,13 @@ export const addOrderClientMobile = async (req, res) => {
             })
         }
 
+        if (client.clientType === false && address?.actual) {
+            address.actual = address.actual.replace(/квартира/gi, 'офис');
+            const actualAddress = client.addresses.find(
+                addr => addr.name === address.name);
+            address.phone = actualAddress.phone
+        }
+
         const franchisee = await User.findOne({role: "superAdmin"})
 
         const sum =
@@ -1002,6 +1026,8 @@ export const addOrderClientMobile = async (req, res) => {
             }
         }
 
+        const clientPhone = address.phone !== "" ? address.phone : client.phone
+
         const order = new Order({
             franchisee: franchisee._id,
             client: client._id,
@@ -1014,7 +1040,8 @@ export const addOrderClientMobile = async (req, res) => {
             needCall,
             comment,
             paymentMethod: paymentMethod,
-            wereCreated: "app"
+            wereCreated: "app",
+            clientPhone: clientPhone
         });
 
         await order.save();
@@ -1218,6 +1245,28 @@ export const sendSupportMessage = async (req, res) => {
             await SupportContacts.create({ client: client._id, lastMessage: message.text, lastMessageTime: new Date().toISOString() });
         } else {
             await SupportContacts.findByIdAndUpdate(supportContact._id, { lastMessage: message.text, lastMessageTime: new Date().toISOString() });
+            const mailOptions = {
+                from: "info@tibetskaya.kz",
+                to: process.env.SENDINFOTOEMAIL,
+                subject: `Новое сообщение от клиента ${client.fullName}`,
+                text: `Новое сообщение от клиента ${client.fullName}: ${message.text}`,
+            };
+        
+            transporter.sendMail(mailOptions, function (error, info) {
+                if (error) {
+                    console.log(error);
+                    res.status(500).json({
+                        success: false,
+                        message: "Ошибка при отправке письма"
+                    })
+                } else {
+                    console.log("Email sent: " + info.response);
+                    res.status(200).json({
+                        success: true,
+                        message: "Письмо успешно отправлено"
+                    })
+                }
+            });
         }
     } catch (error) {
         console.log(error);

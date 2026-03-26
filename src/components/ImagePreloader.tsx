@@ -31,9 +31,10 @@ const criticalImages = [
   require('../assets/banner5.png'),
   require('../assets/banner4_2.png'),
   require('../assets/notificationIcon.png'),
-  require('../assets/newBanner.png'),
+  require('../assets/newBanner1.png'),
   require('../assets/newBanner2.png'),
   require('../assets/newBanner3.png'),
+  require('../assets/newBanner4.png'),
   require('../assets/marketPlace.png'),
 ];
 

@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   hydrationButton: {
-    borderRadius: "100%",
+    borderRadius: 9999,
     marginTop: 50,
     backgroundColor: '#fff',
     alignItems: 'center',

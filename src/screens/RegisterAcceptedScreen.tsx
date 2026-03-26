@@ -83,9 +83,6 @@ const RegisterAcceptedScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                 </View>
                 
                 <Text style={styles.title}>Ваша заявка принята!</Text>
-                <View style={styles.subtitleContainer}>
-                    <Text style={styles.subtitle}>Вы получите СМС уведомление об успешной регистрации</Text>
-                </View>
             </View>
             <View>
                 <TouchableOpacity style={styles.button} onPress={() => {navigation.navigate("Home")}}>

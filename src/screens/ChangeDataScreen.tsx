@@ -69,8 +69,10 @@ const ChangeDataScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     />
                     <OutlinedFilledLabelInput
                         label="Номер телефона"
+                        keyboardType="phone-pad"
                         value={form.phone}
                         onChangeText={(value) => handleChange('phone', value)}
+                        mask="phone"
                         bgWhite={true}
                     />
                     <OutlinedFilledLabelInput

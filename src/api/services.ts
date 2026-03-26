@@ -13,18 +13,19 @@ export const apiService = {
         }
     },
 
-    sendCode: async (mail: string) => {
+    /** Код регистрации уходит в WhatsApp на указанный номер */
+    sendCode: async (mail: string, phone: string) => {
         try {
-            const response = await api.post('/sendMail', {mail});
+            const response = await api.post('/sendMail', { mail, phone });
             return response.data;
         } catch (error) {
-            throw error;    
+            throw error;
         }
     },
 
-    codeConfirm: async (mail: string, code: string) => {
+    codeConfirm: async (phone: string, code: string) => {
         try {
-            const response = await api.post('/codeConfirm', {mail, code});
+            const response = await api.post('/codeConfirm', { phone, code });
             return response.data;
         } catch (error) {
             throw error;
@@ -190,6 +191,19 @@ export const apiService = {
             throw error;
         }
     },
+
+    /** Вызов мастера (ремонт): JWT + fullName и phone в теле */
+    requestMasterCall: async (payload: { fullName: string; phone: string; mail: string }) => {
+        try {
+            const response = await api.post('/requestMasterCallMobile', payload);
+            return response.data;
+        } catch (error: any) {
+            const message =
+                error?.response?.data?.message || 'Не удалось отправить заявку';
+            return { success: false, message };
+        }
+    },
+
     sendMailForgotPassword: async (mail: string) => {
         try {
             const response = await api.post('/sendMailForgotPassword', {mail});
@@ -261,6 +275,49 @@ export const apiService = {
             return {
                 success: false,
                 message: "Не удалось удалить карту",
+            };
+        }
+    },
+
+    /** Статус сессии оплаты (для опроса из WebView после callback на сервер) */
+    getPaymentSessionStatus: async (userId: string, orderId: string) => {
+        try {
+            const response = await api.get('/api/payment/session-status', {
+                params: { userId, orderId },
+            });
+            return response.data;
+        } catch (error: any) {
+            return {
+                success: false,
+                status: 'unknown',
+                message: error?.response?.data?.message || 'Не удалось получить статус',
+            };
+        }
+    },
+
+    // Получение конфига виджета Pay Plus
+    getWidgetConfig: async (userId: string, amount: number, email?: string, phone?: string) => {
+        try {
+            console.log('[getWidgetConfig] Запрос:', { userId, amount, hasEmail: !!email, hasPhone: !!phone });
+            const response = await api.post('/api/payment/widget-config', { userId, amount, email, phone });
+            console.log('[getWidgetConfig] Ответ:', {
+                success: response.data?.success,
+                hasPaymentUrl: !!(response.data?.paymentUrl && response.data.paymentUrl.startsWith('http')),
+                hasWidgetPageUrl: !!response.data?.widgetPageUrl,
+                orderId: response.data?.orderId,
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('[getWidgetConfig] Ошибка:', {
+                message: error?.message,
+                status: error?.response?.status,
+                data: error?.response?.data,
+            });
+            const serverMessage = error?.response?.data?.message || "Не удалось получить конфигурацию платежа";
+            const debugMessage = error?.response?.data?.debug;
+            return {
+                success: false,
+                message: debugMessage ? `${serverMessage}: ${debugMessage}` : serverMessage,
             };
         }
     },

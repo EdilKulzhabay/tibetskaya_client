@@ -16,6 +16,7 @@ import { launchImageLibrary, ImagePickerResponse } from 'react-native-image-pick
 import { NavButton, Navigation } from '../components';
 import ButtonWithSwitch from '../components/ButtonWithSwitch';
 import { useAuth } from '../hooks';
+import { useTopUpBalance } from '../context/TopUpBalanceContext';
 import { profileImageStorage } from '../utils/storage';
 import pushNotificationService from '../services/pushNotifications';
 
@@ -25,6 +26,7 @@ interface ProfileScreenProps {
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const { user, logout, loadingState } = useAuth();
+  const { openTopUpModal } = useTopUpBalance();
   const [notificationSwitchValue, setNotificationSwitchValue] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [language, setLanguage] = useState('Русский');
@@ -186,7 +188,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         
         {/* <NavButton title="Бонусы" onPress={() => navigation.navigate('Bonus')} icon={require('../assets/star.png')} /> */}
         
-        <NavButton title="Мой кошелек" onPress={() => navigation.navigate('Wallet')} icon={require('../assets/wallet.png')} />
+        <NavButton title="Мой кошелек" onPress={() => openTopUpModal()} icon={require('../assets/wallet.png')} />
 
         {/* <NavButton title="Аналитика" onPress={() => navigation.navigate('Bonus')} icon={require('../assets/analytics.png')} /> */}
 
@@ -218,14 +220,14 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             <View style={{height: 1, backgroundColor: "#EDEDED", marginVertical: 16}} />
             <TouchableOpacity style={styles.modalButton}>
               <Text>Русский</Text>
-              <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: language === 'Русский' ? '#DC1818' : '#101010' }}>
-                {language === 'Русский' && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
+              <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: language === 'Русский' ? '#DC1818' : '#101010' }}>
+                {language === 'Русский' && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
               </View>
             </TouchableOpacity>
             {/* <TouchableOpacity style={styles.modalButton}>
               <Text>Казахский</Text>
-              <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: "50%", borderWidth: 1, borderColor: language === 'Казахский' ? '#DC1818' : '#101010' }}>
-                {language === 'Казахский' && <View style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: '#DC1818' }} />}
+              <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: language === 'Казахский' ? '#DC1818' : '#101010' }}>
+                {language === 'Казахский' && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
               </View>
             </TouchableOpacity> */}
           </TouchableOpacity>

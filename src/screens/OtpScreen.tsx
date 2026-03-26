@@ -49,24 +49,29 @@ const OtpScreen: React.FC<OtpScreenProps> = ({ navigation, route }) => {
         if (index === OTP_LENGTH - 1 && text) {
             const fullCode = newCode.join('');
             if (fullCode.length === OTP_LENGTH) {
-                Keyboard.dismiss(); // Скрываем клавиатуру
-                
-                const res = await apiService.codeConfirm(form.mail, fullCode);
-                console.log("res in otp = ", res);
-                if (res.success) {
-                    const registerRes = await apiService.clientRegister(form);
-                    console.log("registerRes in otp = ", registerRes);
-                    // Сохраняем данные пользователя и токены если они есть в ответе
-                    if (registerRes.clientData && registerRes.accessToken) {
-                        await saveUserData(registerRes);
-                    }
-                    if (registerRes.success) {
-                        navigation.navigate("RegisterAccepted");
+                Keyboard.dismiss();
+                try {
+                    const res = await apiService.codeConfirm(form.phone, fullCode);
+                    console.log("res in otp = ", res);
+                    if (res.success) {
+                        const registerRes = await apiService.clientRegister(form);
+                        console.log("registerRes in otp = ", registerRes);
+                        if (registerRes.clientData && registerRes.accessToken) {
+                            await saveUserData(registerRes);
+                        }
+                        if (registerRes.success) {
+                            navigation.navigate("RegisterAccepted");
+                        } else {
+                            Alert.alert("Ошибка", registerRes.message);
+                        }
                     } else {
-                        Alert.alert("Ошибка", registerRes.message);
+                        Alert.alert("Ошибка", res.message);
                     }
-                } else {
-                    Alert.alert("Ошибка", res.message);
+                } catch (err: unknown) {
+                    const msg =
+                        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+                        "Неверный код или ошибка сети";
+                    Alert.alert("Ошибка", msg);
                 }
             }
         }
@@ -107,13 +112,19 @@ const OtpScreen: React.FC<OtpScreenProps> = ({ navigation, route }) => {
     };
     
     const handleResendCode = async () => {
-        const response = await apiService.sendCode(form.mail);
-        if (response.success) {
-            console.log("response in otp = ", response);
-            setTimer(59);
-            // Очищаем все поля при повторной отправке кода
-            setCode(Array(OTP_LENGTH).fill(''));
-            inputs.current[0]?.focus();
+        try {
+            const response = await apiService.sendCode(form.mail, form.phone);
+            if (response.success) {
+                console.log("response in otp = ", response);
+                setTimer(59);
+                setCode(Array(OTP_LENGTH).fill(''));
+                inputs.current[0]?.focus();
+            }
+        } catch (err: unknown) {
+            const msg =
+                (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+                "Не удалось отправить код повторно";
+            Alert.alert("Ошибка", msg);
         }
     }
 
@@ -131,11 +142,6 @@ const OtpScreen: React.FC<OtpScreenProps> = ({ navigation, route }) => {
         }
     }, [timer]);
 
-    useEffect(() => {
-        handleResendCode();
-    }, []);
-
-
     return (
         <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -149,8 +155,8 @@ const OtpScreen: React.FC<OtpScreenProps> = ({ navigation, route }) => {
                 />
             </View>
             <View style={styles.content}>
-                <Text style={styles.title}>Дождитесь кода из сообщения</Text>
-                <Text style={styles.subtitle}>Код отправлен на почту {form.mail}</Text>
+                <Text style={styles.title}>Дождитесь кода из WhatsApp</Text>
+                <Text style={styles.subtitle}>Код отправлен на номер {form.phone}</Text>
 
                 <View style={styles.codeContainer}>
                 {code.map((digit, index) => (

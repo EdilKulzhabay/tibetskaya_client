@@ -9,6 +9,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
+import { useTopUpBalance } from '../context/TopUpBalanceContext';
 
 interface HeaderProps {
   bonus: number;
@@ -40,12 +41,13 @@ const Header: React.FC<HeaderProps> = ({
   onBonusPress: onBonusPressExternal,
 }) => {
   const navigation = useNavigation<NavigationProp>();
+  const { openTopUpModal } = useTopUpBalance();
 
   const onBonusPress = () => {
     if (onBonusPressExternal) {
       onBonusPressExternal();
     } else {
-      navigation.navigate('Wallet');
+      openTopUpModal();
     }
   }
 
@@ -121,19 +123,21 @@ const Header: React.FC<HeaderProps> = ({
         </View>
 
         {showBonus && (
-          <TouchableOpacity 
-            style={styles.bonusContainer} 
-            onPress={onBonusPress} 
+          <TouchableOpacity
+            style={styles.bonusContainer}
+            onPress={onBonusPress}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
           >
-            {paymentMethod === 'balance' && (
+            {paymentMethod === 'coupon' ? (
+              renderCouponBalance() ?? (
+                <Text style={styles.bonusText}>0</Text>
+              )
+            ) : (
               <Text style={styles.bonusText}>
                 {bonus.toLocaleString()} ₸
               </Text>
             )}
-
-            {paymentMethod === 'coupon' && renderCouponBalance()}
-
           </TouchableOpacity>
         )}
       </View>

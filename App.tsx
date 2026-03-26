@@ -46,6 +46,7 @@ import {
 } from './src/screens';
 import { RootStackParamList } from './src/types/navigation';
 import { ScreenLayout } from './src/components';
+import { TopUpBalanceProvider } from './src/context/TopUpBalanceContext';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -69,6 +70,7 @@ function App() {
       <ImagePreloader>
         <AuthWrapper>
           <NavigationContainer>
+            <TopUpBalanceProvider>
             <Stack.Navigator 
               initialRouteName="Home"
               screenOptions={{
@@ -138,6 +140,7 @@ function App() {
               <Stack.Screen name="OtpForgotPassword" component={withLayout(OtpForgotPasswordScreen)} />
               <Stack.Screen name="NewPassword" component={withLayout(NewPasswordScreen)} />
             </Stack.Navigator>
+            </TopUpBalanceProvider>
           </NavigationContainer>
         </AuthWrapper>
       </ImagePreloader>
