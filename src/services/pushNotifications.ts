@@ -496,6 +496,13 @@ class PushNotificationService {
     const { newStatus, orderId, message, messageStatus } = remoteMessage.data;
     const status = newStatus || messageStatus;
 
+    // Маркетинговые пуши: только системный баннер, без синхронизации заказов
+    // (иначе orderStatusUpdated тянет чужой orderId через getOrder и может подмешать заказ в список)
+    if (status === 'courierNearby') {
+      console.log('ℹ️ Маркетинговое уведомление (курьер рядом), пропускаем обновление заказов');
+      return;
+    }
+
     // Обработка сообщений поддержки
     if (status === 'newSupportMessage' && message) {
       try {
@@ -596,6 +603,27 @@ class PushNotificationService {
     } else {
       console.log('⚠️ FCM токен не найден, пытаемся получить');
       await this.getFCMToken();
+    }
+  }
+
+  /**
+   * Удаление текущего FCM-токена с сервера (при логауте)
+   */
+  async removeTokenFromServer(): Promise<void> {
+    try {
+      const userMail = await AsyncStorage.getItem('userMail');
+      const token = this.fcmToken || await AsyncStorage.getItem('fcmToken');
+      if (!userMail || !token) {
+        console.log('⚠️ Нет данных для удаления токена с сервера');
+        return;
+      }
+      await axios.post(`${API_URL}/removeFcmToken`, {
+        mail: userMail,
+        fcmToken: token,
+      });
+      console.log('✅ FCM токен удален с сервера');
+    } catch (error: any) {
+      console.error('❌ Ошибка удаления токена с сервера:', error?.message);
     }
   }
 

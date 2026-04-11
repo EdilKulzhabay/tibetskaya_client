@@ -1,5 +1,6 @@
 // import { Order } from '../types/interfaces';
 import api from './axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RegisterData, SupportMessage } from '../types';
 
 // Примеры API-сервисов
@@ -64,7 +65,11 @@ export const apiService = {
 
     addOrder: async (mail: string, address: any, products: any, clientNotes: any, date: any, opForm: string, needCall: boolean, comment: string) => {
         try {
-            const response = await api.post('/addOrderClientMobile', {mail, address, products, clientNotes, date, opForm, needCall, comment});
+            const fcmToken = await AsyncStorage.getItem('fcmToken');
+            const response = await api.post('/addOrderClientMobile', {
+                mail, address, products, clientNotes, date, opForm, needCall, comment,
+                notificationToken: fcmToken || '',
+            });
             return response.data;
         } catch (error) {
             throw error;

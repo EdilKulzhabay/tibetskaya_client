@@ -226,9 +226,58 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
   }, []);
 
 
-  const reloadOrder = async () => {
+  const getNextDeliveryDate = () => {
+    const now = new Date();
+    let orderDate = new Date(now);
+    const dayOfWeek = now.getDay();
+    const hours = now.getHours();
+
+    if (dayOfWeek !== 0 && hours < 19) {
+      // Будний день / суббота до 19:00 — сегодня
+    } else {
+      orderDate.setDate(orderDate.getDate() + 1);
+      if (orderDate.getDay() === 0) {
+        orderDate.setDate(orderDate.getDate() + 1);
+      }
+    }
+    return orderDate;
+  };
+
+  const getOrderAcceptText = () => {
+    const now = new Date();
+    const orderDate = getNextDeliveryDate();
+    const dayOfWeek = now.getDay();
+    const hours = now.getHours();
+
+    const dayNames = ['воскресенье', 'понедельник', 'вторник', 'среду', 'четверг', 'пятницу', 'субботу'];
+
+    const isToday =
+      orderDate.getDate() === now.getDate() &&
+      orderDate.getMonth() === now.getMonth() &&
+      orderDate.getFullYear() === now.getFullYear();
+
+    if (isToday) {
+      return 'Заказ принят на сегодня';
+    }
+
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const isTomorrow =
+      orderDate.getDate() === tomorrow.getDate() &&
+      orderDate.getMonth() === tomorrow.getMonth() &&
+      orderDate.getFullYear() === tomorrow.getFullYear();
+
+    if (isTomorrow) {
+      return 'Заказ принят на завтра';
+    }
+
+    return `Заказ принят на ${dayNames[orderDate.getDay()]}`;
+  };
+
+  const reloadOrder = async (paymentOverride?: string) => {
+    const paymentValue = paymentOverride || selectedPayment?.value;
     if (user?.mail && lastOrder) {
-      if (selectedPayment?.value === 'card' || selectedPayment?.value === 'credit' || selectedPayment?.value === 'coupon') {
+      if (paymentValue === 'card' || paymentValue === 'credit' || paymentValue === 'coupon') {
         if (user?.paymentMethod === 'balance') {
           if (user?.balance !== undefined && user.balance < lastOrder.sum) {
             setPaymentModalVisible(false);
@@ -246,37 +295,15 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
         }
       }
 
-      // Определяем сегодняшнюю дату и время
-      const now = new Date();
-      let orderDate = new Date(now);
-
-      const dayOfWeek = now.getDay(); // 0 - воскресенье, 6 - суббота
-      const hours = now.getHours();
-
+      const orderDate = getNextDeliveryDate();
       const pad = (n: number) => n.toString().padStart(2, '0');
-
-      // Проверяем условия: до 19:00 и не воскресенье
-      if (dayOfWeek !== 0 && hours < 19) {
-        // Сегодняшний день, не воскресенье, и время до 19:00
-        // orderDate остается сегодняшним
-      } else {
-        // Следующий рабочий день (не воскресенье)
-        // Если сегодня суббота и уже поздно, следующий не воскресенье -> понедельник
-        orderDate.setDate(orderDate.getDate() + 1);
-        let nextDay = orderDate.getDay();
-        // Если это воскресенье, добавляем еще 1 день (на понедельник)
-        if (nextDay === 0) {
-          orderDate.setDate(orderDate.getDate() + 1);
-        }
-      }
-
-      // Формируем дату в формате ГГГГ-ММ-ДД
       const formattedOrderDate = `${orderDate.getFullYear()}-${pad(orderDate.getMonth()+1)}-${pad(orderDate.getDate())}`;
       const orderDateObject = {d: formattedOrderDate, time: ""};
-      const res = await apiService.addOrder(user.mail, lastOrder.address, lastOrder.products, lastOrder.clientNotes, orderDateObject, selectedPayment?.value, lastOrder.needCall, lastOrder.comment);
+      const res = await apiService.addOrder(user.mail, lastOrder.address, lastOrder.products, lastOrder.clientNotes, orderDateObject, paymentValue, lastOrder.needCall, lastOrder.comment);
       if (res.success) {
-        Alert.alert('Успешно', 'Заказ повторно оформлен');
+        Alert.alert('Успешно', getOrderAcceptText());
         setPaymentModalVisible(false);
+        setNotEnoughBalanceModalVisible(false);
         refreshUserData();
       } else {
         Alert.alert('Ошибка', res.message);
@@ -640,11 +667,7 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                           borderRadius: 8,
                           marginTop: 12,
                       }}
-                      onPress={() => {
-                          setNotEnoughBalanceModalVisible(false);
-                          setSelectedPayment({ label: 'Наличными', value: 'fakt' });
-                          setPaymentModalVisible(true);
-                      }}
+                      onPress={() => reloadOrder('fakt')}
                   >
                       <Text style={styles.buttonText}>Оплатить наличными</Text>
                   </TouchableOpacity>
@@ -695,7 +718,19 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                 paddingHorizontal: 24,
               }}
             >
-              Спасибо! Мастер свяжется с вами в течении 5 минут.
+              {(() => {
+                const now = new Date();
+                const day = now.getDay();
+                const h = now.getHours();
+                const isWeekend =
+                  (day === 5 && h >= 18) ||
+                  day === 6 ||
+                  day === 0 ||
+                  (day === 1 && h < 9);
+                return isWeekend
+                  ? 'Ваша заявка принята. Наш менеджер свяжется с вами в ближайший будний день.\nСб–Вс — выходные.'
+                  : 'Спасибо! Мастер свяжется с вами в течение 10 минут.';
+              })()}
             </Text>
 
             <View

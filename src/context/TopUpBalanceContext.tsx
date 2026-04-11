@@ -16,6 +16,7 @@ import {
   Platform,
   Alert,
   InteractionManager,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
 import PaymentWebView from '../components/PaymentWebView';
@@ -112,6 +113,10 @@ export const TopUpBalanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
         statusBarTranslucent={Platform.OS === 'android'}
         presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
       >
+        <KeyboardAvoidingView
+          style={{flex: 1}}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
         <TouchableOpacity
           style={styles.bottomSheetOverlay}
           activeOpacity={1}
@@ -185,6 +190,7 @@ export const TopUpBalanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
             )}
           </TouchableOpacity>
         </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
     </TopUpBalanceContext.Provider>
   );

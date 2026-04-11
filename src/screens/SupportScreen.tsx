@@ -91,10 +91,19 @@ const SupportScreen: React.FC<SupportScreenProps> = ({ navigation }) => {
           <Text style={styles.contactTitle}>Email:</Text>
           <TouchableOpacity 
             onPress={() => {
-              Linking.openURL('mailto:support@example.com');
+              Linking.openURL('mailto:info@tibetskaya.kz');
             }} 
           >
             <Text style={styles.emailButton}>info@tibetskaya.kz</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.legalLinks}>
+          <TouchableOpacity onPress={() => Linking.openURL('https://tibetskaya.kz/PublicOffer')}>
+            <Text style={styles.legalLinkText}>Публичная оферта</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => Linking.openURL('https://tibetskaya.kz/agreement')}>
+            <Text style={styles.legalLinkText}>Соглашение</Text>
           </TouchableOpacity>
         </View>
 
@@ -170,6 +179,17 @@ const styles = StyleSheet.create({
   emailButton: {
     color: '#DC1818',
     fontSize: 16
+  },
+  legalLinks: {
+    marginTop: 24,
+    marginBottom: 32,
+    gap: 12,
+  },
+  legalLinkText: {
+    color: '#DC1818',
+    fontSize: 15,
+    fontWeight: '500',
+    textDecorationLine: 'underline',
   },
   modalOverlay: {
     flex: 1,

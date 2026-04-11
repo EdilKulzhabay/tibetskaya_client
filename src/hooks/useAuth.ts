@@ -174,8 +174,12 @@ export const useAuth = (): UseAuthReturn => {
     try {
       setLoadingState('loading');
 
-      // Очищаем push notification токен
-      // await pushNotificationService.clearToken();
+      // Удаляем FCM-токен с сервера (до очистки userMail)
+      try {
+        await pushNotificationService.removeTokenFromServer();
+      } catch (e) {
+        console.error('Ошибка при удалении FCM-токена:', e);
+      }
       await clearAllData();
 
       // Удаляем данные из локального хранилища
