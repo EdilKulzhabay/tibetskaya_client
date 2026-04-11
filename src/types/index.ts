@@ -50,6 +50,10 @@ export interface User {
   };
   /** Показывать блок «Ремонт техники / Вызвать мастера» в приложении (управляется в CRM) */
   showRepairMasterInApp?: boolean;
+  /** Реферальный код XXXX-XXXX-XXXX */
+  referralCode?: string;
+  /** Сколько заказов оформлено через приложение (сервер) */
+  appOrdersPlacedCount?: number;
 }
 
 export interface ApiResponse<T> {
@@ -78,8 +82,11 @@ export interface RegisterData {
   userName: string;
   phone: string;
   password: string;
+  confirmPassword?: string;
   termsAccepted: boolean;
   privacyAccepted: boolean;
+  /** Необязательно: код приглашения (12 латинских букв, можно с дефисами) */
+  referralCode?: string;
 }
 
 export interface SupportMessage {

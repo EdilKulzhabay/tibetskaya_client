@@ -90,7 +90,7 @@ export const useAuth = (): UseAuthReturn => {
         avatar: '',
         phone: clientData.phone,
         notificationPushToken: clientData.expoPushToken || "",
-        balance: clientData.balance || 0,
+        balance: clientData.balance ?? 0,
         bonus: clientData.bonus || 0,
         price12: clientData.price12 || 0,
         price19: clientData.price19 || 0,
@@ -100,6 +100,14 @@ export const useAuth = (): UseAuthReturn => {
         createdAt: clientData.createdAt,
         isStartedHydration: clientData.isStartedHydration || false,
         showRepairMasterInApp: clientData.showRepairMasterInApp !== false,
+        referralCode: clientData.referralCode,
+        appOrdersPlacedCount: clientData.appOrdersPlacedCount ?? 0,
+        paymentMethod: clientData.paymentMethod,
+        paidBootlesFor19: clientData.paidBootlesFor19,
+        paidBootlesFor12: clientData.paidBootlesFor12,
+        doesItTake19Bottles: clientData.doesItTake19Bottles,
+        doesItTake12Bottles: clientData.doesItTake12Bottles,
+        savedCard: clientData.savedCard,
       };
 
       // Сохраняем пользователя и токены из сервера

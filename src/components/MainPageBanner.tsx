@@ -48,10 +48,10 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
     )
   }
 
-  const fourthBanner = () => {
+  const fifthBanner = () => {
     return (
       <View style={styles.imageContainer}>
-        <StableImage source={require('../assets/newBanner4.png')} style={styles.image} />
+        <StableImage source={require('../assets/newBanner5.png')} style={styles.image} />
       </View>
     )
   }
@@ -61,7 +61,7 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
     { id: '1', Component: firstBanner },
     { id: '1', Component: secondBanner },
     { id: '2', Component: thirdBanner },
-    { id: '3', Component: fourthBanner },
+    { id: '3', Component: fifthBanner },
   ];
   
   const extendedData = [

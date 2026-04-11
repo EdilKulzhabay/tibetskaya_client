@@ -17,6 +17,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { apiService } from '../api/services';
 import { useAuth } from '../hooks/useAuth';
 import { useTopUpBalance } from '../context/TopUpBalanceContext';
+import ReferralPromoModal from '../components/ReferralPromoModal';
 
 const MONTH_NAMES = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
@@ -28,9 +29,10 @@ interface HistoryScreenProps {
 }
 
 const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
-  const { user, loadingState } = useAuth();
+  const { user, loadingState, refreshUserData } = useAuth();
   const { openTopUpModal } = useTopUpBalance();
   const [orders, setOrders] = useState<any[]>([]);
+  const [referralPromoVisible, setReferralPromoVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
@@ -171,9 +173,21 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
       const orderDateObject = {d: formattedOrderDate, time: ""};
       const res = await apiService.addOrder(user.mail, selectedOrder.address, selectedOrder.products, selectedOrder.clientNotes, orderDateObject, selectedPayment?.value, selectedOrder.needCall, selectedOrder.comment);
       if (res.success) {
-        Alert.alert('Успешно', 'Заказ повторно оформлен');
-        setPaymentModalVisible(false);
-        getHistoryOrders();
+        const showRef = Boolean((res as { showReferralModal?: boolean }).showReferralModal);
+        Alert.alert('Успешно', 'Заказ повторно оформлен', [
+          {
+            text: 'OK',
+            onPress: () => {
+              setPaymentModalVisible(false);
+              void refreshUserData().then(() => {
+                getHistoryOrders();
+                if (showRef) {
+                  setReferralPromoVisible(true);
+                }
+              });
+            },
+          },
+        ]);
       } else {
         Alert.alert('Ошибка', res.message);
       }
@@ -509,6 +523,12 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      <ReferralPromoModal
+        visible={referralPromoVisible}
+        onDismiss={() => setReferralPromoVisible(false)}
+        referralCode={user?.referralCode || ''}
+      />
     </SafeAreaView>
   );
 };

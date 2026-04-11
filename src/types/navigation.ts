@@ -138,6 +138,7 @@ export interface RegisterData {
   password: string;
   termsAccepted: boolean;
   privacyAccepted: boolean;
+  referralCode?: string;
 }
 
 export type RootStackParamList = {

@@ -14,7 +14,7 @@ export const apiService = {
         }
     },
 
-    /** Код регистрации уходит в WhatsApp на указанный номер */
+    /** Код регистрации отправляется на указанный email */
     sendCode: async (mail: string, phone: string) => {
         try {
             const response = await api.post('/sendMail', { mail, phone });

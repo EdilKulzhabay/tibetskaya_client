@@ -155,8 +155,8 @@ const OtpScreen: React.FC<OtpScreenProps> = ({ navigation, route }) => {
                 />
             </View>
             <View style={styles.content}>
-                <Text style={styles.title}>Дождитесь кода из WhatsApp</Text>
-                <Text style={styles.subtitle}>Код отправлен на номер {form.phone}</Text>
+                <Text style={styles.title}>Дождитесь кода на почте</Text>
+                <Text style={styles.subtitle}>Код отправлен на {form.mail}</Text>
 
                 <View style={styles.codeContainer}>
                 {code.map((digit, index) => (

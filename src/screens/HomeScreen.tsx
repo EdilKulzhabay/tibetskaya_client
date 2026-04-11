@@ -27,6 +27,7 @@ import { apiService } from '../api/services';
 const { tokenStorage } = require('../utils/storage');
 import { useFocusEffect } from '@react-navigation/native';
 import { useTopUpBalance } from '../context/TopUpBalanceContext';
+import ReferralPromoModal from '../components/ReferralPromoModal';
 
 interface HomeScreenProps {}
 
@@ -44,6 +45,7 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
   const [masterCallConfirmModalVisible, setMasterCallConfirmModalVisible] = useState(false);
   const [masterCallSuccessModalVisible, setMasterCallSuccessModalVisible] = useState(false);
   const [masterCallLoading, setMasterCallLoading] = useState(false);
+  const [referralPromoVisible, setReferralPromoVisible] = useState(false);
 
   const platformSentRef = useRef(false);
 
@@ -57,7 +59,7 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
     if (user?.mail && !platformSentRef.current) {
       platformSentRef.current = true;
       apiService.updateData(user.mail, 'platform', Platform.OS);
-      const APP_VERSION = "1.1.0";
+      const APP_VERSION = "1.2.0";
       apiService.updateData(user.mail, 'appVersion', APP_VERSION.toString());
     }
   }, [user?.mail]);
@@ -301,10 +303,38 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
       const orderDateObject = {d: formattedOrderDate, time: ""};
       const res = await apiService.addOrder(user.mail, lastOrder.address, lastOrder.products, lastOrder.clientNotes, orderDateObject, paymentValue, lastOrder.needCall, lastOrder.comment);
       if (res.success) {
-        Alert.alert('Успешно', getOrderAcceptText());
+        const showRef = Boolean((res as { showReferralModal?: boolean }).showReferralModal);
         setPaymentModalVisible(false);
         setNotEnoughBalanceModalVisible(false);
-        refreshUserData();
+
+        const syncUserAndOrders = async () => {
+          try {
+            await refreshUserData();
+            await getLastOrder();
+            if (user.mail) {
+              const activeRes = await apiService.getActiveOrders(user.mail);
+              if (activeRes?.orders) {
+                setOrders(activeRes.orders);
+              }
+            }
+          } catch (e) {
+            console.error('Ошибка обновления после заказа:', e);
+          }
+        };
+
+        void syncUserAndOrders();
+
+        Alert.alert('Успешно', getOrderAcceptText(), [
+          {
+            text: 'OK',
+            onPress: () => {
+              void syncUserAndOrders();
+              if (showRef) {
+                setReferralPromoVisible(true);
+              }
+            },
+          },
+        ]);
       } else {
         Alert.alert('Ошибка', res.message);
       }
@@ -848,6 +878,12 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      <ReferralPromoModal
+        visible={referralPromoVisible}
+        onDismiss={() => setReferralPromoVisible(false)}
+        referralCode={user?.referralCode || ''}
+      />
     </SafeAreaView>
   );
 };

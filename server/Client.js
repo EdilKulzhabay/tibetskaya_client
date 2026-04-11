@@ -223,7 +223,28 @@ const ClientSchema = new mongoose.Schema(
                 type: String,   // последние 4 цифры карты, например "1111"
                 default: null
             }
-        }
+        },
+        referralCode: {
+            type: String,
+            sparse: true,
+            unique: true,
+        },
+        referredBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Client",
+            default: null,
+        },
+        firstOrderReferrerBonusPaid: {
+            type: Boolean,
+            default: false,
+        },
+        referralReferrerBonusPaid: {
+            type: Boolean,
+        },
+        appOrdersPlacedCount: {
+            type: Number,
+            default: 0,
+        },
     },
     {
         timestamps: true,

@@ -102,8 +102,8 @@ const SupportScreen: React.FC<SupportScreenProps> = ({ navigation }) => {
           <TouchableOpacity onPress={() => Linking.openURL('https://tibetskaya.kz/PublicOffer')}>
             <Text style={styles.legalLinkText}>Публичная оферта</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => Linking.openURL('https://tibetskaya.kz/agreement')}>
-            <Text style={styles.legalLinkText}>Соглашение</Text>
+          <TouchableOpacity onPress={() => Linking.openURL('https://tibetskaya.kz/PrivacyPolicy')}>
+            <Text style={styles.legalLinkText}>Политика конфиденциальности</Text>
           </TouchableOpacity>
         </View>
 

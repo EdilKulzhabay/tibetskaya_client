@@ -5,6 +5,7 @@ import { useTopUpBalance } from "../context/TopUpBalanceContext";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { apiService } from "../api/services";
 import { useFocusEffect } from "@react-navigation/native";
+import ReferralPromoModal from "../components/ReferralPromoModal";
 
 const payments = [
     { label: 'Наличными', value: 'fakt' },
@@ -31,6 +32,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
     const [callModalVisible, setCallModalVisible] = useState(false);
     const [dateModalVisible, setDateModalVisible] = useState(false);
     const [notEnoughBalanceModalVisible, setNotEnoughBalanceModalVisible] = useState(false);
+    const [referralPromoVisible, setReferralPromoVisible] = useState(false);
 
     const [selectedAddress, setSelectedAddress] = useState<any>(order?.address || null);
     const [selectedPayment, setSelectedPayment] = useState<any>(order?.payment || null);
@@ -208,9 +210,21 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
 
 
             if (res.success) {
-                Alert.alert('Успешно', 'Заказ оформлен');
-                refreshUserData();
-                navigation.navigate('Home');
+                const showRef = Boolean((res as { showReferralModal?: boolean }).showReferralModal);
+                Alert.alert('Успешно', 'Заказ оформлен', [
+                    {
+                        text: 'OK',
+                        onPress: () => {
+                            void refreshUserData().then(() => {
+                                if (showRef) {
+                                    setReferralPromoVisible(true);
+                                } else {
+                                    navigation.navigate('Home');
+                                }
+                            });
+                        },
+                    },
+                ]);
             } else {
                 Alert.alert('Ошибка', res.message);
             }
@@ -709,6 +723,15 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                     </TouchableOpacity>
                 </TouchableOpacity>
             </Modal>
+
+            <ReferralPromoModal
+                visible={referralPromoVisible}
+                onDismiss={() => {
+                    setReferralPromoVisible(false);
+                    navigation.navigate('Home');
+                }}
+                referralCode={user?.referralCode || ''}
+            />
         </SafeAreaView>
     )
 }

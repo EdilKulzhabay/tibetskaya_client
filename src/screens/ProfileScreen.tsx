@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,9 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Share,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { launchImageLibrary, ImagePickerResponse } from 'react-native-image-picker';
 import { NavButton, Navigation } from '../components';
 import ButtonWithSwitch from '../components/ButtonWithSwitch';
@@ -19,13 +21,14 @@ import { useAuth } from '../hooks';
 import { useTopUpBalance } from '../context/TopUpBalanceContext';
 import { profileImageStorage } from '../utils/storage';
 import pushNotificationService from '../services/pushNotifications';
+import { apiService } from '../api/services';
 
 interface ProfileScreenProps {
   navigation: any;
 }
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
-  const { user, logout, loadingState } = useAuth();
+  const { user, logout, loadingState, refreshUserData } = useAuth();
   const { openTopUpModal } = useTopUpBalance();
   const [notificationSwitchValue, setNotificationSwitchValue] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
@@ -108,6 +111,14 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     }
   }, [loadingState, user, navigation]);
 
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.mail && loadingState === 'success' && !user?.referralCode) {
+        void refreshUserData();
+      }
+    }, [user?.mail, user?.referralCode, loadingState, refreshUserData])
+  );
+
   // Функция для выбора фото
   const handleSelectPhoto = () => {
     launchImageLibrary(
@@ -189,6 +200,45 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         {/* <NavButton title="Бонусы" onPress={() => navigation.navigate('Bonus')} icon={require('../assets/star.png')} /> */}
         
         <NavButton title="Мой кошелек" onPress={() => openTopUpModal()} icon={require('../assets/wallet.png')} />
+
+        <View style={styles.referralBlock}>
+          <Text style={styles.referralTitle}>Реферальный код</Text>
+          <Text style={styles.referralCodeText}>{user?.referralCode || 'Загрузка…'}</Text>
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={async () => {
+              let code = user?.referralCode;
+              if (!code && user?.mail) {
+                try {
+                  const res = await apiService.getData(user.mail);
+                  code = res.client?.referralCode;
+                  if (res.client) {
+                    await refreshUserData();
+                  }
+                } catch {
+                  Alert.alert('Ошибка', 'Не удалось загрузить реферальный код');
+                  return;
+                }
+              }
+              if (!code) {
+                Alert.alert('Код недоступен', 'Попробуйте позже');
+                return;
+              }
+              const msg = `Присоединяйся к «Тибетской воде»! Мой реферальный код: ${code}`;
+              try {
+                await Share.share(
+                  Platform.OS === 'ios'
+                    ? { message: msg }
+                    : { message: msg, title: 'Тибетская вода' }
+                );
+              } catch {
+                /* отмена шеринга */
+              }
+            }}
+          >
+            <Text style={styles.referralTapHint}>Поделиться</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* <NavButton title="Аналитика" onPress={() => navigation.navigate('Bonus')} icon={require('../assets/analytics.png')} /> */}
 
@@ -368,6 +418,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#333',
     fontFamily: 'monospace',
+  },
+  referralBlock: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#ECECEC',
+  },
+  referralTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 6,
+  },
+  referralCodeText: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: '#101010',
+  },
+  referralTapHint: {
+    fontSize: 12,
+    color: '#DC1818',
+    marginTop: 8,
+    fontWeight: '500',
   },
 });
 

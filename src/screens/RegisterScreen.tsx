@@ -12,6 +12,7 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         phone: "",
         password: "",
         confirmPassword: "",
+        referralCode: "",
         termsAccepted: false,
         privacyAccepted: false,
     });
@@ -24,6 +25,7 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const phoneRef = useRef<TextInput>(null);
     const passRef = useRef<TextInput>(null);
     const confirmRef = useRef<TextInput>(null);
+    const referralRef = useRef<TextInput>(null);
 
     // Отслеживание состояния клавиатуры
     useEffect(() => {
@@ -61,6 +63,7 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             phone: form.phone.trim(),
             password: form.password.trim(),
             confirmPassword: form.confirmPassword.trim(),
+            referralCode: form.referralCode.trim().toUpperCase(),
         };
         setForm(nextForm);
         try {
@@ -163,8 +166,21 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     isPassword={true}
                     autoCapitalize="none"
                     inputRef={confirmRef}
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => referralRef.current?.focus()}
+                />
+
+                <OutlinedFilledLabelInput
+                    label="Реферальный код (необязательно)"
+                    value={form.referralCode}
+                    onChangeText={(text) => setForm({ ...form, referralCode: text.toUpperCase() })}
+                    bgWhite={true}
+                    inputRef={referralRef}
                     returnKeyType="done"
                     blurOnSubmit={true}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
                     onSubmitEditing={handleRegister}
                 />
 
