@@ -9,8 +9,10 @@ echo "📦 Версия приложения: 1.0.0"
 # Переходим в директорию android
 cd android
 
-# Очищаем предыдущие сборки
+# Очищаем предыдущие сборки (без удаления app/.cxx gradle clean может падать в CMake:
+# ссылки на старый react-android в ~/.gradle/caches/transforms/...)
 echo "🧹 Очистка предыдущих сборок..."
+rm -rf app/.cxx app/build build
 ./gradlew clean
 
 # Нужно поменять версию в build.gradle в папке android/app/build.gradle и в src/screens/HomeScreen.tsx

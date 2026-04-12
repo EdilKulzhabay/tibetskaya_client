@@ -76,7 +76,7 @@ const PaymentWebView: React.FC<PaymentWebViewProps> = ({
         setSessionOrderId(orderId);
       }
 
-      // Прямая ссылка на форму оплаты (payplus.kz, easypayly.com и т.д.) — не требовать подстроку "payplus"
+      // Прямая ссылка на форму оплаты (ventrapay.net, easypayly.com и т.д.) — не требовать подстроку "payplus"
       const url =
         paymentUrl && paymentUrl.startsWith('http')
           ? paymentUrl

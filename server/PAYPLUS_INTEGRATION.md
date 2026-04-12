@@ -1,11 +1,13 @@
-# Интеграция Payplus.kz
+# Интеграция Pay Plus (Payplus)
+
+**API-домен (актуально):** `https://ventrapay.net`. Если в `.env` указан старый `https://payplus.kz`, замените на `https://ventrapay.net`.
 
 ## 1. Переменные окружения
 
 Добавьте в `.env`:
 
 ```
-PAYPLUS_BASE_URL=https://payplus.kz
+PAYPLUS_BASE_URL=https://ventrapay.net
 PAYPLUS_MERCHANT=ВАШ_MERCHANT_ID
 PAYPLUS_SECRET=ВАШ_SECRET_KEY
 API_BASE_URL=https://api.tibetskayacrm.kz
@@ -13,7 +15,7 @@ API_BASE_URL=https://api.tibetskayacrm.kz
 
 **Важно:** `PAYPLUS_MERCHANT` и `PAYPLUS_SECRET` должны быть заданы. Иначе `paymentUrl` будет некорректным, и приложение будет использовать `widget-page`, что может давать 404 на production.
 
-- `PAYPLUS_BASE_URL` — базовый URL API Payplus (выдаётся после активации мерчанта)
+- `PAYPLUS_BASE_URL` — базовый URL API Pay Plus (с 2026: `https://ventrapay.net`)
 - `PAYPLUS_MERCHANT` — ID мерчанта из личного кабинета Payplus
 - `PAYPLUS_SECRET` — секретный ключ мерчанта
 - `API_BASE_URL` — URL вашего API (для callback и виджета)
