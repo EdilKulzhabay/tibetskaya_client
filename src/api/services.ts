@@ -63,6 +63,17 @@ export const apiService = {
         }
     },
 
+    generateInvoicePdf: async (mail: string, qty19: number, qty12: number) => {
+        try {
+            const response = await api.post('/generateInvoicePdfMobile', { mail, qty19, qty12 });
+            return response.data;
+        } catch (error: any) {
+            const message =
+                error?.response?.data?.message || 'Не удалось сформировать счёт';
+            return { success: false, message };
+        }
+    },
+
     addOrder: async (mail: string, address: any, products: any, clientNotes: any, date: any, opForm: string, needCall: boolean, comment: string) => {
         try {
             const fcmToken = await AsyncStorage.getItem('fcmToken');

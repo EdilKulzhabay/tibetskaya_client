@@ -1,39 +1,11 @@
-import { SafeAreaView, StyleSheet, View, Text, ScrollView, Image, TouchableOpacity, Modal, Alert } from 'react-native';
+import { SafeAreaView, StyleSheet, View, Text, ScrollView, Image, TouchableOpacity } from 'react-native';
 import { Back } from '../components';
 import { useAuth } from '../hooks/useAuth';
-import { useState } from 'react';
-import OutlinedFilledLabelInput from '../components/OutlinedFilledLabelInput';
-import PaymentWebView from '../components/PaymentWebView';
+import { useTopUpBalance } from '../context/TopUpBalanceContext';
 
 const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { user, refreshUserData } = useAuth();
-  const [modal, setModal] = useState(false);
-  const [sum, setSum] = useState("0");
-  const [paymentWebViewVisible, setPaymentWebViewVisible] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState(0);
-
-  const handlePayment = () => {
-    if (sum === "0" || sum === "" || isNaN(Number(sum))) {
-      Alert.alert('Ошибка', 'Сумма пополнения не может быть 0 или не числом');
-      return;
-    }
-    const amount = Number(sum);
-    if (amount < 100) {
-      Alert.alert('Ошибка', 'Минимальная сумма пополнения 100 ₸');
-      return;
-    }
-    setModal(false);
-    setPaymentAmount(amount);
-    setPaymentWebViewVisible(true);
-  };
-
-  const handlePaymentWebViewClose = (paymentCompleted: boolean) => {
-    setPaymentWebViewVisible(false);
-    setSum("0");
-    if (paymentCompleted) {
-      refreshUserData();
-    }
-  };
+  const { user } = useAuth();
+  const { openTopUpModal } = useTopUpBalance();
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -48,74 +20,37 @@ const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </View>
         </View>
 
-        <TouchableOpacity onPress={() => setModal(true)} style={styles.giveMoreButton}>
-            <Text style={styles.giveMoreButtonText}>Пополнить</Text>
+        <TouchableOpacity onPress={() => openTopUpModal()} style={styles.giveMoreButton}>
+          <Text style={styles.giveMoreButtonText}>Пополнить</Text>
         </TouchableOpacity>
 
         <View style={styles.FAQButtonsContainer}>
-            <TouchableOpacity style={styles.FAQButton} onPress={() => navigation.navigate('WhatIsMyBalance')}>
-                <Image source={require('../assets/star.png')} style={styles.FAQImage} />
-                <Text style={styles.FAQButtonText}>Что такое{'\n'}мой баланс?</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.FAQButton} onPress={() => navigation.navigate('HowToTopUp')}>
-                <Image source={require('../assets/star2.png')} style={styles.FAQImage} />
-                <Text style={styles.FAQButtonText}>Как{'\n'}пополнить?</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.FAQButton} onPress={() => navigation.navigate('FAQ')}>
-                <Image source={require('../assets/faq.png')} style={styles.FAQImage} />
-                <Text style={styles.FAQButtonText}>Вопросы{'\n'}и ответы</Text>
-            </TouchableOpacity>
-        </View>
-
-      </ScrollView>
-      
-      <Modal visible={modal} transparent={true} animationType="fade">
-        <TouchableOpacity style={styles.modalContainer} onPress={() => setModal(false)}>
-          <TouchableOpacity style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-            <OutlinedFilledLabelInput
-                label="Сумма пополнения"
-                value={sum}
-                onChangeText={(text) => setSum(text)}
-                bgWhite={true}
-            />
-            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 12, marginVertical: 12 }}>
-              {[2600, 5000, 10000].map((amount) => (
-                <TouchableOpacity
-                  key={amount}
-                  onPress={() => setSum(amount.toString())}
-                  style={{
-                    backgroundColor: sum === amount.toString() ? '#DC1818' : '#fff',
-                    borderRadius: 18,
-                    paddingHorizontal: 18,
-                    paddingVertical: 8,
-                    borderWidth: sum === amount.toString() ? 2 : 1,
-                    borderColor: sum === amount.toString() ? '#DC1818' : '#E3E3E3',
-                  }}
-                >
-                  <Text style={{
-                    color: sum === amount.toString() ? '#fff' : '#111',
-                    fontWeight: '600',
-                  }}>
-                    {amount}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TouchableOpacity style={styles.giveMoreButton} onPress={handlePayment}>
-              <Text style={styles.giveMoreButtonText}>Пополнить</Text>
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.FAQButton}
+            onPress={() => navigation.navigate('WhatIsMyBalance')}
+          >
+            <Image source={require('../assets/star.png')} style={styles.FAQImage} />
+            <Text style={styles.FAQButtonText}>
+              Что такое{'\n'}мой баланс?
+            </Text>
           </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
-
-      <PaymentWebView
-        visible={paymentWebViewVisible}
-        onClose={handlePaymentWebViewClose}
-        amount={paymentAmount}
-        userId={user?._id || ''}
-        userEmail={user?.mail}
-        userPhone={user?.phone}
-      />
+          <TouchableOpacity
+            style={styles.FAQButton}
+            onPress={() => navigation.navigate('HowToTopUp')}
+          >
+            <Image source={require('../assets/star2.png')} style={styles.FAQImage} />
+            <Text style={styles.FAQButtonText}>
+              Как{'\n'}пополнить?
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.FAQButton} onPress={() => navigation.navigate('FAQ')}>
+            <Image source={require('../assets/faq.png')} style={styles.FAQImage} />
+            <Text style={styles.FAQButtonText}>
+              Вопросы{'\n'}и ответы
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -130,18 +65,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f6f6f6',
     padding: 24,
   },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal:20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
   balanceContainer: {
     backgroundColor: '#FEDBDB',
     borderRadius: 16,
@@ -155,7 +78,7 @@ const styles = StyleSheet.create({
   balanceContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12
+    gap: 12,
   },
   balanceCount: {
     fontSize: 32,
@@ -184,7 +107,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 16,
     justifyContent: 'space-between',
-    alignItems: "stretch"
+    alignItems: 'stretch',
   },
   FAQButton: {
     backgroundColor: 'white',

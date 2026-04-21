@@ -14,6 +14,8 @@ import {
 import { WebView } from 'react-native-webview';
 import type { WebViewNavigation } from 'react-native-webview';
 import { apiService } from '../api/services';
+import { userStorage } from '../utils/storage';
+import { getClientMongoId } from '../utils/clientId';
 
 const SCREEN_H = Dimensions.get('window').height;
 const SHEET_HEIGHT = SCREEN_H * 0.9;
@@ -53,14 +55,29 @@ const PaymentWebView: React.FC<PaymentWebViewProps> = ({
     paymentCompletedRef.current = false;
     setSessionOrderId(null);
 
-    if (!userId) {
+    let effectiveUserId = (userId || '').trim();
+    if (!effectiveUserId) {
+      try {
+        const saved = await userStorage.get();
+        effectiveUserId = getClientMongoId(saved);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (!effectiveUserId) {
       setError('Необходимо войти в аккаунт');
       setLoading(false);
       return;
     }
 
     try {
-      const config = await apiService.getWidgetConfig(userId, amount, userEmail, userPhone);
+      const config = await apiService.getWidgetConfig(
+        effectiveUserId,
+        amount,
+        userEmail,
+        userPhone
+      );
       console.log('[PaymentWebView] Конфиг:', { success: config?.success, hasUrl: !!config?.widgetPageUrl });
 
       if (!config.success) {
@@ -112,7 +129,7 @@ const PaymentWebView: React.FC<PaymentWebViewProps> = ({
 
   /** Опрос статуса на CRM: callback Payplus обновляет баланс до того, как WebView попадёт на success_url */
   useEffect(() => {
-    if (!visible || !sessionOrderId || !userId || paymentCompletedRef.current) {
+    if (!visible || !sessionOrderId || paymentCompletedRef.current) {
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
         pollingRef.current = null;
@@ -123,7 +140,15 @@ const PaymentWebView: React.FC<PaymentWebViewProps> = ({
     const tick = async () => {
       if (paymentCompletedRef.current) return;
       try {
-        const res = await apiService.getPaymentSessionStatus(userId, sessionOrderId);
+        const resolveUserId = async () => {
+          const fromProp = (userId || '').trim();
+          if (fromProp) return fromProp;
+          const saved = await userStorage.get();
+          return getClientMongoId(saved);
+        };
+        const uid = await resolveUserId();
+        if (!uid) return;
+        const res = await apiService.getPaymentSessionStatus(uid, sessionOrderId);
         if (!res?.success || !res.status) return;
         if (res.status === 'success') {
           paymentCompletedRef.current = true;
@@ -152,7 +177,7 @@ const PaymentWebView: React.FC<PaymentWebViewProps> = ({
         pollingRef.current = null;
       }
     };
-  }, [visible, sessionOrderId, userId]);
+  }, [visible, sessionOrderId]);
 
   const isPaymentSuccessUrl = (raw: string) => {
     const u = raw.toLowerCase();

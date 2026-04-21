@@ -11,8 +11,10 @@
 
 import "dotenv/config";
 import Client from "./Client.js";
+import ClientPayment from "./ClientPayment.js";
 import PaymentSession from "./PaymentSession.js";
 import { buildPaymentFormSign, verifyCallbackSign } from "./payplusUtils.js";
+import { extractPayplusCardLast4 } from "./extractPayplusCardLast4.js";
 
 const PAYPLUS_BASE_URL =
     process.env.PAYPLUS_BASE_URL || "https://ventrapay.net";
@@ -22,6 +24,29 @@ const API_BASE_URL = process.env.API_BASE_URL || "https://api.tibetskayacrm.kz";
 
 function generateOrderId() {
     return `PP${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function persistClientPayment({ session, data, status }) {
+    const amountRaw = parseFloat(data.co_amount || 0);
+    const amount =
+        Number.isFinite(amountRaw) && amountRaw > 0 ? amountRaw : session.amount;
+    const cardLast4 = extractPayplusCardLast4(data);
+    try {
+        await ClientPayment.create({
+            client: session.clientId,
+            paidAt: new Date(),
+            amount,
+            currency: session.currency || "KZT",
+            status,
+            cardLast4: cardLast4 && cardLast4.length === 4 ? cardLast4 : null,
+            sessionOrderId: session.orderId,
+            providerInvoiceId: data.co_inv_id != null ? String(data.co_inv_id) : null,
+            rawProviderStatus:
+                data.co_inv_st != null ? String(data.co_inv_st) : null,
+        });
+    } catch (e) {
+        console.error("[persistClientPayment]", e?.message);
+    }
 }
 
 /**
@@ -149,9 +174,11 @@ export const payplusCallback = async (req, res) => {
                 client.balance = (client.balance || 0) + amount;
                 await client.save();
             }
+            await persistClientPayment({ session, data, status: "success" });
         } else {
             session.status = "fail";
             await session.save();
+            await persistClientPayment({ session, data, status: "fail" });
         }
 
         return res.send("OK");

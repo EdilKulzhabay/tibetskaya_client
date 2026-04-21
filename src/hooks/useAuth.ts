@@ -19,7 +19,8 @@ interface AuthActions {
   logout: () => Promise<void>;
   clearError: () => void;
   refreshUser: () => Promise<void>;
-  refreshUserData: () => Promise<void>;
+  /** Возвращает актуального клиента с сервера или null при ошибке / без mail */
+  refreshUserData: () => Promise<User | null>;
   updateUser: (field: string, value: any) => Promise<void>;
 }
 
@@ -108,6 +109,8 @@ export const useAuth = (): UseAuthReturn => {
         doesItTake19Bottles: clientData.doesItTake19Bottles,
         doesItTake12Bottles: clientData.doesItTake12Bottles,
         savedCard: clientData.savedCard,
+        invoiceSequentialNumber: clientData.invoiceSequentialNumber,
+        invoiceLegalData: clientData.invoiceLegalData,
       };
 
       // Сохраняем пользователя и токены из сервера
@@ -234,27 +237,28 @@ export const useAuth = (): UseAuthReturn => {
   /**
    * Получение свежих данных пользователя с сервера
    */
-  const refreshUserData = useCallback(async () => {
-    if (!user?.mail) return;
-    
+  const refreshUserData = useCallback(async (): Promise<User | null> => {
+    if (!user?.mail) return null;
+
     try {
       setLoadingState('loading');
       const response = await apiService.getData(user.mail);
 
       console.log('response', response);
-      
+
       if (response.client) {
-        // Обновляем локальное состояние
         await userStorage.save(response.client);
-        setUser(response.client);
+        const nextUser = response.client as User;
+        setUser(nextUser);
         setLoadingState('success');
-      } else {
-        throw new Error(response.message || 'Не удалось получить данные пользователя');
+        return nextUser;
       }
+      throw new Error(response.message || 'Не удалось получить данные пользователя');
     } catch (error) {
       console.error('Ошибка при получении данных пользователя:', error);
       setError('Не удалось обновить данные пользователя');
       setLoadingState('error');
+      return null;
     }
   }, [user?.mail]);
 
