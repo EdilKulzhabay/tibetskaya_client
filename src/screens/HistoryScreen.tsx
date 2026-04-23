@@ -17,6 +17,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { apiService } from '../api/services';
 import { useAuth } from '../hooks/useAuth';
 import { useTopUpBalance } from '../context/TopUpBalanceContext';
+import { clientHasInvoiceLegalData } from '../utils/clientInvoiceProfile';
 import ReferralPromoModal from '../components/ReferralPromoModal';
 
 const MONTH_NAMES = [
@@ -127,7 +128,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
       const b19 = selectedOrder.products?.b19 || 0;
       const b12 = selectedOrder.products?.b12 || 0;
 
-      if (selectedPayment?.value === 'card' || selectedPayment?.value === 'credit' || selectedPayment?.value === 'coupon') {
+      if (selectedPayment?.value === 'credit' || selectedPayment?.value === 'coupon') {
         if (user?.paymentMethod === 'balance') {
           const orderSum = b19 * (user?.price19 || 0) + b12 * (user?.price12 || 0);
           if (user?.balance !== undefined && user.balance < orderSum) {
@@ -321,12 +322,20 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
                             if (user?.paymentMethod === 'balance') {
                               const orderSum = b19 * (user?.price19 || 0) + b12 * (user?.price12 || 0);
                               if (user?.balance !== undefined && user?.balance < orderSum) {
-                                setNotEnoughBalanceModalVisible(true);
+                                if (clientHasInvoiceLegalData(user)) {
+                                  openTopUpModal();
+                                } else {
+                                  setNotEnoughBalanceModalVisible(true);
+                                }
                                 return;
                               }
                             } else if (user?.paymentMethod === 'coupon') {
                               if (b19 > (user?.paidBootlesFor19 || 0) || b12 > (user?.paidBootlesFor12 || 0)) {
-                                setNotEnoughBalanceModalVisible(true);
+                                if (clientHasInvoiceLegalData(user)) {
+                                  openTopUpModal();
+                                } else {
+                                  setNotEnoughBalanceModalVisible(true);
+                                }
                                 return;
                               }
                             }
@@ -375,10 +384,10 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
                         </View>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.modalAddress} onPress={() => {
-                        if (selectedPayment?.value === 'card') {
+                        if (selectedPayment?.value === 'credit') {
                             setSelectedPayment(null);
                         } else {
-                            setSelectedPayment({ label: 'С баланса', value: 'card' });
+                            setSelectedPayment({ label: 'С баланса', value: 'credit' });
                         }
                     }}>
                         {user && user?.paymentMethod == 'coupon' ? (
@@ -391,7 +400,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
                             </Text>
                         )}
                         <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: selectedPayment?.value === "card" ? '#DC1818' : '#101010' }}>
-                            {selectedPayment?.value === "card" && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
+                            {selectedPayment?.value === "credit" && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
                         </View>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.button} onPress={() => {
@@ -467,7 +476,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
               </>
             ) : (
               <>
-                <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Недостаточно бутылок</Text>
+                <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Недостаточно бутылей</Text>
                 {(selectedOrder?.products?.b19 || 0) > (user?.paidBootlesFor19 || 0) && (
                   <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>
                     18,9л: нужно {selectedOrder?.products?.b19 || 0}, у вас {user?.paidBootlesFor19 || 0} шт
@@ -511,14 +520,14 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
               )}
             </TouchableOpacity>
             <TouchableOpacity
-              style={{padding: 16, borderRadius: 8, marginTop: 10}}
+              style={{padding: 16, borderRadius: 8, marginTop: 10, backgroundColor: '#DC1818'}}
               onPress={() => {
                 setNotEnoughBalanceModalVisible(false);
                 setSelectedPayment({ label: 'Наличными', value: 'fakt' });
                 setPaymentModalVisible(true);
               }}
             >
-              <Text style={{color: '#0d74d0', fontSize: 16, fontWeight: '600', textAlign: 'center'}}>Оплатить наличными</Text>
+              <Text style={{color: '#fff', fontSize: 16, fontWeight: '600', textAlign: 'center'}}>Оплатить наличными</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>

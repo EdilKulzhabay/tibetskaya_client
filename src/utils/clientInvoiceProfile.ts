@@ -18,7 +18,11 @@ function invoiceLegalAsString(v: User['invoiceLegalData']): string {
  */
 export function clientHasInvoiceProfile(user: User | null | undefined): boolean {
   if (!user) return false;
-  const seq = String(user.invoiceSequentialNumber ?? '').trim();
-  const legal = invoiceLegalAsString(user.invoiceLegalData);
-  return !!(seq && legal);
+  return !!invoiceLegalAsString(user.invoiceLegalData);
+}
+
+/** Есть юр. данные для счёта (без требования порядкового номера). */
+export function clientHasInvoiceLegalData(user: User | null | undefined): boolean {
+  if (!user) return false;
+  return !!invoiceLegalAsString(user.invoiceLegalData);
 }

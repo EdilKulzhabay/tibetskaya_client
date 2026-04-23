@@ -109,7 +109,6 @@ export const useAuth = (): UseAuthReturn => {
         doesItTake19Bottles: clientData.doesItTake19Bottles,
         doesItTake12Bottles: clientData.doesItTake12Bottles,
         savedCard: clientData.savedCard,
-        invoiceSequentialNumber: clientData.invoiceSequentialNumber,
         invoiceLegalData: clientData.invoiceLegalData,
       };
 

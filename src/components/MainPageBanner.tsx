@@ -27,7 +27,7 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
   const firstBanner = () => {
     return (
       <View style={styles.imageContainer}>
-        <StableImage source={require('../assets/newBanner1.png')} style={styles.image} />
+        <StableImage source={require('../assets/newBanner5.png')} style={styles.image} />
       </View>
     )
   }
@@ -43,7 +43,7 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
   const thirdBanner = () => {
     return (
       <View style={styles.imageContainer}>
-        <StableImage source={require('../assets/newBanner3.png')} style={styles.image} />
+        <StableImage source={require('../assets/newBanner1.png')} style={styles.image} />
       </View>
     )
   }
@@ -51,7 +51,7 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
   const fifthBanner = () => {
     return (
       <View style={styles.imageContainer}>
-        <StableImage source={require('../assets/newBanner5.png')} style={styles.image} />
+        <StableImage source={require('../assets/newBanner3.png')} style={styles.image} />
       </View>
     )
   }

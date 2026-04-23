@@ -25,8 +25,24 @@ import Share from 'react-native-share';
 import { useAuth } from '../hooks/useAuth';
 import PaymentWebView from '../components/PaymentWebView';
 import { getClientMongoId } from '../utils/clientId';
-import { clientHasInvoiceProfile } from '../utils/clientInvoiceProfile';
+import { clientHasInvoiceLegalData } from '../utils/clientInvoiceProfile';
 import { apiService } from '../api/services';
+
+/** Очищает base64 от пробелов/префикса data-URI — иначе на iOS PDF может не открыться. */
+function normalizePdfBase64(raw: string): string {
+  let s = String(raw || '')
+    .trim()
+    .replace(/\s/g, '');
+  const dataPrefix = /^data:application\/pdf;base64,/i;
+  if (dataPrefix.test(s)) {
+    s = s.replace(dataPrefix, '');
+  }
+  return s;
+}
+
+function pdfDataUri(raw: string): string {
+  return `data:application/pdf;base64,${normalizePdfBase64(raw)}`;
+}
 
 /** Монохромная иконка «Поделиться» (контур без внешних зависимостей) */
 function ShareGlyph({ color = '#333' }: { color?: string }) {
@@ -101,7 +117,7 @@ export const TopUpBalanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
       void (async () => {
         const fresh = await refreshUserData();
         const profileUser = fresh ?? user;
-        if (profileUser && clientHasInvoiceProfile(profileUser)) {
+        if (profileUser && clientHasInvoiceLegalData(profileUser)) {
           setInvoiceStep('form');
           setQty19Str('');
           setQty12Str('');
@@ -215,7 +231,7 @@ export const TopUpBalanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (!pdfBase64 || !pdfFileName) return;
     try {
       const path = `${RNFS.CachesDirectoryPath}/${pdfFileName.replace(/[^\w.-]/g, '_')}`;
-      await RNFS.writeFile(path, pdfBase64, 'base64');
+      await RNFS.writeFile(path, normalizePdfBase64(pdfBase64), 'base64');
       const fileUrl = path.startsWith('file://') ? path : `file://${path}`;
       await Share.open({
         url: fileUrl,
@@ -257,11 +273,9 @@ export const TopUpBalanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setPdfPreviewLoading(true);
     setPdfPreviewLocalUri(null);
     try {
-      const safeName = `invoice_preview_${Date.now()}_${(pdfFileName || 'doc.pdf').replace(/[^\w.-]/g, '_')}`;
-      const path = `${RNFS.CachesDirectoryPath}/${safeName}`;
-      await RNFS.writeFile(path, pdfBase64, 'base64');
-      pdfPreviewPathRef.current = path;
-      setPdfPreviewLocalUri(`file://${path}`);
+      pdfPreviewPathRef.current = null;
+      // data: URI надёжнее file:// на iOS: react-native-pdf сам кладёт файл через react-native-blob-util
+      setPdfPreviewLocalUri(pdfDataUri(pdfBase64));
     } catch (e) {
       console.error(e);
       Alert.alert('Ошибка', 'Не удалось подготовить PDF для просмотра');
@@ -270,7 +284,7 @@ export const TopUpBalanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } finally {
       setPdfPreviewLoading(false);
     }
-  }, [pdfBase64, pdfFileName]);
+  }, [pdfBase64]);
 
   const closeInvoiceModal = useCallback(() => {
     setInvoiceModalVisible(false);
@@ -525,6 +539,7 @@ export const TopUpBalanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
         visible={pdfPreviewVisible}
         onRequestClose={closePdfPreview}
         animationType="fade"
+        presentationStyle={Platform.OS === 'ios' ? 'fullScreen' : undefined}
         statusBarTranslucent={Platform.OS === 'android'}
       >
         <View style={styles.pdfModalRoot}>
@@ -561,7 +576,6 @@ export const TopUpBalanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
         transparent={true}
         animationType="slide"
         statusBarTranslucent={Platform.OS === 'android'}
-        presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
       >
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <TouchableOpacity
@@ -589,7 +603,17 @@ export const TopUpBalanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
               </View>
 
               <TextInput
-                style={styles.bottomSheetInput}
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#E3E3E3',
+                  borderRadius: 12,
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                  fontSize: 16,
+                  color: '#101010',
+                  backgroundColor: '#F8F8F8',
+                  marginBottom: 16,
+                }}
                 value={topUpSum}
                 onChangeText={setTopUpSum}
                 placeholder="Сумма пополнения"
@@ -655,6 +679,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     padding: 24,
     paddingBottom: 40,
+    height: 'max-content' as unknown as number,
   },
   bottomSheetHandle: {
     width: 40,

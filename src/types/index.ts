@@ -54,8 +54,6 @@ export interface User {
   referralCode?: string;
   /** Сколько заказов оформлено через приложение (сервер) */
   appOrdersPlacedCount?: number;
-  /** Следующий порядковый номер счёта (CRM) */
-  invoiceSequentialNumber?: string;
   /** Произвольный текст юр. данных для PDF-счёта */
   invoiceLegalData?: string;
 }

@@ -21,7 +21,3 @@ export {default as OptimizedImage} from './OptimizedImage';
 export {default as ScreenLayout} from './ScreenLayout';
 export {default as StableImage} from './StableImage';
 export {default as ReferralPromoModal} from './ReferralPromoModal';
-// Добавляйте новые компоненты здесь
-// export {default as Input} from './Input';
-// export {default as Card} from './Card';
-// export {default as LoadingSpinner} from './LoadingSpinner';

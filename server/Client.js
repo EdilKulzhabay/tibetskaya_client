@@ -245,10 +245,6 @@ const ClientSchema = new mongoose.Schema(
             type: Number,
             default: 0,
         },
-        invoiceSequentialNumber: {
-            type: String,
-            default: "",
-        },
         invoiceLegalData: {
             type: String,
             default: "",

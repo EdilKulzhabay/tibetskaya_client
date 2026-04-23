@@ -27,6 +27,7 @@ import { apiService } from '../api/services';
 const { tokenStorage } = require('../utils/storage');
 import { useFocusEffect } from '@react-navigation/native';
 import { useTopUpBalance } from '../context/TopUpBalanceContext';
+import { clientHasInvoiceLegalData } from '../utils/clientInvoiceProfile';
 import ReferralPromoModal from '../components/ReferralPromoModal';
 
 interface HomeScreenProps {}
@@ -279,7 +280,7 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
   const reloadOrder = async (paymentOverride?: string) => {
     const paymentValue = paymentOverride || selectedPayment?.value;
     if (user?.mail && lastOrder) {
-      if (paymentValue === 'card' || paymentValue === 'credit' || paymentValue === 'coupon') {
+      if (paymentValue === 'credit' || paymentValue === 'coupon') {
         if (user?.paymentMethod === 'balance') {
           if (user?.balance !== undefined && user.balance < lastOrder.sum) {
             setPaymentModalVisible(false);
@@ -368,7 +369,11 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                 console.log('user?.balance', user?.balance);
                 console.log('lastOrder?.sum', lastOrder?.sum);
                 if (user?.paymentMethod === 'balance' && user?.balance !== undefined && user?.balance !== null && user?.balance < lastOrder?.sum) {
-                  setNotEnoughBalanceModalVisible(true);
+                  if (clientHasInvoiceLegalData(user)) {
+                    openTopUpModal();
+                  } else {
+                    setNotEnoughBalanceModalVisible(true);
+                  }
                 } else if (user?.paymentMethod === 'coupon') {
                   // Проверяем баланс бутылок раздельно для 19л и 12л
                   const needed19 = lastOrder?.products?.b19 || 0;
@@ -377,7 +382,11 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                   const available12 = user?.paidBootlesFor12 || 0;
                   
                   if (needed19 > available19 || needed12 > available12) {
-                    setNotEnoughBalanceModalVisible(true);
+                    if (clientHasInvoiceLegalData(user)) {
+                      openTopUpModal();
+                    } else {
+                      setNotEnoughBalanceModalVisible(true);
+                    }
                   } else {
                     setPaymentModalVisible(true);
                   }
@@ -649,7 +658,7 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                       </>
                   ) : (
                       <>
-                          <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Недостаточно бутылок</Text>
+                          <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Недостаточно бутылей</Text>
                           {(lastOrder?.products?.b19 || 0) > (user?.paidBootlesFor19 || 0) && (
                               <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>
                                   18,9л: нужно {lastOrder?.products?.b19 || 0}, у вас {user?.paidBootlesFor19 || 0} шт
@@ -663,9 +672,6 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                           <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center', marginTop: 8}}>Для оформления заказа необходимо пополнить баланс.</Text>
                       </>
                   )}
-                  {/* <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Не хватает {count12 * price12 + count19 * price19 - (user?.balance || 0)} ₸</Text>
-                  <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>Ваш текущий баланс: {user?.balance || 0} ₸.</Text>
-                  <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>Для оформления заказа необходимо пополнить счет.</Text> */}
                   <TouchableOpacity 
                       style={{
                           backgroundColor: '#0d74d0',

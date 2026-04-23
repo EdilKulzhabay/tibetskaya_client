@@ -6,11 +6,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { apiService } from "../api/services";
 import { useFocusEffect } from "@react-navigation/native";
 import ReferralPromoModal from "../components/ReferralPromoModal";
-
-const payments = [
-    { label: 'Наличными', value: 'fakt' },
-    { label: 'Картой', value: 'card' },
-];
+import { clientHasInvoiceLegalData } from "../utils/clientInvoiceProfile";
 
 const calls = [
     { label: 'Позвонить заранее', value: true },
@@ -251,19 +247,27 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                 if (count19 > available19 || count12 > available12) {
                     console.log('🔄 AddOrderScreen: не хватает бутылок', { count19, available19, count12, available12 });
                     setSelectedPayment(null);
-                    setNotEnoughBalanceModalVisible(true);
+                    if (clientHasInvoiceLegalData(user)) {
+                        openTopUpModal();
+                    } else {
+                        setNotEnoughBalanceModalVisible(true);
+                    }
                     return;
                 }
             } else {
                 if (user && user.balance !== undefined && user.balance !== null && user.balance < totalAmount) {
                     console.log('🔄 AddOrderScreen: не хватает средств', user.balance, totalAmount);
                     setSelectedPayment(null);
-                    setNotEnoughBalanceModalVisible(true);
+                    if (clientHasInvoiceLegalData(user)) {
+                        openTopUpModal();
+                    } else {
+                        setNotEnoughBalanceModalVisible(true);
+                    }
                     return;
                 }
             }
         }
-    }, [selectedPayment, count12, count19, price12, price19, user?.balance, user?.paidBootlesFor19, user?.paidBootlesFor12]);
+    }, [selectedPayment, count12, count19, price12, price19, user?.balance, user?.paidBootlesFor19, user?.paidBootlesFor12, user?.invoiceLegalData, openTopUpModal]);
 
     return (
         <SafeAreaView style={styles.safeArea}>
@@ -673,7 +677,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                             </>
                         ) : (
                             <>
-                                <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Недостаточно бутылок</Text>
+                                <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Недостаточно бутылей</Text>
                                 {count19 > (user?.paidBootlesFor19 || 0) && (
                                     <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>
                                         18,9л: нужно {count19}, у вас {user?.paidBootlesFor19 || 0} шт
@@ -714,7 +718,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                 <Text style={styles.buttonText}>Пополнить баланс</Text>
                             )}
                         </TouchableOpacity>
-                        <TouchableOpacity style={[styles.modalButton, {marginTop: 10}]} onPress={() => {
+                        <TouchableOpacity style={[styles.modalButton, {marginTop: 10, backgroundColor: '#DC1818'}]} onPress={() => {
                             setNotEnoughBalanceModalVisible(false)
                             setSelectedPayment({ label: 'Наличными', value: 'fakt' })
                         }}>
@@ -882,7 +886,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
     },
     modalButtonText: {
-        color: '#0d74d0',
+        color: '#fff',
         fontSize: 16,
         fontWeight: '600',
         textAlign: 'center',

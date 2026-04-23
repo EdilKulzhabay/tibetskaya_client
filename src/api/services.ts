@@ -77,6 +77,15 @@ export const apiService = {
     addOrder: async (mail: string, address: any, products: any, clientNotes: any, date: any, opForm: string, needCall: boolean, comment: string) => {
         try {
             const fcmToken = await AsyncStorage.getItem('fcmToken');
+            console.log("fcmToken: ", fcmToken);
+            console.log("mail: ", mail);
+            console.log("address: ", address);
+            console.log("products: ", products);
+            console.log("clientNotes: ", clientNotes);
+            console.log("date: ", date);
+            console.log("opForm: ", opForm);
+            console.log("needCall: ", needCall);
+            console.log("comment: ", comment);
             const response = await api.post('/addOrderClientMobile', {
                 mail, address, products, clientNotes, date, opForm, needCall, comment,
                 notificationToken: fcmToken || '',
