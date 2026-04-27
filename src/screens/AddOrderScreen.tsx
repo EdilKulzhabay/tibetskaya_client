@@ -7,6 +7,7 @@ import { apiService } from "../api/services";
 import { useFocusEffect } from "@react-navigation/native";
 import ReferralPromoModal from "../components/ReferralPromoModal";
 import { clientHasInvoiceLegalData } from "../utils/clientInvoiceProfile";
+import { getWalletOpFormForUser } from "../utils/invoiceClientOrderPayment";
 
 const calls = [
     { label: 'Позвонить заранее', value: true },
@@ -278,6 +279,31 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
         }
     }, [selectedPayment, count12, count19, price12, price19, user, openTopUpModal]);
 
+    useEffect(() => {
+        if (user && clientHasInvoiceLegalData(user) && selectedPayment?.value === "fakt") {
+            setSelectedPayment(null);
+        }
+    }, [user, selectedPayment?.value]);
+
+    useEffect(() => {
+        if (!user || !clientHasInvoiceLegalData(user)) return;
+        const total = count12 * price12 + count19 * price19;
+        if (count12 + count19 < 2) return;
+        const op = getWalletOpFormForUser(user);
+        if (op === "credit") {
+            if (user.balance != null && user.balance >= total) {
+                setSelectedPayment({ label: "С баланса", value: "credit" });
+            }
+        } else if (op === "coupon") {
+            const ok =
+                count19 <= (user.paidBootlesFor19 || 0) &&
+                count12 <= (user.paidBootlesFor12 || 0);
+            if (ok) {
+                setSelectedPayment({ label: "С баланса", value: "coupon" });
+            }
+        }
+    }, [user, count12, count19, price12, price19]);
+
     return (
         <SafeAreaView style={styles.safeArea}>
             <Back navigation={navigation} title="Оформление заказа" />
@@ -287,7 +313,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                 contentContainerStyle={{ paddingBottom: scrollPaddingBottom }}
             >
                 <View>
-                    {products.b12 >= 0 && (
+                    {products.b12 >= 0 && user?.doesItTake12Bottles === true && (
                         <View style={styles.productContainer}>
                             <View style={styles.productTop}>
                                 <View style={styles.product}>
@@ -739,12 +765,14 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                 <Text style={styles.buttonText}>Пополнить баланс</Text>
                             )}
                         </TouchableOpacity>
-                        <TouchableOpacity style={[styles.modalButton, {marginTop: 10, backgroundColor: '#DC1818'}]} onPress={() => {
-                            setNotEnoughBalanceModalVisible(false)
-                            setSelectedPayment({ label: 'Наличными', value: 'fakt' })
-                        }}>
-                            <Text style={styles.modalButtonText}>Оплатить наличными</Text>
-                        </TouchableOpacity>
+                        {!clientHasInvoiceLegalData(user) ? (
+                            <TouchableOpacity style={[styles.modalButton, {marginTop: 10, backgroundColor: '#DC1818'}]} onPress={() => {
+                                setNotEnoughBalanceModalVisible(false)
+                                setSelectedPayment({ label: 'Наличными', value: 'fakt' })
+                            }}>
+                                <Text style={styles.modalButtonText}>Оплатить наличными</Text>
+                            </TouchableOpacity>
+                        ) : null}
                     </TouchableOpacity>
                 </TouchableOpacity>
             </Modal>

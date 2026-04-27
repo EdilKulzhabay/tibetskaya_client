@@ -28,6 +28,7 @@ const { tokenStorage } = require('../utils/storage');
 import { useFocusEffect } from '@react-navigation/native';
 import { useTopUpBalance } from '../context/TopUpBalanceContext';
 import { clientHasInvoiceLegalData } from '../utils/clientInvoiceProfile';
+import { getWalletOpFormForUser } from '../utils/invoiceClientOrderPayment';
 import ReferralPromoModal from '../components/ReferralPromoModal';
 
 interface HomeScreenProps {}
@@ -60,7 +61,7 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
     if (user?.mail && !platformSentRef.current) {
       platformSentRef.current = true;
       apiService.updateData(user.mail, 'platform', Platform.OS);
-      const APP_VERSION = "1.2.0";
+      const APP_VERSION = "1.3.0";
       apiService.updateData(user.mail, 'appVersion', APP_VERSION.toString());
     }
   }, [user?.mail]);
@@ -284,7 +285,11 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
         if (user?.paymentMethod === 'balance') {
           if (user?.balance !== undefined && user.balance < lastOrder.sum) {
             setPaymentModalVisible(false);
-            setNotEnoughBalanceModalVisible(true);
+            if (clientHasInvoiceLegalData(user)) {
+              void openTopUpModal(String(Math.max(0, Math.ceil(lastOrder.sum - user.balance))));
+            } else {
+              setNotEnoughBalanceModalVisible(true);
+            }
             return;
           }
         } else if (user?.paymentMethod === 'coupon') {
@@ -292,7 +297,11 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
           const needed12 = lastOrder?.products?.b12 || 0;
           if (needed19 > (user?.paidBootlesFor19 || 0) || needed12 > (user?.paidBootlesFor12 || 0)) {
             setPaymentModalVisible(false);
-            setNotEnoughBalanceModalVisible(true);
+            if (clientHasInvoiceLegalData(user)) {
+              void openTopUpModal();
+            } else {
+              setNotEnoughBalanceModalVisible(true);
+            }
             return;
           }
         }
@@ -366,27 +375,39 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
           {lastOrder && (
             <TouchableOpacity
               onPress={() => {
-                console.log('user?.balance', user?.balance);
-                console.log('lastOrder?.sum', lastOrder?.sum);
-                if (user?.paymentMethod === 'balance' && user?.balance !== undefined && user?.balance !== null && user?.balance < lastOrder?.sum) {
-                  if (clientHasInvoiceLegalData(user)) {
-                    openTopUpModal();
-                  } else {
-                    setNotEnoughBalanceModalVisible(true);
-                  }
-                } else if (user?.paymentMethod === 'coupon') {
-                  // Проверяем баланс бутылок раздельно для 19л и 12л
-                  const needed19 = lastOrder?.products?.b19 || 0;
-                  const needed12 = lastOrder?.products?.b12 || 0;
-                  const available19 = user?.paidBootlesFor19 || 0;
-                  const available12 = user?.paidBootlesFor12 || 0;
-                  
-                  if (needed19 > available19 || needed12 > available12) {
-                    if (clientHasInvoiceLegalData(user)) {
-                      openTopUpModal();
-                    } else {
-                      setNotEnoughBalanceModalVisible(true);
+                if (!user || !lastOrder) return;
+                const needed19 = lastOrder?.products?.b19 || 0;
+                const needed12 = lastOrder?.products?.b12 || 0;
+                const available19 = user?.paidBootlesFor19 || 0;
+                const available12 = user?.paidBootlesFor12 || 0;
+                const walletOp = getWalletOpFormForUser(user);
+
+                if (clientHasInvoiceLegalData(user) && (walletOp === 'credit' || walletOp === 'coupon')) {
+                  if (user.paymentMethod === 'balance') {
+                    if (user.balance != null && user.balance < (lastOrder.sum ?? 0)) {
+                      void openTopUpModal(
+                        String(Math.max(0, Math.ceil((lastOrder.sum ?? 0) - user.balance)))
+                      );
+                      return;
                     }
+                    void reloadOrder('credit');
+                    return;
+                  }
+                  if (user.paymentMethod === 'coupon') {
+                    if (needed19 > available19 || needed12 > available12) {
+                      void openTopUpModal();
+                      return;
+                    }
+                    void reloadOrder('coupon');
+                    return;
+                  }
+                }
+
+                if (user?.paymentMethod === 'balance' && user?.balance !== undefined && user?.balance !== null && user?.balance < lastOrder?.sum) {
+                  setNotEnoughBalanceModalVisible(true);
+                } else if (user?.paymentMethod === 'coupon') {
+                  if (needed19 > available19 || needed12 > available12) {
+                    setNotEnoughBalanceModalVisible(true);
                   } else {
                     setPaymentModalVisible(true);
                   }
@@ -582,6 +603,7 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
           <TouchableOpacity style={styles.modalOverlayReloadOrder} onPress={() => setPaymentModalVisible(false)}>
               <TouchableOpacity style={styles.modalContainerReloadOrder} onPress={(e) => e.stopPropagation()}>
                   <Text style={{fontSize: 24, fontWeight: '600', color: '#101010', marginBottom: 16, textAlign: 'center'}}>Способ оплаты</Text>
+                      {!clientHasInvoiceLegalData(user) ? (
                       <TouchableOpacity style={styles.modalAddress} onPress={() => {
                           if (selectedPayment?.value === 'fakt') {
                               setSelectedPayment(null);
@@ -594,6 +616,7 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                               {selectedPayment?.value === "fakt" && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
                           </View>
                       </TouchableOpacity>
+                      ) : null}
                       <TouchableOpacity style={styles.modalAddress} onPress={() => {
                           // Определяем правильное значение opForm в зависимости от paymentMethod пользователя
                           const balanceValue = user?.paymentMethod === "coupon" ? 'coupon' : 'credit';
@@ -696,6 +719,7 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                           <Text style={styles.buttonText}>Пополнить баланс</Text>
                       )}
                   </TouchableOpacity>
+                  {!clientHasInvoiceLegalData(user) ? (
                   <TouchableOpacity
                       style={{
                           backgroundColor: '#DC1818',
@@ -707,6 +731,7 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                   >
                       <Text style={styles.buttonText}>Оплатить наличными</Text>
                   </TouchableOpacity>
+                  ) : null}
               </TouchableOpacity>
           </TouchableOpacity>
       </Modal>
