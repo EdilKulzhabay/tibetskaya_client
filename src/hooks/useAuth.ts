@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Platform } from 'react-native';
+import { Platform, DeviceEventEmitter, AppState } from 'react-native';
 import { User, RegisterData, LoadingState } from '../types';
 import { userStorage, tokenStorage, clearAllData } from '../utils/storage';
 import { apiService } from '../api/services';
@@ -20,7 +20,7 @@ interface AuthActions {
   clearError: () => void;
   refreshUser: () => Promise<void>;
   /** Возвращает актуального клиента с сервера или null при ошибке / без mail */
-  refreshUserData: () => Promise<User | null>;
+  refreshUserData: (options?: { silent?: boolean }) => Promise<User | null>;
   updateUser: (field: string, value: any) => Promise<void>;
 }
 
@@ -236,30 +236,41 @@ export const useAuth = (): UseAuthReturn => {
   /**
    * Получение свежих данных пользователя с сервера
    */
-  const refreshUserData = useCallback(async (): Promise<User | null> => {
-    if (!user?.mail) return null;
+  const refreshUserData = useCallback(
+    async (options?: { silent?: boolean }): Promise<User | null> => {
+      if (!user?.mail) return null;
 
-    try {
-      setLoadingState('loading');
-      const response = await apiService.getData(user.mail);
+      const silent = options?.silent === true;
 
-      console.log('response', response);
+      try {
+        if (!silent) {
+          setLoadingState('loading');
+        }
+        const response = await apiService.getData(user.mail);
 
-      if (response.client) {
-        await userStorage.save(response.client);
-        const nextUser = response.client as User;
-        setUser(nextUser);
-        setLoadingState('success');
-        return nextUser;
+        console.log('response', response);
+
+        if (response.client) {
+          await userStorage.save(response.client);
+          const nextUser = response.client as User;
+          setUser(nextUser);
+          if (!silent) {
+            setLoadingState('success');
+          }
+          return nextUser;
+        }
+        throw new Error(response.message || 'Не удалось получить данные пользователя');
+      } catch (error) {
+        console.error('Ошибка при получении данных пользователя:', error);
+        if (!silent) {
+          setError('Не удалось обновить данные пользователя');
+          setLoadingState('error');
+        }
+        return null;
       }
-      throw new Error(response.message || 'Не удалось получить данные пользователя');
-    } catch (error) {
-      console.error('Ошибка при получении данных пользователя:', error);
-      setError('Не удалось обновить данные пользователя');
-      setLoadingState('error');
-      return null;
-    }
-  }, [user?.mail]);
+    },
+    [user?.mail]
+  );
 
   /**
    * Обновление данных пользователя
@@ -288,6 +299,39 @@ export const useAuth = (): UseAuthReturn => {
   useEffect(() => {
     loadUserFromStorage();
   }, [loadUserFromStorage]);
+
+  /** Служебный FCM после оплаты: обновить баланс без индикатора загрузки */
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('userProfileRefresh', () => {
+      if (user?.mail) {
+        void refreshUserData({ silent: true });
+      }
+    });
+    return () => sub.remove();
+  }, [user?.mail, refreshUserData]);
+
+  /** Фоновый пуш: при возврате в приложение подтянуть профиль */
+  useEffect(() => {
+    const runIfPending = async () => {
+      try {
+        const pending = await AsyncStorage.getItem('pendingUserProfileRefresh');
+        if (pending === '1' && user?.mail) {
+          await AsyncStorage.removeItem('pendingUserProfileRefresh');
+          await refreshUserData({ silent: true });
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void runIfPending();
+      }
+    });
+    void runIfPending();
+    return () => sub.remove();
+  }, [user?.mail, refreshUserData]);
 
   return {
     // State

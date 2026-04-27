@@ -12,6 +12,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   Platform,
   Alert,
@@ -27,6 +28,7 @@ import PaymentWebView from '../components/PaymentWebView';
 import { getClientMongoId } from '../utils/clientId';
 import { clientHasInvoiceLegalData } from '../utils/clientInvoiceProfile';
 import { apiService } from '../api/services';
+import type { User } from '../types';
 
 /** Очищает base64 от пробелов/префикса data-URI — иначе на iOS PDF может не открыться. */
 function normalizePdfBase64(raw: string): string {
@@ -111,12 +113,18 @@ export const TopUpBalanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [pdfPreviewLocalUri, setPdfPreviewLocalUri] = useState<string | null>(null);
   const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false);
   const pdfPreviewPathRef = useRef<string | null>(null);
+  /** iOS: второй Modal поверх счёта часто не появляется; счёт временно скрываем и при закрытии PDF открываем снова */
+  const reopenInvoiceAfterPdfRef = useRef(false);
 
   const openTopUpModal = useCallback(
     (initialSum?: string) => {
       void (async () => {
         const fresh = await refreshUserData();
-        const profileUser = fresh ?? user;
+        // Свежий профиль + поля, которые не пришли в partial-ответе; при ошибке сети — last known user
+        const profileUser =
+          fresh != null && user != null
+            ? ({ ...user, ...fresh } as User)
+            : ((fresh ?? user) as User | null);
         if (profileUser && clientHasInvoiceLegalData(profileUser)) {
           setInvoiceStep('form');
           setQty19Str('');
@@ -257,6 +265,10 @@ export const TopUpBalanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (p) {
       RNFS.unlink(p).catch(() => {});
     }
+    if (Platform.OS === 'ios' && reopenInvoiceAfterPdfRef.current) {
+      reopenInvoiceAfterPdfRef.current = false;
+      setInvoiceModalVisible(true);
+    }
   }, []);
 
   const openPdfPreview = useCallback(async () => {
@@ -269,22 +281,44 @@ export const TopUpBalanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
       RNFS.unlink(prevPath).catch(() => {});
       pdfPreviewPathRef.current = null;
     }
+    if (Platform.OS === 'ios') {
+      reopenInvoiceAfterPdfRef.current = true;
+      setInvoiceModalVisible(false);
+      await new Promise<void>((resolve) => {
+        InteractionManager.runAfterInteractions(() => {
+          setTimeout(() => resolve(), 320);
+        });
+      });
+    }
     setPdfPreviewVisible(true);
     setPdfPreviewLoading(true);
     setPdfPreviewLocalUri(null);
     try {
-      pdfPreviewPathRef.current = null;
-      // data: URI надёжнее file:// на iOS: react-native-pdf сам кладёт файл через react-native-blob-util
-      setPdfPreviewLocalUri(pdfDataUri(pdfBase64));
+      if (Platform.OS === 'ios') {
+        // На iOS загрузка через data: → writeFile в react-native-blob-util внутри react-native-pdf
+        // нередко даёт путь/файл, который PDFKit не открывает; RNFS + file:// совпадает с handleSharePdf.
+        const safeName = (pdfFileName || 'preview.pdf').replace(/[^\w.-]/g, '_');
+        const path = `${RNFS.CachesDirectoryPath}/invoice_preview_${Date.now()}_${safeName}`;
+        await RNFS.writeFile(path, normalizePdfBase64(pdfBase64), 'base64');
+        pdfPreviewPathRef.current = path;
+        setPdfPreviewLocalUri(path.startsWith('file://') ? path : `file://${path}`);
+      } else {
+        pdfPreviewPathRef.current = null;
+        setPdfPreviewLocalUri(pdfDataUri(pdfBase64));
+      }
     } catch (e) {
       console.error(e);
       Alert.alert('Ошибка', 'Не удалось подготовить PDF для просмотра');
       setPdfPreviewVisible(false);
       pdfPreviewPathRef.current = null;
+      if (Platform.OS === 'ios' && reopenInvoiceAfterPdfRef.current) {
+        reopenInvoiceAfterPdfRef.current = false;
+        setInvoiceModalVisible(true);
+      }
     } finally {
       setPdfPreviewLoading(false);
     }
-  }, [pdfBase64]);
+  }, [pdfBase64, pdfFileName]);
 
   const closeInvoiceModal = useCallback(() => {
     setInvoiceModalVisible(false);
@@ -320,10 +354,10 @@ export const TopUpBalanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <TouchableOpacity style={styles.bottomSheetOverlay} activeOpacity={1} onPress={closeInvoiceModal}>
-            <TouchableOpacity
+            <Pressable
               style={styles.bottomSheetContainer}
-              activeOpacity={1}
-              onPress={(e) => e.stopPropagation()}
+              onPress={() => undefined}
+              collapsable={false}
             >
               <View style={styles.bottomSheetHandle} />
               <Text style={styles.bottomSheetTitle}>Оформление счета</Text>
@@ -530,7 +564,7 @@ export const TopUpBalanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 )}
                 
               </>
-            </TouchableOpacity>
+            </Pressable>
           </TouchableOpacity>
         </KeyboardAvoidingView>
       </Modal>

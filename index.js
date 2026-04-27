@@ -6,10 +6,24 @@ import {AppRegistry} from 'react-native';
 import App from './App';
 import {name as appName} from './app.json';
 import messaging from '@react-native-firebase/messaging';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Регистрация обработчика фоновых уведомлений
 // Это КРИТИЧЕСКИ ВАЖНО - должно быть в index.js, вне React компонента
 messaging().setBackgroundMessageHandler(async remoteMessage => {
+  const d = remoteMessage.data || {};
+  const silentBalance =
+    d.newStatus === 'balanceTopUpSuccess' ||
+    String(d.newStatus || '').toLowerCase() === 'balancetopupsuccess';
+  if (silentBalance) {
+    try {
+      await AsyncStorage.setItem('pendingUserProfileRefresh', '1');
+    } catch (e) {
+      console.warn('pendingUserProfileRefresh:', e?.message);
+    }
+    return Promise.resolve();
+  }
+
   console.log('🔴🔴🔴 ФОНОВОЕ УВЕДОМЛЕНИЕ ПОЛУЧЕНО! 🔴🔴🔴');
   console.log('📬 Полные данные сообщения:', JSON.stringify(remoteMessage, null, 2));
   console.log('📋 Notification:', remoteMessage.notification);

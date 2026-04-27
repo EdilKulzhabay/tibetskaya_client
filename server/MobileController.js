@@ -38,6 +38,19 @@ const codes = {};
 const lastSentTime = {}; // Отслеживание времени последней отправки
 const sendingInProgress = new Set(); // Отслеживание отправок в процессе
 
+function normalizeInvoiceLegalData(raw) {
+    if (raw == null || raw === "") return "";
+    if (typeof raw === "string") return raw.trim();
+    if (typeof raw === "object") {
+        const o = raw;
+        return [o.binIin, o.legalName, o.legalAddress, o.invoicePhone]
+            .map((x) => String(x || "").trim())
+            .filter(Boolean)
+            .join(", ");
+    }
+    return String(raw).trim();
+}
+
 export const sendMail = async (req, res) => {
     const { mail } = req.body;
 
@@ -1188,7 +1201,16 @@ export const getClientDataMobile = async (req, res) => {
     try {
         const { mail } = req.body;
         const client = await Client.findOne({ mail: mail?.toLowerCase() });
-        res.json({ client });
+        if (!client) {
+            return res.json({ client: null });
+        }
+        const plain = client.toObject ? client.toObject({ flattenMaps: true }) : { ...client._doc };
+        res.json({
+            client: {
+                ...plain,
+                invoiceLegalData: normalizeInvoiceLegalData(client.invoiceLegalData),
+            },
+        });
     } catch (error) {
         console.log(error);
         res.status(500).json({

@@ -160,7 +160,12 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
             if (user?.balance !== undefined && user.balance < totalAmount) {
                 setLoading(false);
                 isSubmittingRef.current = false;
-                setNotEnoughBalanceModalVisible(true);
+                if (clientHasInvoiceLegalData(user)) {
+                    const deficit = totalAmount - user.balance;
+                    void openTopUpModal(String(Math.max(0, Math.ceil(deficit))));
+                } else {
+                    setNotEnoughBalanceModalVisible(true);
+                }
                 return;
             }
         }
@@ -168,7 +173,11 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
             if (count19 > (user?.paidBootlesFor19 || 0) || count12 > (user?.paidBootlesFor12 || 0)) {
                 setLoading(false);
                 isSubmittingRef.current = false;
-                setNotEnoughBalanceModalVisible(true);
+                if (clientHasInvoiceLegalData(user)) {
+                    void openTopUpModal();
+                } else {
+                    setNotEnoughBalanceModalVisible(true);
+                }
                 return;
             }
         }
@@ -267,7 +276,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                 }
             }
         }
-    }, [selectedPayment, count12, count19, price12, price19, user?.balance, user?.paidBootlesFor19, user?.paidBootlesFor12, user?.invoiceLegalData, openTopUpModal]);
+    }, [selectedPayment, count12, count19, price12, price19, user, openTopUpModal]);
 
     return (
         <SafeAreaView style={styles.safeArea}>
@@ -411,8 +420,14 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                     </TouchableOpacity>
 
                     <TouchableOpacity style={[styles.additionalInfo, {marginTop: 24}]} onPress={() => {
-                        if (user?.paymentMethod === "balance" && user?.balance !== undefined && user?.balance !== null && user?.balance < count12 * price12 + count19 * price19) {
-                            setNotEnoughBalanceModalVisible(true);
+                        const lineTotal = count12 * price12 + count19 * price19;
+                        if (user?.paymentMethod === "balance" && user?.balance !== undefined && user?.balance !== null && user?.balance < lineTotal) {
+                            if (clientHasInvoiceLegalData(user)) {
+                                const deficit = lineTotal - (user?.balance || 0);
+                                void openTopUpModal(String(Math.max(0, Math.ceil(deficit))));
+                            } else {
+                                setNotEnoughBalanceModalVisible(true);
+                            }
                             return;
                         }
                         if (user?.paymentMethod === "coupon") {
@@ -420,7 +435,11 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                             const available12 = user?.paidBootlesFor12 || 0;
                             
                             if (count19 > available19 || count12 > available12) {
-                                setNotEnoughBalanceModalVisible(true);
+                                if (clientHasInvoiceLegalData(user)) {
+                                    void openTopUpModal();
+                                } else {
+                                    setNotEnoughBalanceModalVisible(true);
+                                }
                                 return;
                             }
                         }
@@ -553,19 +572,21 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                 <TouchableOpacity style={styles.modalOverlay} onPress={() => setPaymentModalVisible(false)}>
                     <TouchableOpacity style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
                         <Text style={{fontSize: 24, fontWeight: '600', color: '#101010', marginBottom: 16, textAlign: 'center'}}>Способ оплаты</Text>
-                            <TouchableOpacity style={styles.modalAddress} onPress={() => {
-                                if (selectedPayment?.value === 'fakt') {
-                                    setSelectedPayment(null);
-                                } else {
-                                    setSelectedPayment({ label: 'Наличными', value: 'fakt' });
-                                    setPaymentModalVisible(false);
-                                }
-                            }}>
-                                <Text style={styles.modalAddressText}>Наличными</Text>
-                                <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: selectedPayment?.value === "fakt" ? '#DC1818' : '#101010' }}>
-                                    {selectedPayment?.value === "fakt" && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
-                                </View>
-                            </TouchableOpacity>
+                            {!clientHasInvoiceLegalData(user) && (
+                                <TouchableOpacity style={styles.modalAddress} onPress={() => {
+                                    if (selectedPayment?.value === 'fakt') {
+                                        setSelectedPayment(null);
+                                    } else {
+                                        setSelectedPayment({ label: 'Наличными', value: 'fakt' });
+                                        setPaymentModalVisible(false);
+                                    }
+                                }}>
+                                    <Text style={styles.modalAddressText}>Наличными</Text>
+                                    <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: selectedPayment?.value === "fakt" ? '#DC1818' : '#101010' }}>
+                                        {selectedPayment?.value === "fakt" && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
+                                    </View>
+                                </TouchableOpacity>
+                            )}
                             <TouchableOpacity style={styles.modalAddress} onPress={() => {
                                 // Определяем правильное значение opForm в зависимости от paymentMethod пользователя
                                 const balanceValue = user?.paymentMethod === "coupon" ? 'coupon' : 'credit';

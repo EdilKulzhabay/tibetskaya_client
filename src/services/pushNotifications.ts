@@ -411,6 +411,18 @@ class PushNotificationService {
 
     // Foreground уведомления (приложение открыто)
     const unsubscribeOnMessage = messaging().onMessage(async (remoteMessage) => {
+      const data = remoteMessage.data;
+      const isSilentBalance =
+        data?.newStatus === 'balanceTopUpSuccess' ||
+        String(data?.newStatus || '').toLowerCase() === 'balancetopupsuccess';
+
+      // Служебный пуш после Payplus: только обновление профиля/баланса, без баннера (даже если уведомления «выкл» в настройках приложения)
+      if (isSilentBalance) {
+        console.log('💰 Служебное обновление баланса (FCM data), баннер не показываем');
+        DeviceEventEmitter.emit('userProfileRefresh');
+        return;
+      }
+
       // Проверяем, включены ли уведомления
       if (!this.notificationsEnabled) {
         console.log('⚠️ Уведомления отключены, игнорируем сообщение');
@@ -500,6 +512,14 @@ class PushNotificationService {
     // (иначе orderStatusUpdated тянет чужой orderId через getOrder и может подмешать заказ в список)
     if (status === 'courierNearby') {
       console.log('ℹ️ Маркетинговое уведомление (курьер рядом), пропускаем обновление заказов');
+      return;
+    }
+
+    if (
+      String(status || '').toLowerCase() === 'balancetopupsuccess' ||
+      status === 'balanceTopUpSuccess'
+    ) {
+      DeviceEventEmitter.emit('userProfileRefresh');
       return;
     }
 
