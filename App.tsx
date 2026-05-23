@@ -47,6 +47,7 @@ import {
 import { RootStackParamList } from './src/types/navigation';
 import { ScreenLayout } from './src/components';
 import { TopUpBalanceProvider } from './src/context/TopUpBalanceContext';
+import { AuthProvider } from './src/hooks/useAuth';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -68,15 +69,16 @@ function App() {
   return (
     <SafeAreaProvider>
       <ImagePreloader>
-        <AuthWrapper>
-          <NavigationContainer>
-            <TopUpBalanceProvider>
-            <Stack.Navigator 
-              initialRouteName="Home"
-              screenOptions={{
-                headerShown: false, // Скрываем стандартный заголовок
-              }}
-            >
+        <AuthProvider>
+          <AuthWrapper>
+            <NavigationContainer>
+              <TopUpBalanceProvider>
+              <Stack.Navigator 
+                initialRouteName="Home"
+                screenOptions={{
+                  headerShown: false, // Скрываем стандартный заголовок
+                }}
+              >
               {/* Все экраны с нижней навигацией */}
               <Stack.Screen 
                 name="Home" 
@@ -139,10 +141,11 @@ function App() {
               <Stack.Screen name="ForgotPassword" component={withLayout(ForgotPasswordScreen)} />
               <Stack.Screen name="OtpForgotPassword" component={withLayout(OtpForgotPasswordScreen)} />
               <Stack.Screen name="NewPassword" component={withLayout(NewPasswordScreen)} />
-            </Stack.Navigator>
-            </TopUpBalanceProvider>
-          </NavigationContainer>
-        </AuthWrapper>
+              </Stack.Navigator>
+              </TopUpBalanceProvider>
+            </NavigationContainer>
+          </AuthWrapper>
+        </AuthProvider>
       </ImagePreloader>
     </SafeAreaProvider>
   );

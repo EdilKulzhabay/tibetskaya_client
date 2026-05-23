@@ -61,16 +61,21 @@ const Header: React.FC<HeaderProps> = ({
     // Если оба типа бутылок - показываем с литражом
     if (takes19 && takes12) {
       return (
-        <View style={{ flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Text style={styles.bonusText}>{balance19.toLocaleString()}</Text>
-            <Image source={require('../assets/coupon.png')} style={{ width: 24, height: 24 }} />
-            <Text style={styles.literText}>18,9 л</Text>
+        <View style={{ flexDirection: 'row', alignItems: "center"}}>
+          <View style={{ flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={styles.bonusText}>{balance19.toLocaleString()}</Text>
+              <Image source={require('../assets/coupon.png')} style={{ width: 24, height: 24 }} />
+              <Text style={styles.literText}>18,9 л</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={styles.bonusText}>{balance12.toLocaleString()}</Text>
+              <Image source={require('../assets/coupon.png')} style={{ width: 24, height: 24 }} />
+              <Text style={styles.literText}>12,5 л</Text>
+            </View>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Text style={styles.bonusText}>{balance12.toLocaleString()}</Text>
-            <Image source={require('../assets/coupon.png')} style={{ width: 24, height: 24 }} />
-            <Text style={styles.literText}>12,5 л</Text>
+          <View style={{marginLeft: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#DC1818', borderRadius: 16, padding: 4}}>
+            <Image source={require('../assets/plus.png')} style={{ width: 16, height: 16 }} />
           </View>
         </View>
       );
@@ -83,6 +88,9 @@ const Header: React.FC<HeaderProps> = ({
           <Text style={styles.bonusText}>{balance19.toLocaleString()}</Text>
           <Image source={require('../assets/coupon.png')} style={{ width: 30, height: 30 }} />
           <Text style={styles.literText}>18,9 л</Text>
+          <View style={{marginLeft: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#DC1818', borderRadius: 16, padding: 4}}>
+            <Image source={require('../assets/plus.png')} style={{ width: 16, height: 16 }} />
+          </View>
         </View>
       );
     }
@@ -94,6 +102,9 @@ const Header: React.FC<HeaderProps> = ({
           <Text style={styles.bonusText}>{balance12.toLocaleString()}</Text>
           <Image source={require('../assets/coupon.png')} style={{ width: 30, height: 30 }} />
           <Text style={styles.literText}>12,5 л</Text>
+          <View style={{marginLeft: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#DC1818', borderRadius: 16, padding: 4}}>
+            <Image source={require('../assets/plus.png')} style={{ width: 16, height: 16 }} />
+          </View>
         </View>
       );
     }
@@ -105,6 +116,9 @@ const Header: React.FC<HeaderProps> = ({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Text style={styles.bonusText}>{totalCoupon.toLocaleString()}</Text>
           <Image source={require('../assets/coupon.png')} style={{ width: 30, height: 30 }} />
+          <View style={{marginLeft: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#DC1818', borderRadius: 16, padding: 4}}>
+            <Image source={require('../assets/plus.png')} style={{ width: 16, height: 16 }} />
+          </View>
         </View>
       );
     }
@@ -134,9 +148,14 @@ const Header: React.FC<HeaderProps> = ({
                 <Text style={styles.bonusText}>0</Text>
               )
             ) : (
-              <Text style={styles.bonusText}>
-                {bonus.toLocaleString()} ₸
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={styles.bonusText}>
+                  {bonus.toLocaleString()} ₸
+                </Text>
+                <View style={{justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#DC1818', borderRadius: 16, padding: 4}}>
+                  <Image source={require('../assets/plus.png')} style={{ width: 16, height: 16 }} />
+                </View>
+              </View>
             )}
           </TouchableOpacity>
         )}
@@ -166,12 +185,12 @@ const styles = StyleSheet.create({
   bonusText: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#DC1818',
+    color: '#000',
   },
   literText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#666',
+    color: '#000',
   },
 });
 

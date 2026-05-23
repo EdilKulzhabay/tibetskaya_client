@@ -56,6 +56,8 @@ export interface User {
   appOrdersPlacedCount?: number;
   /** Произвольный текст юр. данных для PDF-счёта */
   invoiceLegalData?: string;
+  /** До какого часа (времени Алматы) принимаются заказы на «сегодня» — приходит с CRM */
+  orderSameDayUntilHour?: number;
 }
 
 export interface ApiResponse<T> {

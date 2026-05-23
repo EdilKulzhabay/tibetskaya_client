@@ -27,7 +27,7 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
   const firstBanner = () => {
     return (
       <View style={styles.imageContainer}>
-        <StableImage source={require('../assets/newBanner5.png')} style={styles.image} />
+        <StableImage source={require('../assets/nb1.png')} style={styles.image} />
       </View>
     )
   }
@@ -35,7 +35,7 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
   const secondBanner = () => {
     return (
       <View style={styles.imageContainer}>
-        <StableImage source={require('../assets/newBanner2.png')} style={styles.image} />
+        <StableImage source={require('../assets/nb2.png')} style={styles.image} />
       </View>
     )
   }
@@ -43,25 +43,25 @@ const MainPageBanner: React.FC<{ navigation: any, setIsModalVisible: (isModalVis
   const thirdBanner = () => {
     return (
       <View style={styles.imageContainer}>
-        <StableImage source={require('../assets/newBanner1.png')} style={styles.image} />
+        <StableImage source={require('../assets/nb3.png')} style={styles.image} />
       </View>
     )
   }
 
-  const fifthBanner = () => {
-    return (
-      <View style={styles.imageContainer}>
-        <StableImage source={require('../assets/newBanner3.png')} style={styles.image} />
-      </View>
-    )
-  }
+  // const fifthBanner = () => {
+  //   return (
+  //     <View style={styles.imageContainer}>
+  //       <StableImage source={require('../assets/nb4.png')} style={styles.image} />
+  //     </View>
+  //   )
+  // }
 
   // Объявляем bannerComponents и extendedData после функций баннеров, но до useEffect
   const bannerComponents = [
     { id: '1', Component: firstBanner },
     { id: '1', Component: secondBanner },
     { id: '2', Component: thirdBanner },
-    { id: '3', Component: fifthBanner },
+    // { id: '3', Component: fifthBanner },
   ];
   
   const extendedData = [
@@ -241,13 +241,16 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     width: screenWidth,
-    minHeight: (screenWidth - 32) / 2.3,
+    minHeight: (screenWidth - 40) / 2,
     marginLeft: -16,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   image: {
     width: '100%',
-    height: (screenWidth - 32) / 2.3,
+    height: (screenWidth - 40) / 2,
     resizeMode: 'contain',
+    borderRadius: 12,
   },
 });
 

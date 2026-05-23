@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Platform, DeviceEventEmitter, AppState } from 'react-native';
 import { User, RegisterData, LoadingState } from '../types';
 import { userStorage, tokenStorage, clearAllData } from '../utils/storage';
@@ -26,13 +26,16 @@ interface AuthActions {
 
 export type UseAuthReturn = AuthState & AuthActions;
 
+const AuthContext = createContext<UseAuthReturn | null>(null);
+
 /**
  * Хук для управления аутентификацией и состоянием пользователя
  */
-export const useAuth = (): UseAuthReturn => {
+const useAuthState = (): UseAuthReturn => {
   const [user, setUser] = useState<User | null>(null);
   const [loadingState, setLoadingState] = useState<LoadingState>('idle');
   const [error, setError] = useState<string | null>(null);
+  const authGenerationRef = useRef(0);
 
   const isAuthenticated = user !== null;
 
@@ -42,7 +45,11 @@ export const useAuth = (): UseAuthReturn => {
   const loadUserFromStorage = useCallback(async () => {
     try {
       setLoadingState('loading');
+      const generation = authGenerationRef.current;
       const savedUser = await userStorage.get();
+      if (generation !== authGenerationRef.current) {
+        return;
+      }
       
       if (savedUser) {
         setUser(savedUser);
@@ -82,6 +89,7 @@ export const useAuth = (): UseAuthReturn => {
 
       // Извлекаем данные из ответа сервера
       const { clientData, accessToken, refreshToken } = responseData;
+      authGenerationRef.current += 1;
 
       // Создаем объект пользователя из серверного ответа
       const userData: User = {
@@ -110,6 +118,7 @@ export const useAuth = (): UseAuthReturn => {
         doesItTake12Bottles: clientData.doesItTake12Bottles,
         savedCard: clientData.savedCard,
         invoiceLegalData: clientData.invoiceLegalData,
+        orderSameDayUntilHour: clientData.orderSameDayUntilHour,
       };
 
       // Сохраняем пользователя и токены из сервера
@@ -146,6 +155,7 @@ export const useAuth = (): UseAuthReturn => {
     try {
       setLoadingState('loading');
       setError(null);
+      authGenerationRef.current += 1;
 
       // Здесь будет вызов API для регистрации
       // Пример мокового ответа:
@@ -183,6 +193,9 @@ export const useAuth = (): UseAuthReturn => {
   const logout = useCallback(async () => {
     try {
       setLoadingState('loading');
+      authGenerationRef.current += 1;
+      setUser(null);
+      setError(null);
 
       // Удаляем FCM-токен с сервера (до очистки userMail)
       try {
@@ -199,8 +212,6 @@ export const useAuth = (): UseAuthReturn => {
         AsyncStorage.removeItem('userMail'),
       ]);
 
-      setUser(null);
-      setError(null);
       setLoadingState('idle');
     } catch (error) {
       console.error('Ошибка при выходе:', error);
@@ -246,11 +257,15 @@ export const useAuth = (): UseAuthReturn => {
         if (!silent) {
           setLoadingState('loading');
         }
+        const generation = authGenerationRef.current;
         const response = await apiService.getData(user.mail);
 
         console.log('response', response);
 
         if (response.client) {
+          if (generation !== authGenerationRef.current) {
+            return null;
+          }
           await userStorage.save(response.client);
           const nextUser = response.client as User;
           setUser(nextUser);
@@ -281,7 +296,11 @@ export const useAuth = (): UseAuthReturn => {
     try {
       setLoadingState('loading');
 
+      const generation = authGenerationRef.current;
       const res = await apiService.updateData(user.mail, field, value);
+      if (generation !== authGenerationRef.current) {
+        return;
+      }
       
       // Сохраняем обновленные данные
       await userStorage.save(res.clientData);
@@ -349,4 +368,17 @@ export const useAuth = (): UseAuthReturn => {
     refreshUserData,
     updateUser,
   };
+};
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const auth = useAuthState();
+  return React.createElement(AuthContext.Provider, { value: auth }, children);
+};
+
+export const useAuth = (): UseAuthReturn => {
+  const auth = useContext(AuthContext);
+  if (!auth) {
+    throw new Error('useAuth должен использоваться внутри AuthProvider');
+  }
+  return auth;
 };

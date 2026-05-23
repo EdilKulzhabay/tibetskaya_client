@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Красная подложка под прозрачные углы макета иконки -->
+    <item>
+        <color android:color="#FF0000" />
+    </item>
+    <!-- Полноэкранный splash (как приложение только что открылось) -->
+    <item>
+        <bitmap
+            android:gravity="fill"
+            android:src="@drawable/splash_screen_logo" />
+    </item>
+</layer-list>

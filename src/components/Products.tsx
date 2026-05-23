@@ -11,13 +11,8 @@ const Products: React.FC<{ navigation: any, price19: number, price12: number}> =
     console.log('📊 Счетчики - 12.5л:', count12, '18.9л:', count19, '| Показать кнопку:', shouldShowButton);
 
     const handleOrder = () => {
-        console.log('🛒 handleOrder вызван');
-        console.log('📦 count12:', count12, 'count19:', count19);
-        console.log('🧭 navigation:', navigation);
-        
         try {
-            navigation.navigate('AddOrder', { products: { b12: count12, b19: count19 }, order: null });
-            console.log('✅ navigate вызван успешно');
+            navigation.navigate('AddOrder', { products: { b12: count12, b19: count19 > 1 ? count19 : 2 }, order: null });
         } catch (error) {
             console.error('❌ Ошибка навигации:', error);
         }
@@ -27,8 +22,15 @@ const Products: React.FC<{ navigation: any, price19: number, price12: number}> =
         <View>
             <View style={styles.containerTitle}>
                 <Text style={styles.title}>Товары</Text>
-                {/* <TouchableOpacity>
-                    <Text style={styles.button}>смотреть все</Text>
+                {/* <TouchableOpacity 
+                        style={styles.orderButton} 
+                        onPress={() => {
+                            console.log('🔴 Кнопка "Заказать" нажата!');
+                            handleOrder();
+                        }}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.orderButtonText}>Заказать</Text>
                 </TouchableOpacity> */}
             </View>
             {/* <View style={styles.productContainer}>

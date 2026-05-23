@@ -61,5 +61,10 @@
 	</array>
 	<key>NSPushNotificationsUsageDescription</key>
 	<string>Мы используем уведомления для уведомления о новых заказах</string>
+	<!-- Kaspi Pay / ApiPay: iOS разрешает canOpenURL для перечисленных схем (часть диплинков kaspi://) -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>kaspi</string>
+	</array>
 </dict>
 </plist>

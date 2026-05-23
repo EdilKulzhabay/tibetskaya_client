@@ -35,20 +35,26 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const [language, setLanguage] = useState('Русский');
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
 
-  // Загружаем сохраненное фото профиля при монтировании компонента
+  // Загружаем сохраненное фото профиля при смене аккаунта
   useEffect(() => {
     const loadProfileImage = async () => {
+      if (!user?.mail) {
+        setProfileImageUri(null);
+        return;
+      }
       try {
         const savedImageUri = await profileImageStorage.get();
         if (savedImageUri) {
           setProfileImageUri(savedImageUri);
+        } else {
+          setProfileImageUri(null);
         }
       } catch (error) {
         console.error('Ошибка при загрузке фото профиля:', error);
       }
     };
     loadProfileImage();
-  }, []);
+  }, [user?.mail]);
 
   // Загружаем состояние уведомлений при монтировании компонента
   useEffect(() => {

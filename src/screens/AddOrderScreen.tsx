@@ -8,11 +8,19 @@ import { useFocusEffect } from "@react-navigation/native";
 import ReferralPromoModal from "../components/ReferralPromoModal";
 import { clientHasInvoiceLegalData } from "../utils/clientInvoiceProfile";
 import { getWalletOpFormForUser } from "../utils/invoiceClientOrderPayment";
+import { buildSelectableDeliveryDates } from "../utils/orderDeliveryDate";
 
 const calls = [
     { label: 'Позвонить заранее', value: true },
     { label: 'Не звонить', value: false },
 ];
+
+type PaymentOption = { label: string; value: string };
+
+type HandleOrderOptions = {
+    skipBalanceCheck?: boolean;
+    paymentOverride?: PaymentOption;
+};
 
 const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation, route }) => {
     const { products, order } = route.params;
@@ -43,64 +51,34 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
     
     const scrollViewRef = useRef<ScrollView>(null);
     const commentInputRef = useRef<TextInput>(null);
-    const isSubmittingRef = useRef(false); // Защита от двойного нажатия
+    const isSubmittingRef = useRef(false); 
+    const continueOrderAfterTopUpRef = useRef<() => void>(() => {});
+    const submitOrderAfterTopUpRef = useRef(false);
 
-    useEffect(() => {
-        console.log('🔄 AddOrderScreen: selectedDate', selectedDate);
-    }, [selectedDate]);
-
-    // Функция для генерации доступных дат (исключая воскресенья)
     const generateAvailableDates = useCallback(() => {
-        const dates = [];
-        const now = new Date();
-        const currentHour = now.getHours();
-        
-        // Определяем, можно ли выбрать "Сегодня"
-        const canSelectToday = currentHour < 19;
-        
-        // Начинаем с сегодня или с завтра
-        let startDate = new Date();
-        if (!canSelectToday) {
-            startDate.setDate(startDate.getDate() + 1);
-        }
-        
-        // Генерируем даты на следующие 14 дней, исключая воскресенья
-        for (let i = 0; i < 30; i++) {
-            const date = new Date(startDate);
-            date.setDate(startDate.getDate() + i);
-            
-            // Пропускаем воскресенье (0)
-            if (date.getDay() !== 0) {
-                const dateStr = date.toISOString().split('T')[0];
-                const isToday = date.toDateString() === new Date().toDateString();
-                const dayName = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'][date.getDay()];
-                
-                dates.push({
-                    value: dateStr,
-                    label: isToday ? 'Сегодня' : `${dayName}, ${date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}`,
-                    date: date
-                });
-            }
-        }
-        console.log('🔄 AddOrderScreen: dates', dates);
-        return dates;
-    }, []);
+        const rows = buildSelectableDeliveryDates(user);
+        return rows.map((row) => ({
+            value: row.value,
+            label: row.label,
+        }));
+    }, [user]);
 
     // Инициализация доступных дат и начального значения
     useEffect(() => {
         const dates = generateAvailableDates();
         setAvailableDates(dates);
-        
-        // Устанавливаем первую доступную дату по умолчанию
-        if (dates.length > 0 && !selectedDate) {
-            setSelectedDate(dates[0]);
-        }
+        setSelectedDate((prev: { value: string; label: string } | null) => {
+            if (dates.length === 0) return null;
+            if (prev && dates.some((d) => d.value === prev.value)) {
+                return prev;
+            }
+            return dates[0];
+        });
     }, [generateAvailableDates]);
 
     // Обновляем данные пользователя при загрузке страницы
     useFocusEffect(
         useCallback(() => {
-            console.log('🔄 AddOrderScreen: обновляем данные пользователя');
             refreshUserData();
         }, [refreshUserData])
     );
@@ -114,13 +92,14 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
         }
     }, [user, user?.price12, user?.price19]);
 
-    const handleOrder = async () => {
+    const handleOrder = async (options: HandleOrderOptions = {}) => {
         // Защита от двойного нажатия (синхронная проверка)
         if (isSubmittingRef.current) {
             return;
         }
         isSubmittingRef.current = true;
         setLoading(true);
+        const payment = options.paymentOverride ?? selectedPayment;
         
         if (!selectedAddress) {
             Alert.alert('Ошибка', 'Пожалуйста, выберите адрес доставки');
@@ -128,7 +107,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
             isSubmittingRef.current = false;
             return;
         }
-        if (!selectedPayment) {
+        if (!payment) {
             Alert.alert('Ошибка', 'Пожалуйста, выберите способ оплаты');
             setLoading(false);
             isSubmittingRef.current = false;
@@ -156,27 +135,34 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
             return;
         }
 
-        if (selectedPayment.value === 'credit' && user?.paymentMethod === 'balance') {
+        if (!options.skipBalanceCheck && payment.value === 'credit' && user?.paymentMethod === 'balance') {
             const totalAmount = count12 * price12 + count19 * price19;
             if (user?.balance !== undefined && user.balance < totalAmount) {
                 setLoading(false);
                 isSubmittingRef.current = false;
                 if (clientHasInvoiceLegalData(user)) {
                     const deficit = totalAmount - user.balance;
-                    void openTopUpModal(String(Math.max(0, Math.ceil(deficit))));
+                    submitOrderAfterTopUpRef.current = true;
+                    void openTopUpModal(String(Math.max(0, Math.ceil(deficit))), {
+                        onTopUpSuccess: () => continueOrderAfterTopUpRef.current(),
+                    });
                 } else {
-                    setNotEnoughBalanceModalVisible(true);
+                    openNotEnoughBalanceTopUp(totalAmount - user.balance, true);
                 }
                 return;
             }
         }
-        if (selectedPayment.value === 'coupon' && user?.paymentMethod === 'coupon') {
+        if (!options.skipBalanceCheck && payment.value === 'coupon' && user?.paymentMethod === 'coupon') {
             if (count19 > (user?.paidBootlesFor19 || 0) || count12 > (user?.paidBootlesFor12 || 0)) {
                 setLoading(false);
                 isSubmittingRef.current = false;
                 if (clientHasInvoiceLegalData(user)) {
-                    void openTopUpModal();
+                    submitOrderAfterTopUpRef.current = true;
+                    void openTopUpModal(undefined, {
+                        onTopUpSuccess: () => continueOrderAfterTopUpRef.current(),
+                    });
                 } else {
+                    submitOrderAfterTopUpRef.current = true;
                     setNotEnoughBalanceModalVisible(true);
                 }
                 return;
@@ -209,7 +195,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                 { b12: count12, b19: count19 }, 
                 [], 
                 {d: selectedDate?.value, time: ""}, 
-                selectedPayment?.value,
+                payment.value,
                 selectedCall?.value,
                 comment,
             );
@@ -217,6 +203,8 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
 
             if (res.success) {
                 const showRef = Boolean((res as { showReferralModal?: boolean }).showReferralModal);
+                /** Сбрасываем способ оплаты: экран оформления может оставаться в стеке, глобальное пополнение не должно «прилипать» к уже завершённому заказу. */
+                setSelectedPayment(null);
                 Alert.alert('Успешно', 'Заказ оформлен', [
                     {
                         text: 'OK',
@@ -234,50 +222,133 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
             } else {
                 Alert.alert('Ошибка', res.message);
             }
-        } catch (error) {
+        } catch (error: unknown) {
             console.error('Ошибка при оформлении заказа:', error);
+            const msg =
+                typeof error === 'object' &&
+                error !== null &&
+                'response' in error &&
+                typeof (error as { response?: { data?: { message?: string } } }).response?.data
+                    ?.message === 'string'
+                ? (error as { response: { data: { message: string } } }).response.data.message
+                : 'Не удалось оформить заказ';
+            Alert.alert('Ошибка', msg);
         } finally {
             setLoading(false);
             isSubmittingRef.current = false;
         }
     }
 
-    useEffect(() => {
-        // Проверяем оплату с баланса (credit или coupon)
-        if (selectedPayment && (selectedPayment.value === 'credit' || selectedPayment.value === 'coupon')) {
-            
-            const totalAmount = count12 * price12 + count19 * price19;
-            console.log('🔄 AddOrderScreen: totalAmount', totalAmount);
-            
-            // Для coupon проверяем количество бутылок раздельно, для credit - баланс в тенге
-            if (selectedPayment.value === 'coupon') {
-                const available19 = user?.paidBootlesFor19 || 0;
-                const available12 = user?.paidBootlesFor12 || 0;
-                
-                if (count19 > available19 || count12 > available12) {
-                    console.log('🔄 AddOrderScreen: не хватает бутылок', { count19, available19, count12, available12 });
-                    setSelectedPayment(null);
-                    if (clientHasInvoiceLegalData(user)) {
-                        openTopUpModal();
-                    } else {
-                        setNotEnoughBalanceModalVisible(true);
-                    }
-                    return;
-                }
-            } else {
-                if (user && user.balance !== undefined && user.balance !== null && user.balance < totalAmount) {
-                    console.log('🔄 AddOrderScreen: не хватает средств', user.balance, totalAmount);
-                    setSelectedPayment(null);
-                    if (clientHasInvoiceLegalData(user)) {
-                        openTopUpModal();
-                    } else {
-                        setNotEnoughBalanceModalVisible(true);
-                    }
-                    return;
-                }
+    continueOrderAfterTopUpRef.current = () => {
+        const balancePayment: PaymentOption = {
+            label: 'С баланса',
+            value: user?.paymentMethod === 'coupon' ? 'coupon' : 'credit',
+        };
+        setSelectedPayment(balancePayment);
+        const shouldSubmit = submitOrderAfterTopUpRef.current;
+        submitOrderAfterTopUpRef.current = false;
+        if (shouldSubmit) {
+            setTimeout(() => {
+                void handleOrder({ skipBalanceCheck: true, paymentOverride: balancePayment });
+            }, 0);
+        }
+    };
+
+    const openNotEnoughBalanceTopUp = (deficit: number, submitAfterTopUp = false) => {
+        const roundedDeficit = Math.max(0, Math.ceil(deficit));
+        submitOrderAfterTopUpRef.current = submitAfterTopUp;
+        void openTopUpModal(String(roundedDeficit), {
+            title: `${roundedDeficit.toLocaleString('ru-RU')} ₸`,
+            subtitle: 'Способы пополнения',
+            showCashPayment: true,
+            onTopUpSuccess: () => continueOrderAfterTopUpRef.current(),
+            onCashPayment: () => {
+                const cashPayment: PaymentOption = { label: 'Наличными', value: 'fakt' };
+                submitOrderAfterTopUpRef.current = false;
+                setSelectedPayment(cashPayment);
+                void handleOrder({ paymentOverride: cashPayment });
+            },
+        });
+    };
+
+    /** Валидация полей без способа оплаты — модалки открываем только после «Оформить заказ». */
+    const beginCheckout = () => {
+        if (isSubmittingRef.current || loading) {
+            return;
+        }
+
+        const lineTotal = count12 * price12 + count19 * price19;
+
+        if (!selectedAddress) {
+            Alert.alert('Ошибка', 'Пожалуйста, выберите адрес доставки');
+            return;
+        }
+        if (count12 + count19 < 2) {
+            Alert.alert('Ошибка', 'Пожалуйста, выберите хотя бы 2 бутыля воды');
+            return;
+        }
+        if (!selectedCall) {
+            Alert.alert('Ошибка', 'Пожалуйста, выберите нужен ли звонок от курьера');
+            return;
+        }
+        if (!selectedDate) {
+            Alert.alert('Ошибка', 'Пожалуйста, выберите дату доставки');
+            return;
+        }
+
+        const invoice = clientHasInvoiceLegalData(user ?? null);
+
+        if (invoice && user) {
+            const op = getWalletOpFormForUser(user);
+            if (op === 'credit') {
+                void handleOrder({
+                    paymentOverride: { label: 'С баланса', value: 'credit' },
+                });
+                return;
+            }
+            if (op === 'coupon') {
+                void handleOrder({
+                    paymentOverride: { label: 'С баланса', value: 'coupon' },
+                });
+                return;
             }
         }
-    }, [selectedPayment, count12, count19, price12, price19, user, openTopUpModal]);
+
+        if (
+            user?.paymentMethod === 'balance' &&
+            user?.balance != null &&
+            user.balance < lineTotal
+        ) {
+            submitOrderAfterTopUpRef.current = true;
+            if (invoice) {
+                void openTopUpModal(String(Math.max(0, Math.ceil(lineTotal - user.balance))), {
+                    onTopUpSuccess: () => continueOrderAfterTopUpRef.current(),
+                });
+            } else {
+                openNotEnoughBalanceTopUp(lineTotal - user.balance, true);
+            }
+            return;
+        }
+
+        if (user?.paymentMethod === 'coupon') {
+            const available19 = user?.paidBootlesFor19 || 0;
+            const available12 = user?.paidBootlesFor12 || 0;
+
+            if (count19 > available19 || count12 > available12) {
+                submitOrderAfterTopUpRef.current = true;
+                if (invoice) {
+                    void openTopUpModal(undefined, {
+                        onTopUpSuccess: () => continueOrderAfterTopUpRef.current(),
+                    });
+                } else {
+                    setNotEnoughBalanceModalVisible(true);
+                }
+                return;
+            }
+        }
+
+        setPaymentModalVisible(true);
+    };
 
     useEffect(() => {
         if (user && clientHasInvoiceLegalData(user) && selectedPayment?.value === "fakt") {
@@ -355,7 +426,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                 </View>
                                 <View style={styles.productBottomSum}>
                                     <Text style={styles.productBottomSumText}>{price12} ₸</Text>
-                                    <Text style={[styles.productBottomSumText, {color: "#DC1818"}]}>{count12 * price12} ₸</Text>
+                                    <Text style={[styles.productBottomSumText, {color: "#000"}]}>{count12 * price12} ₸</Text>
                                 </View>
                             </View>
                         </View>
@@ -401,7 +472,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                 </View>
                                 <View style={styles.productBottomSum}>
                                     <Text style={styles.productBottomSumText}>{price19} ₸</Text>
-                                    <Text style={[styles.productBottomSumText, {color: "#DC1818"}]}>{count19 * price19} ₸</Text>
+                                    <Text style={[styles.productBottomSumText, {color: "#000"}]}>{count19 * price19} ₸</Text>
                                 </View>
                             </View>
                         </View>
@@ -411,7 +482,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                     {count12 > 0 && count19 > 0 && (
                         <View style={{marginTop: 16, flexDirection: 'row', alignItems: 'center', justifyContent: "flex-end", gap: 16}}>
                             <Text style={{fontSize: 18, fontWeight: '500', color: '#101010'}}>Общая сумма:</Text>
-                            <Text style={{color: "#DC1818", fontSize: 16, fontWeight: '600'}}>{count12 * price12 + count19 * price19} ₸</Text>
+                            <Text style={{color: "#000", fontSize: 16, fontWeight: '600'}}>{count12 * price12 + count19 * price19} ₸</Text>
                         </View>
                     )}
 
@@ -441,44 +512,6 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                 Адрес доставки
                             </Text>
                             {selectedAddress && <Text style={{fontSize: 18, fontWeight: '500'}}> {selectedAddress?.name}</Text>}
-                        </View>
-                        <Image source={require('../assets/arrowDown.png')} style={{width: 24, height: 24}} />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={[styles.additionalInfo, {marginTop: 24}]} onPress={() => {
-                        const lineTotal = count12 * price12 + count19 * price19;
-                        if (user?.paymentMethod === "balance" && user?.balance !== undefined && user?.balance !== null && user?.balance < lineTotal) {
-                            if (clientHasInvoiceLegalData(user)) {
-                                const deficit = lineTotal - (user?.balance || 0);
-                                void openTopUpModal(String(Math.max(0, Math.ceil(deficit))));
-                            } else {
-                                setNotEnoughBalanceModalVisible(true);
-                            }
-                            return;
-                        }
-                        if (user?.paymentMethod === "coupon") {
-                            const available19 = user?.paidBootlesFor19 || 0;
-                            const available12 = user?.paidBootlesFor12 || 0;
-                            
-                            if (count19 > available19 || count12 > available12) {
-                                if (clientHasInvoiceLegalData(user)) {
-                                    void openTopUpModal();
-                                } else {
-                                    setNotEnoughBalanceModalVisible(true);
-                                }
-                                return;
-                            }
-                        }
-                        setPaymentModalVisible(true);
-                    }}>
-                        <View>
-                            <Text style={{
-                                fontWeight: '500',
-                                color: '#99A3B3',
-                                fontSize: selectedPayment ? 14 : 16,
-                                transform: selectedPayment ? [{translateY: -8}] : [],
-                            }}>Способ оплаты</Text>
-                            {selectedPayment && <Text style={{fontSize: 18, fontWeight: '500'}}> {selectedPayment?.label}</Text>}
                         </View>
                         <Image source={require('../assets/arrowDown.png')} style={{width: 24, height: 24}} />
                     </TouchableOpacity>
@@ -542,7 +575,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
 
                 </View>
 
-                <TouchableOpacity style={styles.button} onPress={handleOrder} disabled={loading} >
+                <TouchableOpacity style={[styles.button, {marginTop: 12}]} onPress={() => { beginCheckout(); }} disabled={loading} >
                     {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.buttonText}>Оформить заказ</Text>}
                 </TouchableOpacity>
 
@@ -565,17 +598,29 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                     setSelectedAddress(null);
                                 } else {
                                     setSelectedAddress(address);
-                                    setAddressModalVisible(false);
+                                    // setAddressModalVisible(false);
                                 }
                             }}>
-                                <Text style={styles.modalAddressText}>{address.name}</Text>
+                                <View>
+                                    <Text style={styles.modalAddressText}>{address.name}</Text>
+                                    <Text style={{fontSize: 14, fontWeight: '400', color: '#6A7282', marginTop: 4}}>{address.street}</Text>
+                                </View>
                                 <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: selectedAddress?._id === address._id ? '#DC1818' : '#101010' }}>
                                     {selectedAddress?.name === address.name && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
                                 </View>
                             </TouchableOpacity>
                         ))}
 
-                        <TouchableOpacity style={[styles.button, {marginTop: 40}]} onPress={() => {
+                        <TouchableOpacity style={{
+                            flexDirection: 'row',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            borderWidth: 1,
+                            borderColor: "#E5E7EB",
+                            borderStyle: 'dashed',
+                            padding: 16,
+                            borderRadius: 16,
+                        }} onPress={() => {
                             setAddressModalVisible(false);
                             if (!user) {
                                 navigation.navigate('Login');
@@ -583,7 +628,17 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                 navigation.navigate('AddOrUpdateAddress', { address: null });
                             }
                         }}>
-                            <Text style={styles.buttonText}>Добавить адрес</Text>
+                            <Image source={require('../assets/addAddressIcon.png')} style={{width: 24, height: 24}} />
+                            <Text style={{
+                                fontSize: 16,
+                                fontWeight: '500',
+                                color: '#FB2C36',
+                                marginLeft: 8,
+                            }}>Добавить адрес</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={[styles.button, {marginTop: 12}]} onPress={() => setAddressModalVisible(false)}>
+                            <Text style={styles.buttonText}>Продолжить</Text>
                         </TouchableOpacity>
                     </TouchableOpacity>
                 </TouchableOpacity>
@@ -602,10 +657,12 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                 <TouchableOpacity style={styles.modalAddress} onPress={() => {
                                     if (selectedPayment?.value === 'fakt') {
                                         setSelectedPayment(null);
-                                    } else {
-                                        setSelectedPayment({ label: 'Наличными', value: 'fakt' });
-                                        setPaymentModalVisible(false);
+                                        return;
                                     }
+                                    const pay: PaymentOption = { label: 'Наличными', value: 'fakt' };
+                                    setSelectedPayment(pay);
+                                    setPaymentModalVisible(false);
+                                    void handleOrder({ paymentOverride: pay });
                                 }}>
                                     <Text style={styles.modalAddressText}>Наличными</Text>
                                     <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: selectedPayment?.value === "fakt" ? '#DC1818' : '#101010' }}>
@@ -614,14 +671,18 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                 </TouchableOpacity>
                             )}
                             <TouchableOpacity style={styles.modalAddress} onPress={() => {
-                                // Определяем правильное значение opForm в зависимости от paymentMethod пользователя
                                 const balanceValue = user?.paymentMethod === "coupon" ? 'coupon' : 'credit';
                                 if (selectedPayment?.value === balanceValue) {
                                     setSelectedPayment(null);
-                                } else {
-                                    setSelectedPayment({ label: 'С баланса', value: balanceValue });
-                                    setPaymentModalVisible(false);
+                                    return;
                                 }
+                                const pay: PaymentOption = {
+                                    label: 'С баланса',
+                                    value: balanceValue,
+                                };
+                                setSelectedPayment(pay);
+                                setPaymentModalVisible(false);
+                                void handleOrder({ paymentOverride: pay });
                             }}>
                                 {user && user?.paymentMethod === "coupon"? (
                                     <View>
@@ -750,12 +811,15 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                             }} 
                             onPress={() => {
                                 setNotEnoughBalanceModalVisible(false)
-                                setSelectedPayment(null)
                                 if (user?.paymentMethod === "balance") {
                                     const deficit = count12 * price12 + count19 * price19 - (user?.balance || 0);
-                                    openTopUpModal(String(Math.max(0, Math.ceil(deficit))));
+                                    openTopUpModal(String(Math.max(0, Math.ceil(deficit))), {
+                                        onTopUpSuccess: () => continueOrderAfterTopUpRef.current(),
+                                    });
                                 } else {
-                                    openTopUpModal();
+                                    openTopUpModal(undefined, {
+                                        onTopUpSuccess: () => continueOrderAfterTopUpRef.current(),
+                                    });
                                 }
                             }
                         }>
@@ -767,8 +831,11 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                         </TouchableOpacity>
                         {!clientHasInvoiceLegalData(user) ? (
                             <TouchableOpacity style={[styles.modalButton, {marginTop: 10, backgroundColor: '#DC1818'}]} onPress={() => {
-                                setNotEnoughBalanceModalVisible(false)
-                                setSelectedPayment({ label: 'Наличными', value: 'fakt' })
+                                setNotEnoughBalanceModalVisible(false);
+                                const cashPayment: PaymentOption = { label: 'Наличными', value: 'fakt' };
+                                submitOrderAfterTopUpRef.current = false;
+                                setSelectedPayment(cashPayment);
+                                void handleOrder({ paymentOverride: cashPayment });
                             }}>
                                 <Text style={styles.modalButtonText}>Оплатить наличными</Text>
                             </TouchableOpacity>
@@ -909,7 +976,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#EDEDED',
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'space-between',
         marginBottom: 16,
     },
@@ -922,7 +989,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#DC1818',
         padding: 16,
         borderRadius: 8,
-        marginTop: 40,
     },
     buttonText: {
         color: 'white',

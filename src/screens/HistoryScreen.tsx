@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,11 @@ import { useTopUpBalance } from '../context/TopUpBalanceContext';
 import { clientHasInvoiceLegalData } from '../utils/clientInvoiceProfile';
 import { getWalletOpFormForUser } from '../utils/invoiceClientOrderPayment';
 import ReferralPromoModal from '../components/ReferralPromoModal';
+import {
+  computeNextDeliveryYmd,
+  buildSelectableDeliveryDates,
+  getDeliveryAcceptTextFromYmd,
+} from '../utils/orderDeliveryDate';
 
 const MONTH_NAMES = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
@@ -39,15 +44,27 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [notEnoughBalanceModalVisible, setNotEnoughBalanceModalVisible] = useState(false);
+  const currentUserMailRef = useRef<string | null>(null);
 
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [monthPickerVisible, setMonthPickerVisible] = useState(false);
+  const [repeatDateModalVisible, setRepeatDateModalVisible] = useState(false);
+  const [repeatAvailableDates, setRepeatAvailableDates] = useState<{ value: string; label: string }[]>(
+    [],
+  );
 
-  const getHistoryOrders = async () => {
-    if (user?.mail && loadingState === 'success') {
-      apiService.getOrders(user.mail).then((res: any) => {
+  const repeatOrderDeliveryYmdRef = useRef<string | null>(null);
+  const repeatTargetOrderRef = useRef<any>(null);
+
+  const getHistoryOrders = async (mailOverride?: string) => {
+    const mail = mailOverride ?? user?.mail;
+    if (mail && loadingState === 'success') {
+      apiService.getOrders(mail).then((res: any) => {
+        if (currentUserMailRef.current !== mail) {
+          return;
+        }
         setOrders(res.orders);
       }).catch((error) => {
         console.error('Ошибка при получении истории заказов:', error);
@@ -56,10 +73,22 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
   }
 
 
+  useEffect(() => {
+    currentUserMailRef.current = user?.mail ?? null;
+    setOrders([]);
+    setSelectedPayment(null);
+    setSelectedOrder(null);
+    setPaymentModalVisible(false);
+    setNotEnoughBalanceModalVisible(false);
+    setRepeatDateModalVisible(false);
+    repeatOrderDeliveryYmdRef.current = null;
+    repeatTargetOrderRef.current = null;
+  }, [user?.mail]);
+
   useFocusEffect(
     useCallback(() => {
       // Ждем загрузки пользователя перед отправкой запроса
-      getHistoryOrders();
+      getHistoryOrders(user?.mail);
     }, [user?.mail, loadingState])
   );
 
@@ -124,75 +153,100 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
     };
   }, []);
 
-  const reloadOrder = async (paymentOverride?: string, orderOverride?: any) => {
+  const reloadOrder = async (
+    paymentOverride?: string,
+    options?: {
+      order?: any;
+      deliveryYmd?: string | null;
+      skipBalanceCheck?: boolean;
+    },
+  ) => {
     const paymentValue = paymentOverride ?? selectedPayment?.value;
-    const orderRow = orderOverride ?? selectedOrder;
-    if (user?.mail && orderRow) {
-      const b19 = orderRow.products?.b19 || 0;
-      const b12 = orderRow.products?.b12 || 0;
+    const orderRow = options?.order ?? selectedOrder ?? repeatTargetOrderRef.current;
+    const skipBal = options?.skipBalanceCheck ?? false;
+    const resolvedYmd =
+      (options?.deliveryYmd ?? repeatOrderDeliveryYmdRef.current) || computeNextDeliveryYmd(user);
 
-      if (paymentValue === 'credit' || paymentValue === 'coupon') {
-        if (user?.paymentMethod === 'balance') {
-          const orderSum = b19 * (user?.price19 || 0) + b12 * (user?.price12 || 0);
-          if (user?.balance !== undefined && user.balance < orderSum) {
-            setPaymentModalVisible(false);
-            if (clientHasInvoiceLegalData(user)) {
-              void openTopUpModal(String(Math.max(0, Math.ceil(orderSum - user.balance))));
-            } else {
-              setNotEnoughBalanceModalVisible(true);
-            }
-            return;
+    if (!(user?.mail && orderRow)) return;
+
+    const b19 = Number(orderRow.products?.b19 || 0);
+    const b12 = Number(orderRow.products?.b12 || 0);
+    const orderSumMoney =
+      typeof orderRow.sum === 'number' && Number.isFinite(orderRow.sum)
+        ? orderRow.sum
+        : b19 * Number(user?.price19 || 0) + b12 * Number(user?.price12 || 0);
+
+    if (!skipBal && (paymentValue === 'credit' || paymentValue === 'coupon')) {
+      if (user?.paymentMethod === 'balance' && paymentValue === 'credit') {
+        if (user?.balance !== undefined && user.balance < orderSumMoney) {
+          setPaymentModalVisible(false);
+          const deficit = Math.max(0, Math.ceil(orderSumMoney - Number(user.balance)));
+          const afterMoney = () => {
+            const ymd = repeatOrderDeliveryYmdRef.current;
+            const o = repeatTargetOrderRef.current ?? selectedOrder;
+            if (!ymd || !user.mail || !o) return;
+            void reloadOrder('credit', { order: o, deliveryYmd: ymd, skipBalanceCheck: true });
+          };
+          if (clientHasInvoiceLegalData(user)) {
+            void openTopUpModal(String(deficit), { onTopUpSuccess: afterMoney });
+          } else {
+            void openTopUpModal(String(deficit), {
+              title: `Не хватает ${deficit.toLocaleString('ru-RU')} ₸`,
+              subtitle: 'Способы пополнения',
+              showCashPayment: true,
+              onCashPayment: () =>
+                void reloadOrder('fakt', { order: orderRow, deliveryYmd: resolvedYmd }),
+              onTopUpSuccess: afterMoney,
+            });
           }
-        } else if (user?.paymentMethod === 'coupon') {
-          if (b19 > (user?.paidBootlesFor19 || 0) || b12 > (user?.paidBootlesFor12 || 0)) {
-            setPaymentModalVisible(false);
-            if (clientHasInvoiceLegalData(user)) {
-              void openTopUpModal();
-            } else {
-              setNotEnoughBalanceModalVisible(true);
-            }
-            return;
+          return;
+        }
+      } else if (user?.paymentMethod === 'coupon' && paymentValue === 'coupon') {
+        if (
+          b19 > (user?.paidBootlesFor19 || 0) ||
+          b12 > (user?.paidBootlesFor12 || 0)
+        ) {
+          setPaymentModalVisible(false);
+          const afterCoupon = () => {
+            const ymd = repeatOrderDeliveryYmdRef.current;
+            const o = repeatTargetOrderRef.current ?? selectedOrder;
+            if (!ymd || !user.mail || !o) return;
+            void reloadOrder('coupon', { order: o, deliveryYmd: ymd, skipBalanceCheck: true });
+          };
+          if (clientHasInvoiceLegalData(user)) {
+            void openTopUpModal(undefined, { onTopUpSuccess: afterCoupon });
+          } else {
+            setNotEnoughBalanceModalVisible(true);
           }
+          return;
         }
       }
+    }
 
-      // Определяем сегодняшнюю дату и время
-      const now = new Date();
-      let orderDate = new Date(now);
-
-      const dayOfWeek = now.getDay(); // 0 - воскресенье, 6 - суббота
-      const hours = now.getHours();
-
-      const pad = (n: number) => n.toString().padStart(2, '0');
-
-      // Проверяем условия: до 19:00 и не воскресенье
-      if (dayOfWeek !== 0 && hours < 19) {
-        // Сегодняшний день, не воскресенье, и время до 19:00
-        // orderDate остается сегодняшним
-      } else {
-        // Следующий рабочий день (не воскресенье)
-        // Если сегодня суббота и уже поздно, следующий не воскресенье -> понедельник
-        orderDate.setDate(orderDate.getDate() + 1);
-        let nextDay = orderDate.getDay();
-        // Если это воскресенье, добавляем еще 1 день (на понедельник)
-        if (nextDay === 0) {
-          orderDate.setDate(orderDate.getDate() + 1);
-        }
-      }
-
-      // Формируем дату в формате ГГГГ-ММ-ДД
-      const formattedOrderDate = `${orderDate.getFullYear()}-${pad(orderDate.getMonth()+1)}-${pad(orderDate.getDate())}`;
-      const orderDateObject = {d: formattedOrderDate, time: ""};
-      const res = await apiService.addOrder(user.mail, orderRow.address, orderRow.products, orderRow.clientNotes, orderDateObject, paymentValue, orderRow.needCall, orderRow.comment);
+    try {
+      const orderDateObject = { d: resolvedYmd, time: '' };
+      const res = await apiService.addOrder(
+        user.mail,
+        orderRow.address,
+        orderRow.products,
+        orderRow.clientNotes,
+        orderDateObject,
+        paymentValue,
+        orderRow.needCall,
+        orderRow.comment,
+      );
       if (res.success) {
+        repeatOrderDeliveryYmdRef.current = null;
+        repeatTargetOrderRef.current = null;
         const showRef = Boolean((res as { showReferralModal?: boolean }).showReferralModal);
-        Alert.alert('Успешно', 'Заказ повторно оформлен', [
+        const msg = getDeliveryAcceptTextFromYmd(resolvedYmd);
+        Alert.alert('Успешно', msg, [
           {
             text: 'OK',
             onPress: () => {
               setPaymentModalVisible(false);
               void refreshUserData().then(() => {
-                getHistoryOrders();
+                void getHistoryOrders();
                 if (showRef) {
                   setReferralPromoVisible(true);
                 }
@@ -203,8 +257,85 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
       } else {
         Alert.alert('Ошибка', res.message);
       }
+    } catch {
+      Alert.alert('Ошибка', 'Не удалось оформить заказ');
     }
-  }
+  };
+
+  const beginHistoryRepeatFlow = (order: any) => {
+    repeatTargetOrderRef.current = order;
+    setSelectedOrder(order);
+    repeatOrderDeliveryYmdRef.current = null;
+    setRepeatAvailableDates(buildSelectableDeliveryDates(user ?? null));
+    setRepeatDateModalVisible(true);
+  };
+
+  const onHistoryRepeatDateChosen = (deliveryYmd: string) => {
+    setRepeatDateModalVisible(false);
+    const order = repeatTargetOrderRef.current ?? selectedOrder;
+    if (!(user?.mail && order)) return;
+
+    repeatOrderDeliveryYmdRef.current = deliveryYmd;
+
+    const walletOp = getWalletOpFormForUser(user);
+
+    const b19 = Number(order.products?.b19 || 0);
+    const b12 = Number(order.products?.b12 || 0);
+    const orderSumMoney =
+      typeof order.sum === 'number' && Number.isFinite(order.sum)
+        ? order.sum
+        : b19 * Number(user?.price19 || 0) + b12 * Number(user?.price12 || 0);
+    const available19 = Number(user?.paidBootlesFor19 || 0);
+    const available12 = Number(user?.paidBootlesFor12 || 0);
+
+    if (walletOp === 'credit') {
+      const bal = user.balance ?? 0;
+      if (Number(bal) >= Number(orderSumMoney)) {
+        void reloadOrder('credit', { order, deliveryYmd, skipBalanceCheck: true });
+        return;
+      }
+      const deficit = Math.max(0, Math.ceil(orderSumMoney - Number(bal)));
+      const afterTopUp = () => {
+        const ymd = repeatOrderDeliveryYmdRef.current;
+        const o = repeatTargetOrderRef.current ?? selectedOrder;
+        if (!ymd || !user.mail || !o) return;
+        void reloadOrder('credit', { order: o, deliveryYmd: ymd, skipBalanceCheck: true });
+      };
+      if (clientHasInvoiceLegalData(user)) {
+        void openTopUpModal(String(deficit), { onTopUpSuccess: afterTopUp });
+      } else {
+        void openTopUpModal(String(deficit), {
+          title: `${deficit.toLocaleString('ru-RU')} ₸`,
+          subtitle: 'Способы пополнения',
+          showCashPayment: true,
+          onCashPayment: () => void reloadOrder('fakt', { order, deliveryYmd }),
+          onTopUpSuccess: afterTopUp,
+        });
+      }
+      return;
+    }
+
+    if (walletOp === 'coupon') {
+      if (b19 <= available19 && b12 <= available12) {
+        void reloadOrder('coupon', { order, deliveryYmd, skipBalanceCheck: true });
+        return;
+      }
+      const afterTopUpCoupon = () => {
+        const ymd = repeatOrderDeliveryYmdRef.current;
+        const o = repeatTargetOrderRef.current ?? selectedOrder;
+        if (!ymd || !user.mail || !o) return;
+        void reloadOrder('coupon', { order: o, deliveryYmd: ymd, skipBalanceCheck: true });
+      };
+      if (clientHasInvoiceLegalData(user)) {
+        void openTopUpModal(undefined, { onTopUpSuccess: afterTopUpCoupon });
+      } else {
+        setNotEnoughBalanceModalVisible(true);
+      }
+      return;
+    }
+
+    setPaymentModalVisible(true);
+  };
 
   const filteredOrders = useMemo(() => {
     if (!orders || orders.length === 0) return [];
@@ -325,46 +456,10 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
                       </View>
                       <TouchableOpacity 
                           style={{backgroundColor: '#DC1818', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 10}}
-                          onPress={() => {
-                            setSelectedOrder(order);
-                            const b19 = order.products?.b19 || 0;
-                            const b12 = order.products?.b12 || 0;
-                            const orderSum = b19 * (user?.price19 || 0) + b12 * (user?.price12 || 0);
-                            const available19 = user?.paidBootlesFor19 || 0;
-                            const available12 = user?.paidBootlesFor12 || 0;
-                            const walletOp = getWalletOpFormForUser(user);
-
-                            if (clientHasInvoiceLegalData(user) && (walletOp === 'credit' || walletOp === 'coupon')) {
-                              if (user?.paymentMethod === 'balance') {
-                                if (user.balance != null && user.balance < orderSum) {
-                                  void openTopUpModal(String(Math.max(0, Math.ceil(orderSum - user.balance))));
-                                  return;
-                                }
-                                void reloadOrder('credit', order);
-                                return;
-                              }
-                              if (user?.paymentMethod === 'coupon') {
-                                if (b19 > available19 || b12 > available12) {
-                                  void openTopUpModal();
-                                  return;
-                                }
-                                void reloadOrder('coupon', order);
-                                return;
-                              }
-                            }
-
-                            if (user?.paymentMethod === 'balance') {
-                              if (user?.balance !== undefined && user?.balance < orderSum) {
-                                setNotEnoughBalanceModalVisible(true);
-                                return;
-                              }
-                            } else if (user?.paymentMethod === 'coupon') {
-                              if (b19 > available19 || b12 > available12) {
-                                setNotEnoughBalanceModalVisible(true);
-                                return;
-                              }
-                            }
-                            setPaymentModalVisible(true);
+                          onPress={(e) => {
+                            // Не переходить в OrderStatus при нажатии «Повторить»
+                            e?.stopPropagation?.();
+                            beginHistoryRepeatFlow(order);
                           }}
                       >
                           <Text style={{color: 'white', fontSize: 14, fontWeight: '600'}}>Повторить</Text>
@@ -387,6 +482,47 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
         ))}
         <View style={{height: 40}}></View>
       </ScrollView>
+      <Modal
+        visible={repeatDateModalVisible}
+        onRequestClose={() => {
+          repeatOrderDeliveryYmdRef.current = null;
+          repeatTargetOrderRef.current = null;
+          setSelectedOrder(null);
+          setRepeatDateModalVisible(false);
+        }}
+        transparent={true}
+        animationType="fade"
+      >
+        <TouchableOpacity
+          style={styles.modalOverlayReloadOrder}
+          onPress={() => {
+            repeatOrderDeliveryYmdRef.current = null;
+            repeatTargetOrderRef.current = null;
+            setSelectedOrder(null);
+            setRepeatDateModalVisible(false);
+          }}
+        >
+          <TouchableOpacity
+            style={[styles.modalContainerReloadOrder, { maxHeight: '70%' }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={{ fontSize: 24, fontWeight: '600', color: '#101010', marginBottom: 16, textAlign: 'center' }}>
+              Выберите дату доставки
+            </Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {repeatAvailableDates.map((date, index) => (
+                <TouchableOpacity
+                  key={date.value || index}
+                  style={styles.modalAddress}
+                  onPress={() => onHistoryRepeatDateChosen(date.value)}
+                >
+                  <Text style={styles.modalAddressText}>{date.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
       <Modal
           visible={paymentModalVisible}
           onRequestClose={() => setPaymentModalVisible(false)}
@@ -432,7 +568,9 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
                         </View>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.button} onPress={() => {
-                        reloadOrder();
+                        void reloadOrder(undefined, {
+                          order: selectedOrder ?? repeatTargetOrderRef.current,
+                        });
                     }}>
                         <Text style={styles.buttonText}>Подтвердить</Text>
                     </TouchableOpacity>
@@ -523,14 +661,35 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
               onPress={() => {
                 setNotEnoughBalanceModalVisible(false);
                 setSelectedPayment(null);
-                if (user?.paymentMethod === 'balance') {
-                  const b19 = selectedOrder?.products?.b19 || 0;
-                  const b12 = selectedOrder?.products?.b12 || 0;
-                  const sum = b19 * (user?.price19 || 0) + b12 * (user?.price12 || 0);
+                const repeatOrder = repeatTargetOrderRef.current ?? selectedOrder;
+
+                const afterCoupon = () => {
+                  const ymd = repeatOrderDeliveryYmdRef.current;
+                  const o = repeatTargetOrderRef.current ?? selectedOrder;
+                  if (!ymd || !user?.mail || !o) return;
+                  void reloadOrder('coupon', { order: o, deliveryYmd: ymd, skipBalanceCheck: true });
+                };
+
+                const afterMoney = () => {
+                  const ymd = repeatOrderDeliveryYmdRef.current;
+                  const o = repeatTargetOrderRef.current ?? selectedOrder;
+                  if (!ymd || !user?.mail || !o) return;
+                  void reloadOrder('credit', { order: o, deliveryYmd: ymd, skipBalanceCheck: true });
+                };
+
+                if (user?.paymentMethod === 'balance' && repeatOrder) {
+                  const b19 = repeatOrder?.products?.b19 || 0;
+                  const b12 = repeatOrder?.products?.b12 || 0;
+                  const sum =
+                    typeof repeatOrder.sum === 'number' && Number.isFinite(repeatOrder.sum)
+                      ? repeatOrder.sum
+                      : b19 * (user?.price19 || 0) + b12 * (user?.price12 || 0);
                   const deficit = sum - (user?.balance || 0);
-                  openTopUpModal(String(Math.max(0, Math.ceil(deficit))));
+                  openTopUpModal(String(Math.max(0, Math.ceil(deficit))), {
+                    onTopUpSuccess: afterMoney,
+                  });
                 } else {
-                  openTopUpModal();
+                  openTopUpModal(undefined, { onTopUpSuccess: afterCoupon });
                 }
               }}
             >
@@ -552,8 +711,9 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
               style={{padding: 16, borderRadius: 8, marginTop: 10, backgroundColor: '#DC1818'}}
               onPress={() => {
                 setNotEnoughBalanceModalVisible(false);
-                setSelectedPayment({ label: 'Наличными', value: 'fakt' });
-                setPaymentModalVisible(true);
+                const o = repeatTargetOrderRef.current ?? selectedOrder;
+                const ymd = repeatOrderDeliveryYmdRef.current ?? computeNextDeliveryYmd(user);
+                void reloadOrder('fakt', { order: o ?? undefined, deliveryYmd: ymd });
               }}
             >
               <Text style={{color: '#fff', fontSize: 16, fontWeight: '600', textAlign: 'center'}}>Оплатить наличными</Text>

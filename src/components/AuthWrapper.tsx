@@ -11,10 +11,11 @@ interface AuthWrapperProps {
  * Показывает загрузку пока проверяется состояние авторизации
  */
 const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
-  const { loadingState } = useAuth();
+  const { loadingState, user } = useAuth();
 
-  // Показываем загрузку пока проверяется авторизация
-  if (loadingState === 'loading') {
+  // Глобальный loader нужен только для первичной проверки авторизации.
+  // Фоновые обновления профиля не должны размонтировать навигацию.
+  if (loadingState === 'loading' && !user) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
         <ActivityIndicator size="large" color="#DC1818" />

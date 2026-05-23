@@ -9,7 +9,6 @@ import {
   Modal,
   DeviceEventEmitter,
   Image,
-  Dimensions,
   Alert,
   Platform,
   ActivityIndicator,
@@ -30,10 +29,13 @@ import { useTopUpBalance } from '../context/TopUpBalanceContext';
 import { clientHasInvoiceLegalData } from '../utils/clientInvoiceProfile';
 import { getWalletOpFormForUser } from '../utils/invoiceClientOrderPayment';
 import ReferralPromoModal from '../components/ReferralPromoModal';
+import {
+  computeNextDeliveryYmd,
+  buildSelectableDeliveryDates,
+  getDeliveryAcceptTextFromYmd,
+} from '../utils/orderDeliveryDate';
 
-interface HomeScreenProps {}
-
-const HomeScreen: React.FC<HomeScreenProps> = () => {
+const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user, loadingState, refreshUserData } = useAuth();
   const { openTopUpModal } = useTopUpBalance();
@@ -48,8 +50,13 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
   const [masterCallSuccessModalVisible, setMasterCallSuccessModalVisible] = useState(false);
   const [masterCallLoading, setMasterCallLoading] = useState(false);
   const [referralPromoVisible, setReferralPromoVisible] = useState(false);
+  const [repeatDateModalVisible, setRepeatDateModalVisible] = useState(false);
+  const [repeatAvailableDates, setRepeatAvailableDates] = useState<{ value: string; label: string }[]>([]);
 
-  const platformSentRef = useRef(false);
+  const platformSentMailRef = useRef<string | null>(null);
+  const currentUserMailRef = useRef<string | null>(null);
+  /** Дата доставки, выбранная в модалке «Повторить последний заказ». */
+  const repeatOrderDeliveryYmdRef = useRef<string | null>(null);
 
   useEffect(() => {
     tokenStorage.getAuthToken().then((token: any) => {
@@ -58,10 +65,10 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
   }, []);
 
   useEffect(() => {
-    if (user?.mail && !platformSentRef.current) {
-      platformSentRef.current = true;
+    if (user?.mail && platformSentMailRef.current !== user.mail) {
+      platformSentMailRef.current = user.mail;
       apiService.updateData(user.mail, 'platform', Platform.OS);
-      const APP_VERSION = "1.3.0";
+      const APP_VERSION = "1.5.0";
       apiService.updateData(user.mail, 'appVersion', APP_VERSION.toString());
     }
   }, [user?.mail]);
@@ -72,17 +79,38 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
       if (!user) {
         console.log('Пользователь вышел из системы - очищаем заказы');
         setOrders([]);
+        setLastOrder(null);
+        setSelectedPayment(null);
+        setPaymentModalVisible(false);
+        setNotEnoughBalanceModalVisible(false);
+        setRepeatDateModalVisible(false);
+        repeatOrderDeliveryYmdRef.current = null;
       }
     }, [user])
   );
+
+  useEffect(() => {
+    currentUserMailRef.current = user?.mail ?? null;
+    setOrders([]);
+    setLastOrder(null);
+    setSelectedPayment(null);
+    setPaymentModalVisible(false);
+    setNotEnoughBalanceModalVisible(false);
+    setRepeatDateModalVisible(false);
+    repeatOrderDeliveryYmdRef.current = null;
+  }, [user?.mail]);
 
   useFocusEffect(
     useCallback(() => {
       // Запрашиваем активные заказы каждый раз при переходе на экран
       if (user?.mail) {
-        getLastOrder();
+        const mail = user.mail;
+        getLastOrder(mail);
         refreshUserData();
-        apiService.getActiveOrders(user.mail).then((res: any) => {
+        apiService.getActiveOrders(mail).then((res: any) => {
+          if (currentUserMailRef.current !== mail) {
+            return;
+          }
           setOrders(res.orders);
         }).catch((error) => {
           console.error('Ошибка при получении активных заказов:', error);
@@ -91,9 +119,13 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
     }, [user?.mail])
   );
 
-  const getLastOrder = async () => {
-    if (user?.mail) {
-      const lastOrder = await apiService.getLastOrder(user.mail);
+  const getLastOrder = async (mailOverride?: string) => {
+    const mail = mailOverride ?? user?.mail;
+    if (mail) {
+      const lastOrder = await apiService.getLastOrder(mail);
+      if (currentUserMailRef.current !== mail) {
+        return;
+      }
       console.log('lastOrder', lastOrder);
       if (lastOrder.success) {
         setLastOrder(lastOrder.order);
@@ -230,75 +262,69 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
   }, []);
 
 
-  const getNextDeliveryDate = () => {
-    const now = new Date();
-    let orderDate = new Date(now);
-    const dayOfWeek = now.getDay();
-    const hours = now.getHours();
+  const getNextDeliveryYmd = () => computeNextDeliveryYmd(user ?? null);
 
-    if (dayOfWeek !== 0 && hours < 19) {
-      // Будний день / суббота до 19:00 — сегодня
-    } else {
-      orderDate.setDate(orderDate.getDate() + 1);
-      if (orderDate.getDay() === 0) {
-        orderDate.setDate(orderDate.getDate() + 1);
-      }
-    }
-    return orderDate;
-  };
+  const reloadOrder = async (
+    paymentOverride?: string,
+    options?: {
+      deliveryYmd?: string | null;
+      skipBalanceCheck?: boolean;
+    },
+  ) => {
+    const paymentValue = paymentOverride ?? selectedPayment?.value;
+    const skipBal = options?.skipBalanceCheck ?? false;
+    const resolvedYmd =
+      (options?.deliveryYmd ?? repeatOrderDeliveryYmdRef.current) || getNextDeliveryYmd();
 
-  const getOrderAcceptText = () => {
-    const now = new Date();
-    const orderDate = getNextDeliveryDate();
-    const dayOfWeek = now.getDay();
-    const hours = now.getHours();
-
-    const dayNames = ['воскресенье', 'понедельник', 'вторник', 'среду', 'четверг', 'пятницу', 'субботу'];
-
-    const isToday =
-      orderDate.getDate() === now.getDate() &&
-      orderDate.getMonth() === now.getMonth() &&
-      orderDate.getFullYear() === now.getFullYear();
-
-    if (isToday) {
-      return 'Заказ принят на сегодня';
-    }
-
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const isTomorrow =
-      orderDate.getDate() === tomorrow.getDate() &&
-      orderDate.getMonth() === tomorrow.getMonth() &&
-      orderDate.getFullYear() === tomorrow.getFullYear();
-
-    if (isTomorrow) {
-      return 'Заказ принят на завтра';
-    }
-
-    return `Заказ принят на ${dayNames[orderDate.getDay()]}`;
-  };
-
-  const reloadOrder = async (paymentOverride?: string) => {
-    const paymentValue = paymentOverride || selectedPayment?.value;
     if (user?.mail && lastOrder) {
-      if (paymentValue === 'credit' || paymentValue === 'coupon') {
+      if (
+        !skipBal &&
+        (paymentValue === 'credit' || paymentValue === 'coupon')
+      ) {
         if (user?.paymentMethod === 'balance') {
-          if (user?.balance !== undefined && user.balance < lastOrder.sum) {
+          if (
+            paymentValue === 'credit' &&
+            user?.balance !== undefined &&
+            user.balance < lastOrder.sum
+          ) {
             setPaymentModalVisible(false);
+            const deficit = Math.max(0, Math.ceil(lastOrder.sum - user.balance));
+            const afterTopUp = () => {
+              const ymd = repeatOrderDeliveryYmdRef.current;
+              if (!ymd || !user?.mail || !lastOrder) return;
+              void reloadOrder('credit', { deliveryYmd: ymd, skipBalanceCheck: true });
+            };
             if (clientHasInvoiceLegalData(user)) {
-              void openTopUpModal(String(Math.max(0, Math.ceil(lastOrder.sum - user.balance))));
+              void openTopUpModal(String(deficit), {
+                onTopUpSuccess: afterTopUp,
+              });
             } else {
-              setNotEnoughBalanceModalVisible(true);
+              void openTopUpModal(String(deficit), {
+                title: `Не хватает ${deficit.toLocaleString('ru-RU')} ₸`,
+                subtitle: 'Способы пополнения',
+                showCashPayment: true,
+                onCashPayment: () => void reloadOrder('fakt', { deliveryYmd: resolvedYmd }),
+                onTopUpSuccess: afterTopUp,
+              });
             }
             return;
           }
         } else if (user?.paymentMethod === 'coupon') {
           const needed19 = lastOrder?.products?.b19 || 0;
           const needed12 = lastOrder?.products?.b12 || 0;
-          if (needed19 > (user?.paidBootlesFor19 || 0) || needed12 > (user?.paidBootlesFor12 || 0)) {
+          if (
+            paymentValue === 'coupon' &&
+            (needed19 > (user?.paidBootlesFor19 || 0) ||
+              needed12 > (user?.paidBootlesFor12 || 0))
+          ) {
             setPaymentModalVisible(false);
+            const afterTopUpCoupon = () => {
+              const ymd = repeatOrderDeliveryYmdRef.current;
+              if (!ymd || !user?.mail || !lastOrder) return;
+              void reloadOrder('coupon', { deliveryYmd: ymd, skipBalanceCheck: true });
+            };
             if (clientHasInvoiceLegalData(user)) {
-              void openTopUpModal();
+              void openTopUpModal(undefined, { onTopUpSuccess: afterTopUpCoupon });
             } else {
               setNotEnoughBalanceModalVisible(true);
             }
@@ -307,12 +333,19 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
         }
       }
 
-      const orderDate = getNextDeliveryDate();
-      const pad = (n: number) => n.toString().padStart(2, '0');
-      const formattedOrderDate = `${orderDate.getFullYear()}-${pad(orderDate.getMonth()+1)}-${pad(orderDate.getDate())}`;
-      const orderDateObject = {d: formattedOrderDate, time: ""};
-      const res = await apiService.addOrder(user.mail, lastOrder.address, lastOrder.products, lastOrder.clientNotes, orderDateObject, paymentValue, lastOrder.needCall, lastOrder.comment);
+      const orderDateObject = { d: resolvedYmd, time: '' };
+      const res = await apiService.addOrder(
+        user.mail,
+        lastOrder.address,
+        lastOrder.products,
+        lastOrder.clientNotes,
+        orderDateObject,
+        paymentValue,
+        lastOrder.needCall,
+        lastOrder.comment,
+      );
       if (res.success) {
+        repeatOrderDeliveryYmdRef.current = null;
         const showRef = Boolean((res as { showReferralModal?: boolean }).showReferralModal);
         setPaymentModalVisible(false);
         setNotEnoughBalanceModalVisible(false);
@@ -334,7 +367,8 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
 
         void syncUserAndOrders();
 
-        Alert.alert('Успешно', getOrderAcceptText(), [
+        const alertText = getDeliveryAcceptTextFromYmd(resolvedYmd);
+        Alert.alert('Успешно', alertText, [
           {
             text: 'OK',
             onPress: () => {
@@ -349,8 +383,83 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
         Alert.alert('Ошибка', res.message);
       }
     }
-  }
+  };
 
+  /** Повтор последнего заказа: 1) дата 2) кошелёк или пополнение. */
+  const startRepeatLastOrderFlow = () => {
+    if (!user || !lastOrder) return;
+    repeatOrderDeliveryYmdRef.current = null;
+    setRepeatAvailableDates(buildSelectableDeliveryDates(user ?? null));
+    setRepeatDateModalVisible(true);
+  };
+
+  const onRepeatDateSelectedFromModal = (deliveryYmd: string) => {
+    setRepeatDateModalVisible(false);
+    if (!user?.mail || !lastOrder) return;
+
+    repeatOrderDeliveryYmdRef.current = deliveryYmd;
+
+    const walletOp = getWalletOpFormForUser(user);
+
+    const needed19 = Number(lastOrder?.products?.b19 || 0);
+    const needed12 = Number(lastOrder?.products?.b12 || 0);
+    const available19 = Number(user?.paidBootlesFor19 || 0);
+    const available12 = Number(user?.paidBootlesFor12 || 0);
+
+    const orderSumMoney =
+      typeof lastOrder.sum === 'number' && Number.isFinite(lastOrder.sum)
+        ? lastOrder.sum
+        : needed19 * Number(user.price19 || 0) + needed12 * Number(user.price12 || 0);
+
+    // Кошелёк: баланс в тенге
+    if (walletOp === 'credit') {
+      const bal = user.balance ?? 0;
+      if (Number(bal) >= Number(orderSumMoney)) {
+        void reloadOrder('credit', { deliveryYmd, skipBalanceCheck: true });
+        return;
+      }
+      const deficit = Math.max(0, Math.ceil(orderSumMoney - Number(bal)));
+      const afterTopUp = () => {
+        const ymd = repeatOrderDeliveryYmdRef.current;
+        if (!ymd || !user.mail || !lastOrder) return;
+        void reloadOrder('credit', { deliveryYmd: ymd, skipBalanceCheck: true });
+      };
+      if (clientHasInvoiceLegalData(user)) {
+        void openTopUpModal(String(deficit), { onTopUpSuccess: afterTopUp });
+      } else {
+        void openTopUpModal(String(deficit), {
+          title: `${deficit.toLocaleString('ru-RU')} ₸`,
+          subtitle: 'Способы пополнения',
+          showCashPayment: true,
+          onCashPayment: () => void reloadOrder('fakt', { deliveryYmd }),
+          onTopUpSuccess: afterTopUp,
+        });
+      }
+      return;
+    }
+
+    // Кошелёк: бутылями (купон)
+    if (walletOp === 'coupon') {
+      if (needed19 <= available19 && needed12 <= available12) {
+        void reloadOrder('coupon', { deliveryYmd, skipBalanceCheck: true });
+        return;
+      }
+      const afterTopUpCoupon = () => {
+        const ymd = repeatOrderDeliveryYmdRef.current;
+        if (!ymd || !user.mail || !lastOrder) return;
+        void reloadOrder('coupon', { deliveryYmd: ymd, skipBalanceCheck: true });
+      };
+      if (clientHasInvoiceLegalData(user)) {
+        void openTopUpModal(undefined, { onTopUpSuccess: afterTopUpCoupon });
+      } else {
+        setNotEnoughBalanceModalVisible(true);
+      }
+      return;
+    }
+
+    // Без типичного «кошелька» — только ручной выбор способа оплаты; дата уже в ref.
+    setPaymentModalVisible(true);
+  };
   const showRepairMasterBlock =
     !!user && user.showRepairMasterInApp === true;
 
@@ -374,47 +483,7 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
 
           {lastOrder && (
             <TouchableOpacity
-              onPress={() => {
-                if (!user || !lastOrder) return;
-                const needed19 = lastOrder?.products?.b19 || 0;
-                const needed12 = lastOrder?.products?.b12 || 0;
-                const available19 = user?.paidBootlesFor19 || 0;
-                const available12 = user?.paidBootlesFor12 || 0;
-                const walletOp = getWalletOpFormForUser(user);
-
-                if (clientHasInvoiceLegalData(user) && (walletOp === 'credit' || walletOp === 'coupon')) {
-                  if (user.paymentMethod === 'balance') {
-                    if (user.balance != null && user.balance < (lastOrder.sum ?? 0)) {
-                      void openTopUpModal(
-                        String(Math.max(0, Math.ceil((lastOrder.sum ?? 0) - user.balance)))
-                      );
-                      return;
-                    }
-                    void reloadOrder('credit');
-                    return;
-                  }
-                  if (user.paymentMethod === 'coupon') {
-                    if (needed19 > available19 || needed12 > available12) {
-                      void openTopUpModal();
-                      return;
-                    }
-                    void reloadOrder('coupon');
-                    return;
-                  }
-                }
-
-                if (user?.paymentMethod === 'balance' && user?.balance !== undefined && user?.balance !== null && user?.balance < lastOrder?.sum) {
-                  setNotEnoughBalanceModalVisible(true);
-                } else if (user?.paymentMethod === 'coupon') {
-                  if (needed19 > available19 || needed12 > available12) {
-                    setNotEnoughBalanceModalVisible(true);
-                  } else {
-                    setPaymentModalVisible(true);
-                  }
-                } else {
-                  setPaymentModalVisible(true);
-                }
-              }}
+              onPress={startRepeatLastOrderFlow}
               style={{
                 flexDirection: 'row', 
                 justifyContent: 'space-between', 
@@ -595,6 +664,43 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
         </TouchableOpacity>
       </Modal>
       <Modal
+        visible={repeatDateModalVisible}
+        onRequestClose={() => {
+          repeatOrderDeliveryYmdRef.current = null;
+          setRepeatDateModalVisible(false);
+        }}
+        transparent={true}
+        animationType="fade"
+      >
+        <TouchableOpacity
+          style={styles.modalOverlayReloadOrder}
+          onPress={() => {
+            repeatOrderDeliveryYmdRef.current = null;
+            setRepeatDateModalVisible(false);
+          }}
+        >
+          <TouchableOpacity
+            style={[styles.modalContainerReloadOrder, { maxHeight: '70%' }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={{ fontSize: 24, fontWeight: '600', color: '#101010', marginBottom: 16, textAlign: 'center' }}>
+              Выберите дату доставки
+            </Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {repeatAvailableDates.map((date, index) => (
+                <TouchableOpacity
+                  key={date.value || index}
+                  style={styles.modalAddress}
+                  onPress={() => onRepeatDateSelectedFromModal(date.value)}
+                >
+                  <Text style={styles.modalAddressText}>{date.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+      <Modal
           visible={paymentModalVisible}
           onRequestClose={() => setPaymentModalVisible(false)}
           transparent={true}
@@ -703,16 +809,28 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                           marginTop: 40,
                       }} 
                       onPress={() => {
-                          setNotEnoughBalanceModalVisible(false)
-                          setSelectedPayment(null)
+                          setNotEnoughBalanceModalVisible(false);
+                          setSelectedPayment(null);
                           if (user?.paymentMethod === 'balance' && lastOrder?.sum != null) {
                             const deficit = lastOrder.sum - (user?.balance || 0);
-                            openTopUpModal(String(Math.max(0, Math.ceil(deficit))));
+                            const afterMoney = () => {
+                              const ymd = repeatOrderDeliveryYmdRef.current;
+                              if (!ymd || !user.mail || !lastOrder) return;
+                              void reloadOrder('credit', { deliveryYmd: ymd, skipBalanceCheck: true });
+                            };
+                            openTopUpModal(String(Math.max(0, Math.ceil(deficit))), {
+                              onTopUpSuccess: afterMoney,
+                            });
                           } else {
-                            openTopUpModal();
+                            const afterCoupon = () => {
+                              const ymd = repeatOrderDeliveryYmdRef.current;
+                              if (!ymd || !user?.mail || !lastOrder) return;
+                              void reloadOrder('coupon', { deliveryYmd: ymd, skipBalanceCheck: true });
+                            };
+                            openTopUpModal(undefined, { onTopUpSuccess: afterCoupon });
                           }
-                      }
-                  }>
+                      }}
+                  >
                       {user?.paymentMethod === "balance" ? (
                           <Text style={styles.buttonText}>Пополнить на {lastOrder?.sum - (user?.balance || 0)} ₸</Text>
                       ) : (
@@ -727,7 +845,11 @@ const HomeScreen: React.FC<HomeScreenProps> = () => {
                           borderRadius: 8,
                           marginTop: 12,
                       }}
-                      onPress={() => reloadOrder('fakt')}
+                      onPress={() =>
+                          void reloadOrder('fakt', {
+                            deliveryYmd: repeatOrderDeliveryYmdRef.current ?? getNextDeliveryYmd(),
+                          })
+                      }
                   >
                       <Text style={styles.buttonText}>Оплатить наличными</Text>
                   </TouchableOpacity>
