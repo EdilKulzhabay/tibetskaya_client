@@ -20,8 +20,9 @@ import {
   OrderStatusScreen, 
   BonusScreen,
   WalletScreen, 
-  ChatScreen, 
-  AddressScreen, 
+  ChatScreen,
+  CourierChatScreen,
+  AddressScreen,
   AddOrUpdateAddress, 
   LoginScreen, 
   RegisterScreen, 
@@ -112,6 +113,7 @@ function App() {
               <Stack.Screen name="Bonus" component={withLayout(BonusScreen)} />
               <Stack.Screen name="Wallet" component={withLayout(WalletScreen)} />
               <Stack.Screen name="Chat" component={withLayout(ChatScreen, false)} />
+              <Stack.Screen name="CourierChat" component={withLayout(CourierChatScreen, false)} />
               <Stack.Screen name="Address" component={withLayout(AddressScreen)} />
               <Stack.Screen name="AddOrUpdateAddress" component={withLayout(AddOrUpdateAddress)} />
               <Stack.Screen 

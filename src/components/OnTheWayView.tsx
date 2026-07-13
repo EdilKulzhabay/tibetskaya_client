@@ -13,6 +13,7 @@ interface OnTheWayViewProps {
   order: OrderData;
   onCallCourier?: () => void;
   onTrackOrder?: () => void;
+  onChatWithCourier?: () => void;
 }
 
 // Координаты различных адресов в Алматы для примера
@@ -36,6 +37,7 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
   order,
   onCallCourier,
   onTrackOrder,
+  onChatWithCourier,
 }) => {
   const [estimatedTime, setEstimatedTime] = useState('15-20 мин');
   const [courierDistance, setCourierDistance] = useState('1.2 км');
@@ -293,7 +295,16 @@ const OnTheWayView: React.FC<OnTheWayViewProps> = ({
               {order.courierAggregator ? '📞 Позвонить курьеру' : '⏳ Ожидается назначение курьера'}
             </Text>
           </TouchableOpacity>
-          
+
+          {order.courierAggregator && (
+            <TouchableOpacity
+              style={[styles.button, styles.chatButton]}
+              onPress={onChatWithCourier}
+            >
+              <Text style={styles.buttonText}>💬 Написать курьеру</Text>
+            </TouchableOpacity>
+          )}
+
           {order.courierAggregator && (
             <TouchableOpacity 
               style={[styles.button, styles.refreshButton, refreshTimer > 0 && styles.buttonDisabled]} 
@@ -373,6 +384,9 @@ const styles = StyleSheet.create({
   },
   refreshButton: {
     backgroundColor: '#007AFF',
+  },
+  chatButton: {
+    backgroundColor: '#3da163',
   },
   productsInfo: {
     backgroundColor: 'white',

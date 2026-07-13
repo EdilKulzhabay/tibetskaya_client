@@ -264,6 +264,24 @@ const HomeScreen: React.FC = () => {
 
   const getNextDeliveryYmd = () => computeNextDeliveryYmd(user ?? null);
 
+  /**
+   * Черновик повторного заказа для сервера: если клиент уйдёт оплачивать Kaspi QR
+   * и не вернётся в приложение, сервер создаст этот заказ сам после зачисления баланса.
+   */
+  const buildPendingOrderDraft = (opForm: string, deliveryYmd: string) => {
+    if (!user?.mail || !lastOrder) return undefined;
+    return {
+      mail: user.mail,
+      address: lastOrder.address,
+      products: lastOrder.products,
+      clientNotes: lastOrder.clientNotes || [],
+      date: { d: deliveryYmd, time: '' },
+      opForm,
+      needCall: lastOrder.needCall,
+      comment: lastOrder.comment,
+    };
+  };
+
   const reloadOrder = async (
     paymentOverride?: string,
     options?: {
@@ -297,6 +315,7 @@ const HomeScreen: React.FC = () => {
             if (clientHasInvoiceLegalData(user)) {
               void openTopUpModal(String(deficit), {
                 onTopUpSuccess: afterTopUp,
+                pendingOrder: buildPendingOrderDraft('credit', resolvedYmd),
               });
             } else {
               void openTopUpModal(String(deficit), {
@@ -305,6 +324,7 @@ const HomeScreen: React.FC = () => {
                 showCashPayment: true,
                 onCashPayment: () => void reloadOrder('fakt', { deliveryYmd: resolvedYmd }),
                 onTopUpSuccess: afterTopUp,
+                pendingOrder: buildPendingOrderDraft('credit', resolvedYmd),
               });
             }
             return;
@@ -324,7 +344,10 @@ const HomeScreen: React.FC = () => {
               void reloadOrder('coupon', { deliveryYmd: ymd, skipBalanceCheck: true });
             };
             if (clientHasInvoiceLegalData(user)) {
-              void openTopUpModal(undefined, { onTopUpSuccess: afterTopUpCoupon });
+              void openTopUpModal(undefined, {
+                onTopUpSuccess: afterTopUpCoupon,
+                pendingOrder: buildPendingOrderDraft('coupon', resolvedYmd),
+              });
             } else {
               setNotEnoughBalanceModalVisible(true);
             }
@@ -344,7 +367,10 @@ const HomeScreen: React.FC = () => {
         lastOrder.needCall,
         lastOrder.comment,
       );
-      if (res.success) {
+      // "Заказ на эту дату уже существует" — сервер мог уже создать этот заказ сам
+      // (автосоздание после пополнения баланса через Kaspi), это не ошибка.
+      const alreadyCreatedByServer = !res.success && res.message === 'Заказ на эту дату уже существует';
+      if (res.success || alreadyCreatedByServer) {
         repeatOrderDeliveryYmdRef.current = null;
         const showRef = Boolean((res as { showReferralModal?: boolean }).showReferralModal);
         setPaymentModalVisible(false);
@@ -425,7 +451,10 @@ const HomeScreen: React.FC = () => {
         void reloadOrder('credit', { deliveryYmd: ymd, skipBalanceCheck: true });
       };
       if (clientHasInvoiceLegalData(user)) {
-        void openTopUpModal(String(deficit), { onTopUpSuccess: afterTopUp });
+        void openTopUpModal(String(deficit), {
+          onTopUpSuccess: afterTopUp,
+          pendingOrder: buildPendingOrderDraft('credit', deliveryYmd),
+        });
       } else {
         void openTopUpModal(String(deficit), {
           title: `${deficit.toLocaleString('ru-RU')} ₸`,
@@ -433,6 +462,7 @@ const HomeScreen: React.FC = () => {
           showCashPayment: true,
           onCashPayment: () => void reloadOrder('fakt', { deliveryYmd }),
           onTopUpSuccess: afterTopUp,
+          pendingOrder: buildPendingOrderDraft('credit', deliveryYmd),
         });
       }
       return;
@@ -450,7 +480,10 @@ const HomeScreen: React.FC = () => {
         void reloadOrder('coupon', { deliveryYmd: ymd, skipBalanceCheck: true });
       };
       if (clientHasInvoiceLegalData(user)) {
-        void openTopUpModal(undefined, { onTopUpSuccess: afterTopUpCoupon });
+        void openTopUpModal(undefined, {
+          onTopUpSuccess: afterTopUpCoupon,
+          pendingOrder: buildPendingOrderDraft('coupon', deliveryYmd),
+        });
       } else {
         setNotEnoughBalanceModalVisible(true);
       }
@@ -723,6 +756,7 @@ const HomeScreen: React.FC = () => {
                           </View>
                       </TouchableOpacity>
                       ) : null}
+                      {(user?.paymentMethod === "balance" || user?.paymentMethod === "coupon") && (
                       <TouchableOpacity style={styles.modalAddress} onPress={() => {
                           // Определяем правильное значение opForm в зависимости от paymentMethod пользователя
                           const balanceValue = user?.paymentMethod === "coupon" ? 'coupon' : 'credit';
@@ -762,6 +796,7 @@ const HomeScreen: React.FC = () => {
                               {(selectedPayment?.value === "credit" || selectedPayment?.value === "coupon") && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
                           </View>
                       </TouchableOpacity>
+                      )}
                       <TouchableOpacity style={styles.button} onPress={() => {
                           reloadOrder();
                       }}>
@@ -811,6 +846,7 @@ const HomeScreen: React.FC = () => {
                       onPress={() => {
                           setNotEnoughBalanceModalVisible(false);
                           setSelectedPayment(null);
+                          const ymdForDraft = repeatOrderDeliveryYmdRef.current ?? getNextDeliveryYmd();
                           if (user?.paymentMethod === 'balance' && lastOrder?.sum != null) {
                             const deficit = lastOrder.sum - (user?.balance || 0);
                             const afterMoney = () => {
@@ -820,6 +856,7 @@ const HomeScreen: React.FC = () => {
                             };
                             openTopUpModal(String(Math.max(0, Math.ceil(deficit))), {
                               onTopUpSuccess: afterMoney,
+                              pendingOrder: buildPendingOrderDraft('credit', ymdForDraft),
                             });
                           } else {
                             const afterCoupon = () => {
@@ -827,7 +864,10 @@ const HomeScreen: React.FC = () => {
                               if (!ymd || !user?.mail || !lastOrder) return;
                               void reloadOrder('coupon', { deliveryYmd: ymd, skipBalanceCheck: true });
                             };
-                            openTopUpModal(undefined, { onTopUpSuccess: afterCoupon });
+                            openTopUpModal(undefined, {
+                              onTopUpSuccess: afterCoupon,
+                              pendingOrder: buildPendingOrderDraft('coupon', ymdForDraft),
+                            });
                           }
                       }}
                   >

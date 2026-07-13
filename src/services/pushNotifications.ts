@@ -541,6 +541,20 @@ class PushNotificationService {
       }
     }
 
+    // Обработка сообщений чата с курьером
+    if (status === 'newOrderChatMessage' && message) {
+      try {
+        const messageData = typeof message === 'string' ? JSON.parse(message) : message;
+        console.log('💬 Обработка нового сообщения чата с курьером:', messageData);
+        DeviceEventEmitter.emit('newOrderChatMessage', messageData);
+        return;
+      } catch (error) {
+        console.error('❌ Ошибка обработки сообщения чата с курьером:', error);
+        console.error('   Данные:', remoteMessage.data);
+        return;
+      }
+    }
+
     // Обработка уведомлений о заказах
     if (!status || !orderId) {
       console.log('⚠️ Нет статуса или данных заказа в уведомлении');

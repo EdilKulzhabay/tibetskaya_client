@@ -74,9 +74,9 @@ export const apiService = {
         }
     },
 
-    createKaspiQrInvoice: async (amount: number, clientId: string) => {
+    createKaspiQrInvoice: async (amount: number, clientId: string, pendingOrderDraft?: unknown) => {
         try {
-            const response = await api.post('/api/apipay/qr/create', { amount, clientId });
+            const response = await api.post('/api/apipay/qr/create', { amount, clientId, pendingOrderDraft });
             return response.data;
         } catch (error: any) {
             const message =
@@ -162,6 +162,30 @@ export const apiService = {
     getSupportMessages: async (mail: string) => {
         try {
             const response = await api.post('/getSupportMessages', {mail});
+            return response.data;
+        } catch (error) {
+            return {
+                success: false,
+                message: "Не удалось получить сообщения",
+            };
+        }
+    },
+
+    sendOrderChatMessage: async (orderId: string, text: string) => {
+        try {
+            const response = await api.post('/sendOrderChatMessage', {orderId, text});
+            return response.data;
+        } catch (error) {
+            return {
+                success: false,
+                message: "Не удалось отправить сообщение",
+            };
+        }
+    },
+
+    getOrderChatMessages: async (orderId: string) => {
+        try {
+            const response = await api.post('/getOrderChatMessages', {orderId});
             return response.data;
         } catch (error) {
             return {

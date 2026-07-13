@@ -55,6 +55,50 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
     const continueOrderAfterTopUpRef = useRef<() => void>(() => {});
     const submitOrderAfterTopUpRef = useRef(false);
 
+    /** Тот же адрес, что уходит в apiService.addOrder — нужен и в handleOrder, и заранее для черновика на случай ухода в Kaspi. */
+    const buildOrderAddress = useCallback(() => {
+        if (!selectedAddress) return null;
+        let actualAddress = selectedAddress.street;
+        if (selectedAddress.floor) {
+            actualAddress += `, этаж ${selectedAddress.floor}`;
+        }
+        if (selectedAddress.apartment) {
+            actualAddress += `, квартира ${selectedAddress.apartment}`;
+        }
+        return {
+            actual: actualAddress,
+            name: selectedAddress.name,
+            phone: user?.phone,
+            point: {
+                lat: selectedAddress?.point?.lat || "",
+                lon: selectedAddress?.point?.lon || "",
+            },
+            link: selectedAddress?.link || "",
+        };
+    }, [selectedAddress, user?.phone]);
+
+    /**
+     * Черновик заказа для сервера: если клиент уйдёт оплачивать Kaspi QR и не вернётся
+     * в приложение, сервер создаст этот заказ сам сразу после зачисления баланса.
+     */
+    const buildPendingOrderDraft = useCallback(
+        (opForm: string) => {
+            const address = buildOrderAddress();
+            if (!user?.mail || !address || !selectedDate) return undefined;
+            return {
+                mail: user.mail,
+                address,
+                products: { b12: count12, b19: count19 },
+                clientNotes: [],
+                date: { d: selectedDate.value, time: '' },
+                opForm,
+                needCall: selectedCall?.value,
+                comment,
+            };
+        },
+        [buildOrderAddress, user?.mail, selectedDate, count12, count19, selectedCall, comment]
+    );
+
     const generateAvailableDates = useCallback(() => {
         const rows = buildSelectableDeliveryDates(user);
         return rows.map((row) => ({
@@ -145,6 +189,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                     submitOrderAfterTopUpRef.current = true;
                     void openTopUpModal(String(Math.max(0, Math.ceil(deficit))), {
                         onTopUpSuccess: () => continueOrderAfterTopUpRef.current(),
+                        pendingOrder: buildPendingOrderDraft('credit'),
                     });
                 } else {
                     openNotEnoughBalanceTopUp(totalAmount - user.balance, true);
@@ -160,6 +205,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                     submitOrderAfterTopUpRef.current = true;
                     void openTopUpModal(undefined, {
                         onTopUpSuccess: () => continueOrderAfterTopUpRef.current(),
+                        pendingOrder: buildPendingOrderDraft('coupon'),
                     });
                 } else {
                     submitOrderAfterTopUpRef.current = true;
@@ -169,24 +215,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
             }
         }
 
-        let actualAddress = selectedAddress.street;
-        if (selectedAddress.floor) {
-            actualAddress += `, этаж ${selectedAddress.floor}`;
-        }
-        if (selectedAddress.apartment) {
-            actualAddress += `, квартира ${selectedAddress.apartment}`;
-        }
-
-        const orderAddress = {
-            actual: actualAddress,
-            name: selectedAddress.name,
-            phone: user?.phone,
-            point: {
-                lat: selectedAddress?.point?.lat || "",
-                lon: selectedAddress?.point?.lon || "",
-            },
-            link: selectedAddress?.link || "",
-        }
+        const orderAddress = buildOrderAddress()!;
 
         try {
             const res = await apiService.addOrder(
@@ -201,7 +230,10 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
             );
 
 
-            if (res.success) {
+            // "Заказ на эту дату уже существует" — сервер мог уже создать этот же заказ сам
+            // (см. pendingOrder / автосоздание после пополнения баланса через Kaspi), это не ошибка.
+            const alreadyCreatedByServer = !res.success && res.message === 'Заказ на эту дату уже существует';
+            if (res.success || alreadyCreatedByServer) {
                 const showRef = Boolean((res as { showReferralModal?: boolean }).showReferralModal);
                 /** Сбрасываем способ оплаты: экран оформления может оставаться в стеке, глобальное пополнение не должно «прилипать» к уже завершённому заказу. */
                 setSelectedPayment(null);
@@ -262,6 +294,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
             subtitle: 'Способы пополнения',
             showCashPayment: true,
             onTopUpSuccess: () => continueOrderAfterTopUpRef.current(),
+            pendingOrder: submitAfterTopUp ? buildPendingOrderDraft('credit') : undefined,
             onCashPayment: () => {
                 const cashPayment: PaymentOption = { label: 'Наличными', value: 'fakt' };
                 submitOrderAfterTopUpRef.current = false;
@@ -323,6 +356,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
             if (invoice) {
                 void openTopUpModal(String(Math.max(0, Math.ceil(lineTotal - user.balance))), {
                     onTopUpSuccess: () => continueOrderAfterTopUpRef.current(),
+                    pendingOrder: buildPendingOrderDraft('credit'),
                 });
             } else {
                 openNotEnoughBalanceTopUp(lineTotal - user.balance, true);
@@ -339,6 +373,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                 if (invoice) {
                     void openTopUpModal(undefined, {
                         onTopUpSuccess: () => continueOrderAfterTopUpRef.current(),
+                        pendingOrder: buildPendingOrderDraft('coupon'),
                     });
                 } else {
                     setNotEnoughBalanceModalVisible(true);
@@ -670,6 +705,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                     </View>
                                 </TouchableOpacity>
                             )}
+                            {(user?.paymentMethod === "balance" || user?.paymentMethod === "coupon") && (
                             <TouchableOpacity style={styles.modalAddress} onPress={() => {
                                 const balanceValue = user?.paymentMethod === "coupon" ? 'coupon' : 'credit';
                                 if (selectedPayment?.value === balanceValue) {
@@ -714,6 +750,7 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                     {(selectedPayment?.value === "credit" || selectedPayment?.value === "coupon") && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
                                 </View>
                             </TouchableOpacity>
+                            )}
                     </TouchableOpacity>
                 </TouchableOpacity>
             </Modal>
@@ -815,10 +852,12 @@ const AddOrderScreen: React.FC<{ navigation: any, route: any }> = ({ navigation,
                                     const deficit = count12 * price12 + count19 * price19 - (user?.balance || 0);
                                     openTopUpModal(String(Math.max(0, Math.ceil(deficit))), {
                                         onTopUpSuccess: () => continueOrderAfterTopUpRef.current(),
+                                        pendingOrder: buildPendingOrderDraft('credit'),
                                     });
                                 } else {
                                     openTopUpModal(undefined, {
                                         onTopUpSuccess: () => continueOrderAfterTopUpRef.current(),
+                                        pendingOrder: buildPendingOrderDraft('coupon'),
                                     });
                                 }
                             }

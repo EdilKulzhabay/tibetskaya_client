@@ -156,6 +156,9 @@ export type RootStackParamList = {
   OrderStatus: {
     order: OrderData;
   };
+  CourierChat: {
+    order: OrderData;
+  };
   Login: undefined;
   Register: undefined;
   Otp: {

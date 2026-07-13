@@ -101,6 +101,14 @@ export interface SupportMessage {
   isRead?: boolean;
 }
 
+export interface OrderChatMessage {
+  _id: string;
+  text: string;
+  sender: 'client' | 'courier';
+  timestamp: string;
+  isRead?: boolean;
+}
+
 export type LoadingState = 'idle' | 'loading' | 'success' | 'error';
 
 // Дополнительные типы для приложения

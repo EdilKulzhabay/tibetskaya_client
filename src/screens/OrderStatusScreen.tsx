@@ -264,9 +264,10 @@ const OrderStatusScreen: React.FC = () => {
       case "onTheWay":
         return (
           // <View></View>
-          <OnTheWayView 
-            order={order} 
+          <OnTheWayView
+            order={order}
             onCallCourier={handleCallCourier}
+            onChatWithCourier={() => navigation.navigate('CourierChat', { order })}
           />
         );
         

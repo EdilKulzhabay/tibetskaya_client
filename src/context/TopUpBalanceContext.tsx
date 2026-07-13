@@ -89,12 +89,30 @@ type TopUpBalanceContextValue = {
 
 type TopUpMethod = 'kaspi' | 'card';
 
+/**
+ * Черновик заказа, который нужно оформить сразу после пополнения (тот же формат,
+ * что и параметры apiService.addOrder). Передаётся на сервер вместе со счётом Kaspi,
+ * чтобы вебхук мог создать заказ сам — даже если клиент не вернётся в приложение.
+ */
+export type PendingOrderDraft = {
+  mail: string;
+  address: any;
+  products: { b12: number; b19: number };
+  clientNotes: any[];
+  date: { d: string; time: string };
+  opForm: string;
+  needCall: boolean;
+  comment: string;
+};
+
 type TopUpModalOptions = {
   title?: string;
   subtitle?: string;
   showCashPayment?: boolean;
   onCashPayment?: () => void;
   onTopUpSuccess?: (updatedUser?: User | null) => void;
+  /** Если задан и пользователь оплачивает через Kaspi — заказ будет создан автоматически на сервере после оплаты. */
+  pendingOrder?: PendingOrderDraft;
 };
 
 const TopUpBalanceContext = createContext<TopUpBalanceContextValue | null>(null);
@@ -264,7 +282,7 @@ export const TopUpBalanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
         setTopUpSubmitting(true);
         try {
-            const res = await apiService.createKaspiQrInvoice(amount, clientId);
+            const res = await apiService.createKaspiQrInvoice(amount, clientId, topUpOptions.pendingOrder);
             const qrTokenUrl = typeof res?.invoice?.qrTokenUrl === 'string' ? res.invoice.qrTokenUrl.trim() : '';
             if (!res?.success || !qrTokenUrl) {
                 Alert.alert('Ошибка', res?.message || 'Не удалось создать ссылку для оплаты Kaspi');
@@ -293,7 +311,7 @@ export const TopUpBalanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
         } finally {
             setTopUpSubmitting(false);
         }
-    }, [topUpSum, user]);
+    }, [topUpSum, user, topUpOptions.pendingOrder]);
 
     const checkPendingKaspiInvoice = useCallback(async () => {
         const invoiceId = pendingKaspiInvoiceIdRef.current;

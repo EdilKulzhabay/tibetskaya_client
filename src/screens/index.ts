@@ -7,6 +7,7 @@ export {default as SupportScreen} from './SupportScreen';
 export {default as BonusScreen} from './BonusScreen';
 export {default as WalletScreen} from './WalletScreen';
 export {default as ChatScreen} from './ChatScreen';
+export {default as CourierChatScreen} from './CourierChatScreen';
 export {default as AddressScreen} from './Address';
 export {default as AddOrUpdateAddress} from './Address/AddOrUpdateAddress';
 export {default as LoginScreen} from './LoginScreen';
