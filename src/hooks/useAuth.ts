@@ -1,10 +1,18 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { Platform, DeviceEventEmitter, AppState } from 'react-native';
-import { User, RegisterData, LoadingState } from '../types';
-import { userStorage, tokenStorage, clearAllData } from '../utils/storage';
-import { apiService } from '../api/services';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from 'react';
+import {Platform, DeviceEventEmitter, AppState} from 'react-native';
+import {User, RegisterData, LoadingState} from '../types';
+import {userStorage, tokenStorage, clearAllData} from '../utils/storage';
+import {apiService} from '../api/services';
 import pushNotificationService from '../services/pushNotifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {getClientMongoId} from '../utils/clientId';
 
 interface AuthState {
   user: User | null;
@@ -20,7 +28,7 @@ interface AuthActions {
   clearError: () => void;
   refreshUser: () => Promise<void>;
   /** Возвращает актуального клиента с сервера или null при ошибке / без mail */
-  refreshUserData: (options?: { silent?: boolean }) => Promise<User | null>;
+  refreshUserData: (options?: {silent?: boolean}) => Promise<User | null>;
   updateUser: (field: string, value: any) => Promise<void>;
 }
 
@@ -50,27 +58,36 @@ const useAuthState = (): UseAuthReturn => {
       if (generation !== authGenerationRef.current) {
         return;
       }
-      
+
       if (savedUser) {
         setUser(savedUser);
-        
-        // Сохраняем email для push notifications
-        await AsyncStorage.setItem('userMail', savedUser.mail);
-        
+
+        // Сохраняем id клиента для push notifications (mail необязателен и может отсутствовать)
+        const savedClientId = getClientMongoId(savedUser);
+        if (savedClientId) {
+          await AsyncStorage.setItem('userId', savedClientId);
+        }
+
         // Push: на Android init() сам ждёт Activity; не блокируем загрузку профиля дольше необходимого
         try {
           if (Platform.OS === 'android') {
-            void pushNotificationService.init().catch((pushError) => {
-              console.error('❌ Ошибка при инициализации push notifications:', pushError);
+            void pushNotificationService.init().catch(pushError => {
+              console.error(
+                '❌ Ошибка при инициализации push notifications:',
+                pushError,
+              );
             });
           } else {
             await pushNotificationService.init();
           }
         } catch (pushError) {
-          console.error('❌ Ошибка при инициализации push notifications:', pushError);
+          console.error(
+            '❌ Ошибка при инициализации push notifications:',
+            pushError,
+          );
         }
       }
-      
+
       setLoadingState('success');
     } catch (error) {
       console.error('Ошибка при загрузке пользователя:', error);
@@ -88,7 +105,7 @@ const useAuthState = (): UseAuthReturn => {
       setError(null);
 
       // Извлекаем данные из ответа сервера
-      const { clientData, accessToken, refreshToken } = responseData;
+      const {clientData, accessToken, refreshToken} = responseData;
       authGenerationRef.current += 1;
 
       // Создаем объект пользователя из серверного ответа
@@ -98,7 +115,7 @@ const useAuthState = (): UseAuthReturn => {
         mail: clientData.mail,
         avatar: '',
         phone: clientData.phone,
-        notificationPushToken: clientData.expoPushToken || "",
+        notificationPushToken: clientData.expoPushToken || '',
         balance: clientData.balance ?? 0,
         bonus: clientData.bonus || 0,
         price12: clientData.price12 || 0,
@@ -126,23 +143,28 @@ const useAuthState = (): UseAuthReturn => {
         userStorage.save(userData),
         tokenStorage.saveAuthToken(accessToken),
         tokenStorage.saveRefreshToken(refreshToken),
-        AsyncStorage.setItem('userMail', userData.mail),
+        AsyncStorage.setItem('userId', getClientMongoId(userData)),
       ]);
 
       setUser(userData);
       setLoadingState('success');
-      
+
       // Инициализируем push notifications (если еще не инициализированы)
-      // Токен отправится автоматически, так как userMail уже сохранен в AsyncStorage
+      // Токен отправится автоматически, так как userId уже сохранен в AsyncStorage
       try {
         await pushNotificationService.init();
         await pushNotificationService.resendToken();
       } catch (pushError) {
-        console.error('❌ Ошибка при инициализации push notifications после логина/регистрации:', pushError);
+        console.error(
+          '❌ Ошибка при инициализации push notifications после логина/регистрации:',
+          pushError,
+        );
       }
     } catch (error) {
       console.error('Ошибка при входе:', error);
-      setError(error instanceof Error ? error.message : 'Ошибка при входе в систему');
+      setError(
+        error instanceof Error ? error.message : 'Ошибка при входе в систему',
+      );
       setLoadingState('error');
       throw error;
     }
@@ -181,7 +203,9 @@ const useAuthState = (): UseAuthReturn => {
       setLoadingState('success');
     } catch (error) {
       console.error('Ошибка при регистрации:', error);
-      setError(error instanceof Error ? error.message : 'Ошибка при регистрации');
+      setError(
+        error instanceof Error ? error.message : 'Ошибка при регистрации',
+      );
       setLoadingState('error');
       throw error;
     }
@@ -197,7 +221,7 @@ const useAuthState = (): UseAuthReturn => {
       setUser(null);
       setError(null);
 
-      // Удаляем FCM-токен с сервера (до очистки userMail)
+      // Удаляем FCM-токен с сервера (до очистки userId)
       try {
         await pushNotificationService.removeTokenFromServer();
       } catch (e) {
@@ -209,7 +233,7 @@ const useAuthState = (): UseAuthReturn => {
       await Promise.all([
         userStorage.remove(),
         tokenStorage.removeTokens(),
-        AsyncStorage.removeItem('userMail'),
+        AsyncStorage.removeItem('userId'),
       ]);
 
       setLoadingState('idle');
@@ -232,7 +256,7 @@ const useAuthState = (): UseAuthReturn => {
    */
   const refreshUser = useCallback(async () => {
     if (!isAuthenticated) return;
-    
+
     try {
       setLoadingState('loading');
       // Здесь будет вызов API для получения свежих данных пользователя
@@ -248,8 +272,9 @@ const useAuthState = (): UseAuthReturn => {
    * Получение свежих данных пользователя с сервера
    */
   const refreshUserData = useCallback(
-    async (options?: { silent?: boolean }): Promise<User | null> => {
-      if (!user?.mail) return null;
+    async (options?: {silent?: boolean}): Promise<User | null> => {
+      const clientId = getClientMongoId(user);
+      if (!clientId) return null;
 
       const silent = options?.silent === true;
 
@@ -258,7 +283,7 @@ const useAuthState = (): UseAuthReturn => {
           setLoadingState('loading');
         }
         const generation = authGenerationRef.current;
-        const response = await apiService.getData(user.mail);
+        const response = await apiService.getData(clientId);
 
         console.log('response', response);
 
@@ -274,7 +299,9 @@ const useAuthState = (): UseAuthReturn => {
           }
           return nextUser;
         }
-        throw new Error(response.message || 'Не удалось получить данные пользователя');
+        throw new Error(
+          response.message || 'Не удалось получить данные пользователя',
+        );
       } catch (error) {
         console.error('Ошибка при получении данных пользователя:', error);
         if (!silent) {
@@ -284,35 +311,39 @@ const useAuthState = (): UseAuthReturn => {
         return null;
       }
     },
-    [user?.mail]
+    [getClientMongoId(user)],
   );
 
   /**
    * Обновление данных пользователя
    */
-  const updateUser = useCallback(async (field: string, value: any) => {
-    if (!user) return;
+  const updateUser = useCallback(
+    async (field: string, value: any) => {
+      const clientId = getClientMongoId(user);
+      if (!clientId) return;
 
-    try {
-      setLoadingState('loading');
+      try {
+        setLoadingState('loading');
 
-      const generation = authGenerationRef.current;
-      const res = await apiService.updateData(user.mail, field, value);
-      if (generation !== authGenerationRef.current) {
-        return;
+        const generation = authGenerationRef.current;
+        const res = await apiService.updateData(clientId, field, value);
+        if (generation !== authGenerationRef.current) {
+          return;
+        }
+
+        // Сохраняем обновленные данные
+        await userStorage.save(res.clientData);
+        setUser(res.clientData);
+        setLoadingState('success');
+      } catch (error) {
+        console.error('Ошибка при обновлении пользователя:', error);
+        setError('Не удалось обновить данные пользователя');
+        setLoadingState('error');
+        throw error;
       }
-      
-      // Сохраняем обновленные данные
-      await userStorage.save(res.clientData);
-      setUser(res.clientData);
-      setLoadingState('success');
-    } catch (error) {
-      console.error('Ошибка при обновлении пользователя:', error);
-      setError('Не удалось обновить данные пользователя');
-      setLoadingState('error');
-      throw error;
-    }
-  }, [user]);
+    },
+    [user],
+  );
 
   // Загружаем пользователя при инициализации хука
   useEffect(() => {
@@ -322,35 +353,35 @@ const useAuthState = (): UseAuthReturn => {
   /** Служебный FCM после оплаты: обновить баланс без индикатора загрузки */
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('userProfileRefresh', () => {
-      if (user?.mail) {
-        void refreshUserData({ silent: true });
+      if (getClientMongoId(user)) {
+        void refreshUserData({silent: true});
       }
     });
     return () => sub.remove();
-  }, [user?.mail, refreshUserData]);
+  }, [user, refreshUserData]);
 
   /** Фоновый пуш: при возврате в приложение подтянуть профиль */
   useEffect(() => {
     const runIfPending = async () => {
       try {
         const pending = await AsyncStorage.getItem('pendingUserProfileRefresh');
-        if (pending === '1' && user?.mail) {
+        if (pending === '1' && getClientMongoId(user)) {
           await AsyncStorage.removeItem('pendingUserProfileRefresh');
-          await refreshUserData({ silent: true });
+          await refreshUserData({silent: true});
         }
       } catch {
         // ignore
       }
     };
 
-    const sub = AppState.addEventListener('change', (state) => {
+    const sub = AppState.addEventListener('change', state => {
       if (state === 'active') {
         void runIfPending();
       }
     });
     void runIfPending();
     return () => sub.remove();
-  }, [user?.mail, refreshUserData]);
+  }, [user, refreshUserData]);
 
   return {
     // State
@@ -358,7 +389,7 @@ const useAuthState = (): UseAuthReturn => {
     isAuthenticated,
     loadingState,
     error,
-    
+
     // Actions
     saveUserData,
     register,
@@ -370,9 +401,11 @@ const useAuthState = (): UseAuthReturn => {
   };
 };
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
+  children,
+}) => {
   const auth = useAuthState();
-  return React.createElement(AuthContext.Provider, { value: auth }, children);
+  return React.createElement(AuthContext.Provider, {value: auth}, children);
 };
 
 export const useAuth = (): UseAuthReturn => {

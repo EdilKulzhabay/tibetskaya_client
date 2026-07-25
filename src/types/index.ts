@@ -31,6 +31,13 @@ export interface User {
     street: string;
     floor?: string;
     apartment?: string;
+    house?: string;
+    link?: string;
+    phone?: string;
+    point?: {
+      lat?: number;
+      lon?: number;
+    };
   }[];
   dailyWaterIntake?: number; // Потребление воды в мл за день
   isStartedHydration?: boolean;

@@ -10,10 +10,9 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import messaging from '@react-native-firebase/messaging';
-import notifee, { AndroidImportance } from '@notifee/react-native';
+import notifee, {AndroidImportance} from '@notifee/react-native';
 
 const API_URL = 'https://api.tibetskayacrm.kz';
-
 
 class PushNotificationService {
   private static instance: PushNotificationService;
@@ -37,7 +36,9 @@ class PushNotificationService {
     // Проверяем, включены ли уведомления
     const enabled = await this.isNotificationsEnabled();
     if (!enabled) {
-      console.log('⚠️ Уведомления отключены пользователем, пропускаем инициализацию');
+      console.log(
+        '⚠️ Уведомления отключены пользователем, пропускаем инициализацию',
+      );
       return;
     }
 
@@ -45,13 +46,13 @@ class PushNotificationService {
       console.log('⚠️ Push notifications уже инициализированы, пропускаем');
       return;
     }
-    
+
     console.log('🔔 Начало инициализации push notifications...');
     console.log('📱 Платформа:', Platform.OS, 'Версия:', Platform.Version);
 
     // Android: не вызываем нативный код, пока MainActivity не готова (useAuth стартует очень рано)
     if (Platform.OS === 'android') {
-      await new Promise<void>((resolve) => setTimeout(resolve, 1200));
+      await new Promise<void>(resolve => setTimeout(resolve, 1200));
       await this.waitUntilActivityReadyForPermissions();
     }
 
@@ -64,7 +65,9 @@ class PushNotificationService {
     const granted = await this.requestPermission();
     if (!granted) {
       console.log('❌ Пользователь отклонил разрешение на уведомления');
-      console.log('💡 Проверьте настройки приложения: Настройки → Приложения → tibetskayaClientApp → Уведомления');
+      console.log(
+        '💡 Проверьте настройки приложения: Настройки → Приложения → tibetskayaClientApp → Уведомления',
+      );
       return;
     }
 
@@ -72,16 +75,16 @@ class PushNotificationService {
     if (Platform.OS === 'ios') {
       try {
         console.log('⏳ iOS: Регистрируем устройство в APNs...');
-        
+
         // Этот метод сам связывается с iOS и ждет получения APNs токена
         // Если capability "Push Notifications" не включена, он упадет или зависнет
         await messaging().registerDeviceForRemoteMessages();
-        
+
         console.log('✅ iOS: Устройство зарегистрировано в APNs');
       } catch (error) {
         console.error('❌ Ошибка регистрации в APNs:', error);
         // Если здесь ошибка, то getToken дальше 100% не сработает
-        return; 
+        return;
       }
     }
 
@@ -91,7 +94,7 @@ class PushNotificationService {
       this.initializeNotificationListeners();
       this.isInitialized = true;
     } catch (error) {
-       console.error('❌ Ошибка инициализации FCM:', error);
+      console.error('❌ Ошибка инициализации FCM:', error);
     }
   }
 
@@ -108,27 +111,39 @@ class PushNotificationService {
       // Проверяем, не зарегистрировано ли уже устройство
       const isRegistered = messaging().isDeviceRegisteredForRemoteMessages;
       if (isRegistered) {
-        console.log('✅ iOS: Устройство уже зарегистрировано для удаленных сообщений');
+        console.log(
+          '✅ iOS: Устройство уже зарегистрировано для удаленных сообщений',
+        );
         return;
       }
 
-      console.log('🔍 iOS: Регистрация устройства для удаленных сообщений в Firebase...');
+      console.log(
+        '🔍 iOS: Регистрация устройства для удаленных сообщений в Firebase...',
+      );
       await messaging().registerDeviceForRemoteMessages();
-      console.log('✅ iOS: Устройство успешно зарегистрировано для удаленных сообщений');
+      console.log(
+        '✅ iOS: Устройство успешно зарегистрировано для удаленных сообщений',
+      );
     } catch (error: any) {
       const errorCode = error?.code || 'unknown';
       const errorMessage = error?.message || String(error);
-      
+
       console.error('❌ iOS: Ошибка регистрации устройства:', errorMessage);
       console.error('   Код:', errorCode);
-      
+
       // Если это ошибка "system did not respond", возможно APNs токен еще не получен
       if (errorCode === 'messaging/unknown-error') {
-        console.error('   ⚠️ Возможно, APNs токен еще не получен или не установлен в Firebase Messaging');
-        console.error('   Проверьте логи AppDelegate - должен быть "✅ [AppDelegate] APNs token registered"');
-        console.error('   Попробуем получить токен все равно, возможно регистрация произойдет автоматически');
+        console.error(
+          '   ⚠️ Возможно, APNs токен еще не получен или не установлен в Firebase Messaging',
+        );
+        console.error(
+          '   Проверьте логи AppDelegate - должен быть "✅ [AppDelegate] APNs token registered"',
+        );
+        console.error(
+          '   Попробуем получить токен все равно, возможно регистрация произойдет автоматически',
+        );
       }
-      
+
       // Не пробрасываем ошибку дальше, пробуем получить токен все равно
       // Firebase может автоматически зарегистрировать устройство при вызове getToken()
     }
@@ -142,7 +157,7 @@ class PushNotificationService {
   private async waitUntilActivityReadyForPermissions(): Promise<void> {
     if (Platform.OS === 'android' && AppState.currentState !== 'active') {
       await Promise.race([
-        new Promise<void>((resolve) => {
+        new Promise<void>(resolve => {
           const sub = AppState.addEventListener(
             'change',
             (next: AppStateStatus) => {
@@ -150,14 +165,14 @@ class PushNotificationService {
                 sub.remove();
                 resolve();
               }
-            }
+            },
           );
         }),
-        new Promise<void>((resolve) => setTimeout(resolve, 10000)),
+        new Promise<void>(resolve => setTimeout(resolve, 10000)),
       ]);
     }
 
-    await new Promise<void>((resolve) => {
+    await new Promise<void>(resolve => {
       InteractionManager.runAfterInteractions(() => {
         // После первого кадра MainActivity обычно уже прикреплена
         setTimeout(() => resolve(), Platform.OS === 'android' ? 1200 : 0);
@@ -174,7 +189,9 @@ class PushNotificationService {
 
       // Для Android 13+ нужно запрашивать POST_NOTIFICATIONS отдельно
       if (Platform.OS === 'android' && Platform.Version >= 33) {
-        console.log('📱 Android 13+: Запрашиваем разрешение POST_NOTIFICATIONS');
+        console.log(
+          '📱 Android 13+: Запрашиваем разрешение POST_NOTIFICATIONS',
+        );
         let granted: string = PermissionsAndroid.RESULTS.DENIED;
         const maxAttempts = 4;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -184,11 +201,12 @@ class PushNotificationService {
               PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
               {
                 title: 'Разрешение на уведомления',
-                message: 'Приложению нужно разрешение для отправки уведомлений о заказах',
+                message:
+                  'Приложению нужно разрешение для отправки уведомлений о заказах',
                 buttonNeutral: 'Позже',
                 buttonNegative: 'Отмена',
                 buttonPositive: 'OK',
-              }
+              },
             );
             break;
           } catch (err: unknown) {
@@ -197,9 +215,9 @@ class PushNotificationService {
               msg.includes('Activity') || msg.includes('IllegalStateException');
             if (isActivity && attempt < maxAttempts) {
               console.warn(
-                `[Push] POST_NOTIFICATIONS попытка ${attempt}/${maxAttempts}, ждём Activity...`
+                `[Push] POST_NOTIFICATIONS попытка ${attempt}/${maxAttempts}, ждём Activity...`,
               );
-              await new Promise<void>((r) => setTimeout(r, 400 * attempt));
+              await new Promise<void>(r => setTimeout(r, 400 * attempt));
               continue;
             }
             throw err;
@@ -211,12 +229,12 @@ class PushNotificationService {
           return false;
         }
         console.log('✅ Android: Разрешение POST_NOTIFICATIONS получено');
-        await new Promise<void>((r) => setTimeout(r, 300));
+        await new Promise<void>(r => setTimeout(r, 300));
       }
 
       // Запрашиваем разрешение через Firebase Messaging
       const status = await messaging().requestPermission();
-  
+
       if (
         status === messaging.AuthorizationStatus.AUTHORIZED ||
         status === messaging.AuthorizationStatus.PROVISIONAL
@@ -224,7 +242,7 @@ class PushNotificationService {
         console.log('✅ Firebase: Разрешение на уведомления получено:', status);
         return true;
       }
-      
+
       console.log('❌ Firebase: Разрешение на уведомления отклонено:', status);
       return false;
     } catch (e) {
@@ -253,14 +271,16 @@ class PushNotificationService {
           }
         } catch (error: any) {
           const errorCode = error?.code || 'unknown';
-          
+
           // Если это ошибка unregistered и это не последняя попытка
           if (errorCode === 'messaging/unregistered' && attempt < maxRetries) {
-            console.log(`⚠️ Устройство еще не зарегистрировано, попытка ${attempt}/${maxRetries}`);
+            console.log(
+              `⚠️ Устройство еще не зарегистрировано, попытка ${attempt}/${maxRetries}`,
+            );
             await new Promise(resolve => setTimeout(resolve, retryDelay));
             continue;
           }
-          
+
           // Если это последняя попытка, пробрасываем ошибку
           if (attempt === maxRetries) {
             throw error;
@@ -276,8 +296,8 @@ class PushNotificationService {
       this.fcmToken = token;
       await AsyncStorage.setItem('fcmToken', token);
 
-      const mail = await AsyncStorage.getItem('userMail');
-      if (mail) {
+      const userId = await AsyncStorage.getItem('userId');
+      if (userId) {
         await this.sendTokenToServer(token);
       }
 
@@ -286,12 +306,16 @@ class PushNotificationService {
       console.error('❌ Ошибка получения FCM токена:', error);
       console.error('   Код ошибки:', error?.code);
       console.error('   Сообщение:', error?.message);
-      
+
       if (error?.code === 'messaging/unregistered') {
-        console.error('   ⚠️ Устройство не зарегистрировано для удаленных сообщений');
-        console.error('   Проверьте логи AppDelegate - должен быть "✅ [AppDelegate] APNs token registered"');
+        console.error(
+          '   ⚠️ Устройство не зарегистрировано для удаленных сообщений',
+        );
+        console.error(
+          '   Проверьте логи AppDelegate - должен быть "✅ [AppDelegate] APNs token registered"',
+        );
       }
-      
+
       return null;
     }
   }
@@ -301,20 +325,17 @@ class PushNotificationService {
    */
   private async sendTokenToServer(token: string): Promise<void> {
     try {
-      const userMail = await AsyncStorage.getItem('userMail');
-      if (!userMail) {
-        console.log('⚠️ Email пользователя не найден, токен не отправлен');
+      const userId = await AsyncStorage.getItem('userId');
+      if (!userId) {
+        console.log('⚠️ Id пользователя не найден, токен не отправлен');
         return;
       }
 
-      await axios.post(
-        `${API_URL}/saveFcmToken`,
-        {
-          mail: userMail,
-          fcmToken: token,
-          platform: Platform.OS,
-        }
-      );
+      await axios.post(`${API_URL}/saveFcmToken`, {
+        clientId: userId,
+        fcmToken: token,
+        platform: Platform.OS,
+      });
       console.log('✅ Токен успешно отправлен на сервер');
     } catch (error: any) {
       console.error('❌ Ошибка отправки токена на сервер:', error);
@@ -348,10 +369,14 @@ class PushNotificationService {
   /**
    * Показ локального уведомления (для foreground)
    */
-  private async displayLocalNotification(title: string, body: string, data?: any) {
+  private async displayLocalNotification(
+    title: string,
+    body: string,
+    data?: any,
+  ) {
     try {
       let channelId = 'orders_v2';
-      
+
       // Создаем канал для Android (если еще не создан)
       if (Platform.OS === 'android') {
         channelId = await notifee.createChannel({
@@ -378,7 +403,7 @@ class PushNotificationService {
           sound: 'default',
         },
       });
-      
+
       console.log('✅ Локальное уведомление показано');
     } catch (error) {
       console.error('❌ Ошибка показа локального уведомления:', error);
@@ -395,7 +420,9 @@ class PushNotificationService {
   private initializeNotificationListeners() {
     // Защита от повторной регистрации обработчиков
     if (this.listenersRegistered) {
-      console.log('⚠️ Обработчики уведомлений уже зарегистрированы, пропускаем');
+      console.log(
+        '⚠️ Обработчики уведомлений уже зарегистрированы, пропускаем',
+      );
       console.trace('Стек вызовов:');
       return;
     }
@@ -410,7 +437,7 @@ class PushNotificationService {
     this.createNotificationChannel();
 
     // Foreground уведомления (приложение открыто)
-    const unsubscribeOnMessage = messaging().onMessage(async (remoteMessage) => {
+    const unsubscribeOnMessage = messaging().onMessage(async remoteMessage => {
       const data = remoteMessage.data;
       const isSilentBalance =
         data?.newStatus === 'balanceTopUpSuccess' ||
@@ -418,7 +445,9 @@ class PushNotificationService {
 
       // Служебный пуш после Payplus: только обновление профиля/баланса, без баннера (даже если уведомления «выкл» в настройках приложения)
       if (isSilentBalance) {
-        console.log('💰 Служебное обновление баланса (FCM data), баннер не показываем');
+        console.log(
+          '💰 Служебное обновление баланса (FCM data), баннер не показываем',
+        );
         DeviceEventEmitter.emit('userProfileRefresh');
         return;
       }
@@ -429,11 +458,15 @@ class PushNotificationService {
         return;
       }
 
-      console.log('🟢 Уведомление на переднем плане (messageId:', remoteMessage.messageId, ')');
-      
+      console.log(
+        '🟢 Уведомление на переднем плане (messageId:',
+        remoteMessage.messageId,
+        ')',
+      );
+
       // Обрабатываем данные уведомления
       await this.handleNotificationData(remoteMessage);
-      
+
       // Показываем локальное уведомление через notifee (выглядит как системное)
       const title = remoteMessage.notification?.title ?? 'Новое уведомление';
       const body = remoteMessage.notification?.body ?? 'Сообщение';
@@ -441,15 +474,16 @@ class PushNotificationService {
     });
 
     // Уведомление открыто из фона
-    const unsubscribeOnNotificationOpenedApp = messaging().onNotificationOpenedApp(async (remoteMessage) => {
-      console.log('👆 Открыто из фона:', remoteMessage);
-      await this.handleNotificationData(remoteMessage);
-    });
+    const unsubscribeOnNotificationOpenedApp =
+      messaging().onNotificationOpenedApp(async remoteMessage => {
+        console.log('👆 Открыто из фона:', remoteMessage);
+        await this.handleNotificationData(remoteMessage);
+      });
 
     // Уведомление открыто при холодном старте (вызывается один раз при запуске)
     messaging()
       .getInitialNotification()
-      .then(async (remoteMessage) => {
+      .then(async remoteMessage => {
         if (remoteMessage) {
           console.log('🚀 Открыто при холодном старте:', remoteMessage);
           await this.handleNotificationData(remoteMessage);
@@ -457,22 +491,24 @@ class PushNotificationService {
       });
 
     // Обновление токена
-    const unsubscribeOnTokenRefresh = messaging().onTokenRefresh(async (newToken) => {
-      console.log('🔄 Обновлённый FCM токен:', newToken);
-      this.fcmToken = newToken;
-      await AsyncStorage.setItem('fcmToken', newToken);
+    const unsubscribeOnTokenRefresh = messaging().onTokenRefresh(
+      async newToken => {
+        console.log('🔄 Обновлённый FCM токен:', newToken);
+        this.fcmToken = newToken;
+        await AsyncStorage.setItem('fcmToken', newToken);
 
-      const userMail = await AsyncStorage.getItem('userMail');
-      if (userMail) {
-        await this.sendTokenToServer(newToken);
-      }
-    });
+        const userMail = await AsyncStorage.getItem('userMail');
+        if (userMail) {
+          await this.sendTokenToServer(newToken);
+        }
+      },
+    );
 
     // Сохраняем функции отписки
     this.unsubscribeFunctions.push(
       unsubscribeOnMessage,
       unsubscribeOnNotificationOpenedApp,
-      unsubscribeOnTokenRefresh
+      unsubscribeOnTokenRefresh,
     );
 
     this.listenersRegistered = true;
@@ -503,15 +539,20 @@ class PushNotificationService {
       return;
     }
 
-    console.log('📦 Данные уведомления:', JSON.stringify(remoteMessage.data, null, 2));
+    console.log(
+      '📦 Данные уведомления:',
+      JSON.stringify(remoteMessage.data, null, 2),
+    );
 
-    const { newStatus, orderId, message, messageStatus } = remoteMessage.data;
+    const {newStatus, orderId, message, messageStatus} = remoteMessage.data;
     const status = newStatus || messageStatus;
 
     // Маркетинговые пуши: только системный баннер, без синхронизации заказов
     // (иначе orderStatusUpdated тянет чужой orderId через getOrder и может подмешать заказ в список)
     if (status === 'courierNearby') {
-      console.log('ℹ️ Маркетинговое уведомление (курьер рядом), пропускаем обновление заказов');
+      console.log(
+        'ℹ️ Маркетинговое уведомление (курьер рядом), пропускаем обновление заказов',
+      );
       return;
     }
 
@@ -526,9 +567,10 @@ class PushNotificationService {
     // Обработка сообщений поддержки
     if (status === 'newSupportMessage' && message) {
       try {
-        const messageData = typeof message === 'string' ? JSON.parse(message) : message;
+        const messageData =
+          typeof message === 'string' ? JSON.parse(message) : message;
         console.log('💬 Обработка нового сообщения поддержки:', messageData);
-        
+
         // Отправляем событие для обновления чата
         console.log('📢 Отправка события newSupportMessage');
         DeviceEventEmitter.emit('newSupportMessage', messageData);
@@ -544,8 +586,12 @@ class PushNotificationService {
     // Обработка сообщений чата с курьером
     if (status === 'newOrderChatMessage' && message) {
       try {
-        const messageData = typeof message === 'string' ? JSON.parse(message) : message;
-        console.log('💬 Обработка нового сообщения чата с курьером:', messageData);
+        const messageData =
+          typeof message === 'string' ? JSON.parse(message) : message;
+        console.log(
+          '💬 Обработка нового сообщения чата с курьером:',
+          messageData,
+        );
         DeviceEventEmitter.emit('newOrderChatMessage', messageData);
         return;
       } catch (error) {
@@ -626,9 +672,9 @@ class PushNotificationService {
    * Повторная отправка токена на сервер (после логина)
    */
   async resendToken() {
-    const userMail = await AsyncStorage.getItem('userMail');
-    if (!userMail) {
-      console.log('⚠️ userMail не найден, пропускаем отправку токена');
+    const userId = await AsyncStorage.getItem('userId');
+    if (!userId) {
+      console.log('⚠️ userId не найден, пропускаем отправку токена');
       return;
     }
 
@@ -645,14 +691,14 @@ class PushNotificationService {
    */
   async removeTokenFromServer(): Promise<void> {
     try {
-      const userMail = await AsyncStorage.getItem('userMail');
-      const token = this.fcmToken || await AsyncStorage.getItem('fcmToken');
-      if (!userMail || !token) {
+      const userId = await AsyncStorage.getItem('userId');
+      const token = this.fcmToken || (await AsyncStorage.getItem('fcmToken'));
+      if (!userId || !token) {
         console.log('⚠️ Нет данных для удаления токена с сервера');
         return;
       }
       await axios.post(`${API_URL}/removeFcmToken`, {
-        mail: userMail,
+        clientId: userId,
         fcmToken: token,
       });
       console.log('✅ FCM токен удален с сервера');
@@ -675,20 +721,28 @@ class PushNotificationService {
     try {
       if (Platform.OS === 'android' && Platform.Version >= 33) {
         const granted = await PermissionsAndroid.check(
-          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
         );
-        console.log('📱 Android 13+: Разрешение POST_NOTIFICATIONS:', granted ? '✅' : '❌');
+        console.log(
+          '📱 Android 13+: Разрешение POST_NOTIFICATIONS:',
+          granted ? '✅' : '❌',
+        );
         if (!granted) {
           return false;
         }
       }
 
       const authStatus = await messaging().hasPermission();
-      const isAuthorized = 
+      const isAuthorized =
         authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
         authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-      
-      console.log('📱 Firebase разрешение:', isAuthorized ? '✅' : '❌', 'Статус:', authStatus);
+
+      console.log(
+        '📱 Firebase разрешение:',
+        isAuthorized ? '✅' : '❌',
+        'Статус:',
+        authStatus,
+      );
       return isAuthorized;
     } catch (error) {
       console.error('❌ Ошибка проверки разрешений:', error);
@@ -704,12 +758,12 @@ class PushNotificationService {
       await AsyncStorage.setItem('notificationsEnabled', 'true');
       this.notificationsEnabled = true;
       console.log('✅ Уведомления включены');
-      
+
       // Если еще не инициализированы, инициализируем
       if (!this.isInitialized) {
         await this.init();
       }
-      
+
       return true;
     } catch (error) {
       console.error('❌ Ошибка включения уведомлений:', error);
@@ -725,14 +779,14 @@ class PushNotificationService {
       await AsyncStorage.setItem('notificationsEnabled', 'false');
       this.notificationsEnabled = false;
       console.log('❌ Уведомления отключены');
-      
+
       // Отписываемся от всех обработчиков
       this.unsubscribeAllListeners();
       this.isInitialized = false;
-      
+
       // Удаляем токен с сервера (опционально)
       // Можно добавить API endpoint для удаления токена
-      
+
       return true;
     } catch (error) {
       console.error('❌ Ошибка отключения уведомлений:', error);
@@ -749,7 +803,10 @@ class PushNotificationService {
       // По умолчанию уведомления включены (если значение не установлено)
       const enabled = stored !== 'false';
       this.notificationsEnabled = enabled;
-      console.log('📱 Статус уведомлений:', enabled ? '✅ Включены' : '❌ Отключены');
+      console.log(
+        '📱 Статус уведомлений:',
+        enabled ? '✅ Включены' : '❌ Отключены',
+      );
       return enabled;
     } catch (error) {
       console.error('❌ Ошибка проверки статуса уведомлений:', error);

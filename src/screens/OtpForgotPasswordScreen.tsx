@@ -1,14 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Dimensions, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, Keyboard } from 'react-native';
 import { apiService } from '../api/services';
+import { StableImage } from '../components';
 
 const OTP_LENGTH = 6;
 const screenWidth = Dimensions.get('window').width
 
-const OtpForgotPasswordScreen: React.FC<{ navigation: any, route: { params: { mail: string } } }> = ({ navigation, route }: { navigation: any, route: { params: { mail: string } } }) => {
+const OtpForgotPasswordScreen: React.FC<{ navigation: any, route: { params: { mail?: string; phone?: string } } }> = ({ navigation, route }: { navigation: any, route: { params: { mail?: string; phone?: string } } }) => {
     const mail = route?.params?.mail;
-    if (!mail) {
-        Alert.alert("Ошибка", "Некорректный email");
+    const phone = route?.params?.phone;
+    const identifier = phone ? { phone } : { mail };
+    if (!mail && !phone) {
+        Alert.alert("Ошибка", "Некорректный телефон или email");
         return;
     }
     const [code, setCode] = useState<string[]>(Array(OTP_LENGTH).fill(''));
@@ -43,10 +46,10 @@ const OtpForgotPasswordScreen: React.FC<{ navigation: any, route: { params: { ma
             if (fullCode.length === OTP_LENGTH) {
                 Keyboard.dismiss(); // Скрываем клавиатуру
                 
-                const res = await apiService.codeConfirmForgotPassword(mail, fullCode);
+                const res = await apiService.codeConfirmForgotPassword(identifier, fullCode);
                 console.log("res in otp = ", res);
                 if (res.success) {
-                    navigation.navigate("NewPassword", {mail});
+                    navigation.navigate("NewPassword", identifier);
                 } else {
                     Alert.alert("Ошибка", res.message);
                 }
@@ -55,7 +58,7 @@ const OtpForgotPasswordScreen: React.FC<{ navigation: any, route: { params: { ma
     };
     
     const handleResendCode = async () => {
-        const response = await apiService.sendMailForgotPassword(mail);
+        const response = await apiService.sendMailForgotPassword(identifier);
         if (response.success) {
             console.log("response in otp = ", response);
             setTimer(59);
@@ -89,6 +92,11 @@ const OtpForgotPasswordScreen: React.FC<{ navigation: any, route: { params: { ma
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={styles.container}
         >
+            <TouchableOpacity onPress={() => {navigation.goBack();}} 
+                style={{padding: 8, backgroundColor: '#EFEFEF', borderRadius: 8, position: 'absolute', top: 30, left: 16, zIndex: 1000}}
+            >
+                <StableImage source={require('../assets/arrowBack.png')} style={{width: 24, height: 24}} />
+            </TouchableOpacity>
             <View style={styles.imageContainer}>
                 <Image
                 source={require('../assets/loginBanner.png')} 
@@ -98,7 +106,9 @@ const OtpForgotPasswordScreen: React.FC<{ navigation: any, route: { params: { ma
             </View>
             <View style={styles.content}>
                 <Text style={styles.title}>Дождитесь кода из сообщения</Text>
-                <Text style={styles.subtitle}>Код отправлен на почту {mail}</Text>
+                <Text style={styles.subtitle}>
+                    {phone ? `Код отправлен в WhatsApp на ${phone}` : `Код отправлен на почту ${mail}`}
+                </Text>
 
                 <View style={styles.codeContainer}>
                 {code.map((digit, index) => (
@@ -159,6 +169,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: 'white',
+        position: 'relative',
     },
     imageContainer: {
         width: '100%',

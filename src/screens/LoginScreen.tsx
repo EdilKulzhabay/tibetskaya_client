@@ -4,11 +4,14 @@ import OutlinedFilledLabelInput from "../components/OutlinedFilledLabelInput";
 import { apiService } from "../api/services";
 import { useAuth } from "../hooks/useAuth";
 import { useFocusEffect } from '@react-navigation/native';
+import StableImage from '../components/StableImage';
 const screenWidth = Dimensions.get('window').width
 
 const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const { saveUserData } = useAuth();
+    const [loginMethod, setLoginMethod] = useState<'phone' | 'mail'>('phone');
     const [mail, setMail] = useState("")
+    const [phone, setPhone] = useState("")
     const [password, setPassword] = useState("")
     const [loading, setLoading] = useState(false);
 
@@ -29,7 +32,11 @@ const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
     const handleLogin = async () => {
         setLoading(true);
-        const res = await apiService.clientLogin({mail: mail.trim(), password: password.trim()});
+        const res = await apiService.clientLogin(
+            loginMethod === 'phone'
+                ? { phone: phone.trim(), password: password.trim() }
+                : { mail: mail.trim(), password: password.trim() }
+        );
         if (res.success) {
             // Передаем весь ответ сервера (включая токены)
             setLoading(false);
@@ -43,6 +50,11 @@ const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     }
     return (
         <ScrollView style={styles.container}>
+            <TouchableOpacity onPress={() => {navigation.goBack();}} 
+                style={{padding: 8, backgroundColor: '#EFEFEF', borderRadius: 8, position: 'absolute', top: 30, left: 16, zIndex: 1000}}
+            >
+                <StableImage source={require('../assets/arrowBack.png')} style={{width: 24, height: 24}} />
+            </TouchableOpacity>
             <View style={styles.bannerContainer}>
                 <Image
                     source={require('../assets/loginBanner.png')} 
@@ -62,24 +74,44 @@ const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
             <View style={styles.contentContainer}>
                 <View>
-                    <OutlinedFilledLabelInput
-                        label="Введите почту" 
-                        keyboardType="email-address" 
-                        value={mail} 
-                        onChangeText={(text) => setMail(text)} 
-                        onRightIconPress={() => {}}
-                        autoCapitalize="none"
-                    />
+                    {loginMethod === 'phone' ? (
+                        <OutlinedFilledLabelInput
+                            label="Номер телефона"
+                            keyboardType="phone-pad"
+                            value={phone}
+                            onChangeText={(text) => setPhone(text)}
+                            mask="phone"
+                            onRightIconPress={() => {}}
+                        />
+                    ) : (
+                        <OutlinedFilledLabelInput
+                            label="Введите почту"
+                            keyboardType="email-address"
+                            value={mail}
+                            onChangeText={(text) => setMail(text)}
+                            onRightIconPress={() => {}}
+                            autoCapitalize="none"
+                        />
+                    )}
 
                     <OutlinedFilledLabelInput
-                        label="Введите пароль" 
-                        keyboardType="default" 
-                        value={password} 
-                        onChangeText={(text) => setPassword(text)} 
+                        label="Введите пароль"
+                        keyboardType="default"
+                        value={password}
+                        onChangeText={(text) => setPassword(text)}
                         onRightIconPress={() => {}}
                         isPassword={true}
                         autoCapitalize="none"
                     />
+
+                    <TouchableOpacity
+                        onPress={() => setLoginMethod(loginMethod === 'phone' ? 'mail' : 'phone')}
+                        style={styles.forgotPassword}
+                    >
+                        <Text style={styles.forgotPasswordText}>
+                            {loginMethod === 'phone' ? 'Войти через почту' : 'Войти через телефон'}
+                        </Text>
+                    </TouchableOpacity>
 
                     <TouchableOpacity onPress={() => {navigation.navigate("ForgotPassword")}} style={styles.forgotPassword}>
                         <Text style={styles.forgotPasswordText}>Забыли пароль?</Text>
@@ -110,6 +142,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: 'white',
+        position: 'relative',
     },
     bannerContainer: {
         width: '100%',

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, {useEffect, useState, useCallback} from 'react';
 import {
   View,
   Text,
@@ -13,23 +13,27 @@ import {
   Platform,
   Share,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { launchImageLibrary, ImagePickerResponse } from 'react-native-image-picker';
-import { NavButton, Navigation } from '../components';
+import {useFocusEffect} from '@react-navigation/native';
+import {
+  launchImageLibrary,
+  ImagePickerResponse,
+} from 'react-native-image-picker';
+import {NavButton, Navigation} from '../components';
 import ButtonWithSwitch from '../components/ButtonWithSwitch';
-import { useAuth } from '../hooks';
-import { useTopUpBalance } from '../context/TopUpBalanceContext';
-import { profileImageStorage } from '../utils/storage';
+import {useAuth} from '../hooks';
+import {useTopUpBalance} from '../context/TopUpBalanceContext';
+import {profileImageStorage} from '../utils/storage';
 import pushNotificationService from '../services/pushNotifications';
-import { apiService } from '../api/services';
+import {apiService} from '../api/services';
+import {getClientMongoId} from '../utils/clientId';
 
 interface ProfileScreenProps {
   navigation: any;
 }
 
-const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
-  const { user, logout, loadingState, refreshUserData } = useAuth();
-  const { openTopUpModal } = useTopUpBalance();
+const ProfileScreen: React.FC<ProfileScreenProps> = ({navigation}) => {
+  const {user, logout, loadingState, refreshUserData} = useAuth();
+  const {openTopUpModal} = useTopUpBalance();
   const [notificationSwitchValue, setNotificationSwitchValue] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [language, setLanguage] = useState('Русский');
@@ -38,7 +42,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   // Загружаем сохраненное фото профиля при смене аккаунта
   useEffect(() => {
     const loadProfileImage = async () => {
-      if (!user?.mail) {
+      if (!getClientMongoId(user)) {
         setProfileImageUri(null);
         return;
       }
@@ -54,7 +58,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       }
     };
     loadProfileImage();
-  }, [user?.mail]);
+  }, [user]);
 
   // Загружаем состояние уведомлений при монтировании компонента
   useEffect(() => {
@@ -72,11 +76,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   // Обработчик переключения уведомлений
   const handleNotificationToggle = async () => {
     const newValue = !notificationSwitchValue;
-    
+
     try {
       // Оптимистично обновляем UI
       setNotificationSwitchValue(newValue);
-      
+
       if (newValue) {
         // Включаем уведомления
         const success = await pushNotificationService.enableNotifications();
@@ -84,7 +88,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           Alert.alert(
             'Ошибка',
             'Не удалось включить уведомления. Проверьте разрешения в настройках приложения.',
-            [{ text: 'OK' }]
+            [{text: 'OK'}],
           );
           setNotificationSwitchValue(false);
         }
@@ -92,19 +96,23 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         // Отключаем уведомления
         const success = await pushNotificationService.disableNotifications();
         if (!success) {
-          Alert.alert('Ошибка', 'Не удалось отключить уведомления', [{ text: 'OK' }]);
+          Alert.alert('Ошибка', 'Не удалось отключить уведомления', [
+            {text: 'OK'},
+          ]);
           setNotificationSwitchValue(true);
         } else {
           Alert.alert(
             'Уведомления отключены',
             'Вы больше не будете получать push-уведомления',
-            [{ text: 'OK' }]
+            [{text: 'OK'}],
           );
         }
       }
     } catch (error) {
       console.error('Ошибка при переключении уведомлений:', error);
-      Alert.alert('Ошибка', 'Не удалось изменить настройки уведомлений', [{ text: 'OK' }]);
+      Alert.alert('Ошибка', 'Не удалось изменить настройки уведомлений', [
+        {text: 'OK'},
+      ]);
       // Возвращаем предыдущее значение
       setNotificationSwitchValue(!newValue);
     }
@@ -119,10 +127,21 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
   useFocusEffect(
     useCallback(() => {
-      if (user?.mail && loadingState === 'success' && !user?.referralCode) {
+      if (
+        getClientMongoId(user) &&
+        loadingState === 'success' &&
+        !user?.referralCode
+      ) {
         void refreshUserData();
       }
-    }, [user?.mail, user?.referralCode, loadingState, refreshUserData])
+      // clientId/referralCode вместо user целиком — иначе новый объект user после каждого
+      // refreshUserData() пересоздаёт этот колбэк и useFocusEffect гоняет запрос по кругу.
+    }, [
+      getClientMongoId(user),
+      loadingState,
+      user?.referralCode,
+      refreshUserData,
+    ]),
   );
 
   // Функция для выбора фото
@@ -155,13 +174,19 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             }
           }
         }
-      }
+      },
     );
   };
 
   // Показываем загрузку пока данные пользователя загружаются
   if (loadingState === 'loading') {
-    return <ActivityIndicator size="large" color="#DC1818" style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }} />;
+    return (
+      <ActivityIndicator
+        size="large"
+        color="#DC1818"
+        style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}
+      />
+    );
   }
 
   // Если пользователь не авторизован после загрузки, не рендерим компонент
@@ -175,48 +200,74 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       <View style={styles.header}>
         <View style={{width: 24}} />
         <Text style={styles.profileTitle}>Профиль</Text>
-        <TouchableOpacity style={styles.logInOutButton} onPress={async () => {
-          await logout()
-          navigation.navigate('Home');
-        }}>
-          <Image source={require('../assets/logInOut.png')} style={styles.logInOutIcon} />
+        <TouchableOpacity
+          style={styles.logInOutButton}
+          onPress={async () => {
+            await logout();
+            navigation.navigate('Home');
+          }}>
+          <Image
+            source={require('../assets/logInOut.png')}
+            style={styles.logInOutIcon}
+          />
         </TouchableOpacity>
       </View>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.profileContainer}>
           <View style={styles.profileImageContainer}>
             {profileImageUri ? (
-              <Image source={{ uri: profileImageUri }} style={styles.profileImageCustom} />
+              <Image
+                source={{uri: profileImageUri}}
+                style={styles.profileImageCustom}
+              />
             ) : (
               <View style={{padding: 25}}>
-                <Image source={require('../assets/profileEmptyImage.png')} style={styles.profileImage} />
+                <Image
+                  source={require('../assets/profileEmptyImage.png')}
+                  style={styles.profileImage}
+                />
               </View>
             )}
           </View>
-          <TouchableOpacity style={styles.profileImageButton} onPress={handleSelectPhoto}>
-            <Text style={styles.profileImageButtonText}>Изменить{'\n'}фото</Text>
+          <TouchableOpacity
+            style={styles.profileImageButton}
+            onPress={handleSelectPhoto}>
+            <Text style={styles.profileImageButtonText}>
+              Изменить{'\n'}фото
+            </Text>
           </TouchableOpacity>
           <Text style={styles.profileName}>{user?.userName}</Text>
         </View>
 
-        <NavButton title="Изменить данные" onPress={() => navigation.navigate('ChangeData')} icon={require('../assets/edit.png')} />
+        <NavButton
+          title="Изменить данные"
+          onPress={() => navigation.navigate('ChangeData')}
+          icon={require('../assets/edit.png')}
+        />
 
         {/* <NavButton title="Настройки" onPress={() => navigation.navigate('Settings')} icon={require('../assets/setting.png')} /> */}
-        
+
         {/* <NavButton title="Бонусы" onPress={() => navigation.navigate('Bonus')} icon={require('../assets/star.png')} /> */}
-        
-        <NavButton title="Мой кошелек" onPress={() => openTopUpModal()} icon={require('../assets/wallet.png')} />
+
+        <NavButton
+          title="Мой кошелек"
+          onPress={() => openTopUpModal()}
+          icon={require('../assets/wallet.png')}
+        />
 
         <View style={styles.referralBlock}>
           <Text style={styles.referralTitle}>Реферальный код</Text>
-          <Text style={styles.referralCodeText}>{user?.referralCode || 'Загрузка…'}</Text>
+          <Text style={styles.referralCodeText}>
+            {user?.referralCode || 'Загрузка…'}
+          </Text>
           <TouchableOpacity
             activeOpacity={0.75}
             onPress={async () => {
               let code = user?.referralCode;
-              if (!code && user?.mail) {
+              const clientId = getClientMongoId(user);
+              if (!code && clientId) {
                 try {
-                  const res = await apiService.getData(user.mail);
+                  const res = await apiService.getData(clientId);
                   code = res.client?.referralCode;
                   if (res.client) {
                     await refreshUserData();
@@ -234,14 +285,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               try {
                 await Share.share(
                   Platform.OS === 'ios'
-                    ? { message: msg }
-                    : { message: msg, title: 'Тибетская вода' }
+                    ? {message: msg}
+                    : {message: msg, title: 'Тибетская вода'},
                 );
               } catch {
                 /* отмена шеринга */
               }
-            }}
-          >
+            }}>
             <Text style={styles.referralTapHint}>Поделиться</Text>
           </TouchableOpacity>
         </View>
@@ -250,15 +300,42 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
         {/* <NavButton title="Тарифы" onPress={() => navigation.navigate('Tarrifs')} icon={require('../assets/tarifs.png')} additioinalText="Standard" /> */}
 
-        <View style={{width: '100%', height: 1, backgroundColor: '#ECECEC', marginVertical: 12}} />
+        <View
+          style={{
+            width: '100%',
+            height: 1,
+            backgroundColor: '#ECECEC',
+            marginVertical: 12,
+          }}
+        />
 
-        <NavButton title="Адрес доставки" onPress={() => navigation.navigate('Address')} icon={require('../assets/location.png')} />
+        <NavButton
+          title="Адрес доставки"
+          onPress={() => navigation.navigate('Address')}
+          icon={require('../assets/location.png')}
+        />
 
-        <NavButton title="Язык" onPress={() => setLanguageModalVisible(true)} icon={require('../assets/language.png')}  additioinalText={language}/>
+        <NavButton
+          title="Язык"
+          onPress={() => setLanguageModalVisible(true)}
+          icon={require('../assets/language.png')}
+          additioinalText={language}
+        />
 
-        <ButtonWithSwitch title="Уведомления" icon={require('../assets/notification.png')} switchValue={notificationSwitchValue} onSwitchChange={() => { handleNotificationToggle(); }} />
+        <ButtonWithSwitch
+          title="Уведомления"
+          icon={require('../assets/notification.png')}
+          switchValue={notificationSwitchValue}
+          onSwitchChange={() => {
+            handleNotificationToggle();
+          }}
+        />
 
-        <NavButton title="Удалить аккаунт" onPress={() => navigation.navigate('DeleteAccount')} icon={require('../assets/trash.png')} />
+        <NavButton
+          title="Удалить аккаунт"
+          onPress={() => navigation.navigate('DeleteAccount')}
+          icon={require('../assets/trash.png')}
+        />
 
         <View style={{height: 120}} />
       </ScrollView>
@@ -268,16 +345,43 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         visible={languageModalVisible}
         onRequestClose={() => {}}
         transparent={true}
-        animationType="fade"
-      >
-        <TouchableOpacity style={styles.modalOverlay} onPress={() => setLanguageModalVisible(false)}>
-          <TouchableOpacity style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
+        animationType="fade">
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          onPress={() => setLanguageModalVisible(false)}>
+          <TouchableOpacity
+            style={styles.modalContainer}
+            onPress={e => e.stopPropagation()}>
             <Text>Выберите язык</Text>
-            <View style={{height: 1, backgroundColor: "#EDEDED", marginVertical: 16}} />
+            <View
+              style={{
+                height: 1,
+                backgroundColor: '#EDEDED',
+                marginVertical: 16,
+              }}
+            />
             <TouchableOpacity style={styles.modalButton}>
               <Text>Русский</Text>
-              <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: language === 'Русский' ? '#DC1818' : '#101010' }}>
-                {language === 'Русский' && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
+              <View
+                style={{
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  width: 16,
+                  height: 16,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: language === 'Русский' ? '#DC1818' : '#101010',
+                }}>
+                {language === 'Русский' && (
+                  <View
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: 5,
+                      backgroundColor: '#DC1818',
+                    }}
+                  />
+                )}
               </View>
             </TouchableOpacity>
             {/* <TouchableOpacity style={styles.modalButton}>
@@ -346,7 +450,7 @@ const styles = StyleSheet.create({
   profileTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: "#292D32"
+    color: '#292D32',
   },
   profileContainer: {
     flexDirection: 'column',
@@ -371,8 +475,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '500',
   },
-  profileImageButton: {
-  },
+  profileImageButton: {},
   profileImageButtonText: {
     fontSize: 12,
     fontWeight: '600',

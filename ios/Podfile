@@ -52,5 +52,22 @@ target 'tibetskayaClientApp' do
         end
       end
     end
+
+    # Xcode 26 (Apple clang 21): fmt 11.0.2 вычисляет FMT_USE_CONSTEVAL через безусловный
+    # #define (не #ifndef), поэтому внешний -DFMT_USE_CONSTEVAL=0 игнорируется — заголовок
+    # сам его переопределяет в 1 для любого clang >= 14 / с __cpp_consteval. Новый clang не
+    # может посчитать некоторые её consteval-конструкторы constant expression ("call to
+    # consteval function ... is not a constant expression" в format-inl.h). Патчим сам
+    # заголовок после каждого pod install — идемпотентно, безопасно перезапускать.
+    fmt_base_h = File.join(installer.sandbox.pod_dir("fmt").to_s, "include", "fmt", "base.h")
+    if File.exist?(fmt_base_h)
+      content = File.read(fmt_base_h)
+      patched = content.gsub(/#\s*define FMT_USE_CONSTEVAL 1\b/, "#define FMT_USE_CONSTEVAL 0")
+      if patched != content
+        File.chmod(0644, fmt_base_h)
+        File.write(fmt_base_h, patched)
+        Pod::UI.puts "Patched fmt/include/fmt/base.h: forced FMT_USE_CONSTEVAL=0".green
+      end
+    end
   end
 end

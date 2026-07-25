@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, {useState, useCallback, useEffect, useMemo, useRef} from 'react';
 import {
   View,
   Text,
@@ -12,69 +12,86 @@ import {
   Image,
   Platform,
 } from 'react-native';
-import { Header, Navigation, OrderBlock } from '../components';
-import { useFocusEffect } from '@react-navigation/native';
-import { apiService } from '../api/services';
-import { useAuth } from '../hooks/useAuth';
-import { useTopUpBalance } from '../context/TopUpBalanceContext';
-import { clientHasInvoiceLegalData } from '../utils/clientInvoiceProfile';
-import { getWalletOpFormForUser } from '../utils/invoiceClientOrderPayment';
+import {Header, Navigation, OrderBlock} from '../components';
+import {useFocusEffect} from '@react-navigation/native';
+import {apiService} from '../api/services';
+import {useAuth} from '../hooks/useAuth';
+import {useTopUpBalance} from '../context/TopUpBalanceContext';
+import {clientHasInvoiceLegalData} from '../utils/clientInvoiceProfile';
+import {getWalletOpFormForUser} from '../utils/invoiceClientOrderPayment';
 import ReferralPromoModal from '../components/ReferralPromoModal';
 import {
   computeNextDeliveryYmd,
   buildSelectableDeliveryDates,
   getDeliveryAcceptTextFromYmd,
 } from '../utils/orderDeliveryDate';
+import {getClientMongoId} from '../utils/clientId';
+import {resolveRepeatOrderAddress} from '../utils/orderAddress';
 
 const MONTH_NAMES = [
-  'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
+  'Январь',
+  'Февраль',
+  'Март',
+  'Апрель',
+  'Май',
+  'Июнь',
+  'Июль',
+  'Август',
+  'Сентябрь',
+  'Октябрь',
+  'Ноябрь',
+  'Декабрь',
 ];
 
 interface HistoryScreenProps {
   navigation?: any;
 }
 
-const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
-  const { user, loadingState, refreshUserData } = useAuth();
-  const { openTopUpModal } = useTopUpBalance();
+const HistoryScreen: React.FC<HistoryScreenProps> = ({navigation}) => {
+  const {user, loadingState, refreshUserData} = useAuth();
+  const {openTopUpModal} = useTopUpBalance();
+  /** Стабильный id вместо объекта user — refreshUserData() пересобирает user на каждый вызов. */
+  const clientId = getClientMongoId(user);
   const [orders, setOrders] = useState<any[]>([]);
   const [referralPromoVisible, setReferralPromoVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  const [notEnoughBalanceModalVisible, setNotEnoughBalanceModalVisible] = useState(false);
-  const currentUserMailRef = useRef<string | null>(null);
+  const [notEnoughBalanceModalVisible, setNotEnoughBalanceModalVisible] =
+    useState(false);
+  const currentUserIdRef = useRef<string | null>(null);
 
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [monthPickerVisible, setMonthPickerVisible] = useState(false);
   const [repeatDateModalVisible, setRepeatDateModalVisible] = useState(false);
-  const [repeatAvailableDates, setRepeatAvailableDates] = useState<{ value: string; label: string }[]>(
-    [],
-  );
+  const [repeatAvailableDates, setRepeatAvailableDates] = useState<
+    {value: string; label: string}[]
+  >([]);
 
   const repeatOrderDeliveryYmdRef = useRef<string | null>(null);
   const repeatTargetOrderRef = useRef<any>(null);
 
-  const getHistoryOrders = async (mailOverride?: string) => {
-    const mail = mailOverride ?? user?.mail;
-    if (mail && loadingState === 'success') {
-      apiService.getOrders(mail).then((res: any) => {
-        if (currentUserMailRef.current !== mail) {
-          return;
-        }
-        setOrders(res.orders);
-      }).catch((error) => {
-        console.error('Ошибка при получении истории заказов:', error);
-      });
+  const getHistoryOrders = async (clientIdOverride?: string) => {
+    const clientId = clientIdOverride ?? getClientMongoId(user);
+    if (clientId && loadingState === 'success') {
+      apiService
+        .getOrders(clientId)
+        .then((res: any) => {
+          if (currentUserIdRef.current !== clientId) {
+            return;
+          }
+          setOrders(res.orders);
+        })
+        .catch(error => {
+          console.error('Ошибка при получении истории заказов:', error);
+        });
     }
-  }
-
+  };
 
   useEffect(() => {
-    currentUserMailRef.current = user?.mail ?? null;
+    currentUserIdRef.current = clientId || null;
     setOrders([]);
     setSelectedPayment(null);
     setSelectedOrder(null);
@@ -83,60 +100,72 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
     setRepeatDateModalVisible(false);
     repeatOrderDeliveryYmdRef.current = null;
     repeatTargetOrderRef.current = null;
-  }, [user?.mail]);
+  }, [clientId]);
 
   useFocusEffect(
     useCallback(() => {
       // Ждем загрузки пользователя перед отправкой запроса
-      getHistoryOrders(user?.mail);
-    }, [user?.mail, loadingState])
+      getHistoryOrders(clientId);
+    }, [clientId, loadingState]),
   );
 
   // Подписка на обновления статусов заказов
   useEffect(() => {
     let isMounted = true;
-    
+
     const subscription = DeviceEventEmitter.addListener(
       'orderStatusUpdated',
-      async ({ orderId, newStatus }) => {
+      async ({orderId, newStatus}) => {
         // Проверяем, что компонент все еще смонтирован
         if (!isMounted) {
           return;
         }
-        
+
         // Проверяем наличие обязательных данных
         if (!orderId || !newStatus) {
-          console.warn('⚠️ HomeScreen: Неполные данные обновления заказа:', { orderId, newStatus });
+          console.warn('⚠️ HomeScreen: Неполные данные обновления заказа:', {
+            orderId,
+            newStatus,
+          });
           return;
         }
 
         const fetchOrder = async () => {
           const orderData = await apiService.getOrder(orderId);
           return orderData.order;
-        }
+        };
         const orderData = await fetchOrder();
         if (!orderData) {
-          console.warn('⚠️ HomeScreen: Не удалось получить данные заказа:', orderId);
+          console.warn(
+            '⚠️ HomeScreen: Не удалось получить данные заказа:',
+            orderId,
+          );
           return;
         }
 
         // Обновляем состояние заказов
         setOrders(prevOrders => {
-          
           // Защита от null/undefined
           if (!prevOrders || !Array.isArray(prevOrders)) {
             console.warn('⚠️ HomeScreen: prevOrders не является массивом');
             return orderData ? [orderData] : [];
           }
-          
-          const orderExists = prevOrders.some(order => order && order._id === orderId);
-          
+
+          const orderExists = prevOrders.some(
+            order => order && order._id === orderId,
+          );
+
           if (orderExists) {
             // Обновляем существующий заказ
             return prevOrders.map(order => {
               if (!order) return order;
               return order._id === orderId
-                ? { ...order, courierAggregator: orderData?.courierAggregator, status: newStatus, updatedAt: orderData?.updatedAt || new Date().toISOString() }
+                ? {
+                    ...order,
+                    courierAggregator: orderData?.courierAggregator,
+                    status: newStatus,
+                    updatedAt: orderData?.updatedAt || new Date().toISOString(),
+                  }
                 : order;
             });
           } else {
@@ -144,7 +173,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
             return orderData ? [orderData, ...prevOrders] : prevOrders;
           }
         });
-      }
+      },
     );
 
     return () => {
@@ -157,17 +186,22 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
    * Черновик повторного заказа для сервера: если клиент уйдёт оплачивать Kaspi QR
    * и не вернётся в приложение, сервер создаст этот заказ сам после зачисления баланса.
    */
-  const buildPendingOrderDraft = (opForm: string, deliveryYmd: string, order: any) => {
-    if (!user?.mail || !order) return undefined;
+  const buildPendingOrderDraft = (
+    opForm: string,
+    deliveryYmd: string,
+    order: any,
+  ) => {
+    const clientId = getClientMongoId(user);
+    if (!clientId || !order) return undefined;
     return {
-      mail: user.mail,
-      address: order.address,
+      clientId,
+      address: resolveRepeatOrderAddress(user, order.address),
       products: order.products,
-      clientNotes: order.clientNotes || [],
-      date: { d: deliveryYmd, time: '' },
+      clientNotes: [],
+      date: {d: deliveryYmd, time: ''},
       opForm,
-      needCall: order.needCall,
-      comment: order.comment,
+      needCall: true,
+      comment: '',
     };
   };
 
@@ -180,12 +214,15 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
     },
   ) => {
     const paymentValue = paymentOverride ?? selectedPayment?.value;
-    const orderRow = options?.order ?? selectedOrder ?? repeatTargetOrderRef.current;
+    const orderRow =
+      options?.order ?? selectedOrder ?? repeatTargetOrderRef.current;
     const skipBal = options?.skipBalanceCheck ?? false;
     const resolvedYmd =
-      (options?.deliveryYmd ?? repeatOrderDeliveryYmdRef.current) || computeNextDeliveryYmd(user);
+      (options?.deliveryYmd ?? repeatOrderDeliveryYmdRef.current) ||
+      computeNextDeliveryYmd(user);
+    const clientId = getClientMongoId(user);
 
-    if (!(user?.mail && orderRow)) return;
+    if (!(user && clientId && orderRow)) return;
 
     const b19 = Number(orderRow.products?.b19 || 0);
     const b12 = Number(orderRow.products?.b12 || 0);
@@ -198,17 +235,28 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
       if (user?.paymentMethod === 'balance' && paymentValue === 'credit') {
         if (user?.balance !== undefined && user.balance < orderSumMoney) {
           setPaymentModalVisible(false);
-          const deficit = Math.max(0, Math.ceil(orderSumMoney - Number(user.balance)));
+          const deficit = Math.max(
+            0,
+            Math.ceil(orderSumMoney - Number(user.balance)),
+          );
           const afterMoney = () => {
             const ymd = repeatOrderDeliveryYmdRef.current;
             const o = repeatTargetOrderRef.current ?? selectedOrder;
-            if (!ymd || !user.mail || !o) return;
-            void reloadOrder('credit', { order: o, deliveryYmd: ymd, skipBalanceCheck: true });
+            if (!ymd || !clientId || !o) return;
+            void reloadOrder('credit', {
+              order: o,
+              deliveryYmd: ymd,
+              skipBalanceCheck: true,
+            });
           };
           if (clientHasInvoiceLegalData(user)) {
             void openTopUpModal(String(deficit), {
               onTopUpSuccess: afterMoney,
-              pendingOrder: buildPendingOrderDraft('credit', resolvedYmd, orderRow),
+              pendingOrder: buildPendingOrderDraft(
+                'credit',
+                resolvedYmd,
+                orderRow,
+              ),
             });
           } else {
             void openTopUpModal(String(deficit), {
@@ -216,14 +264,24 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
               subtitle: 'Способы пополнения',
               showCashPayment: true,
               onCashPayment: () =>
-                void reloadOrder('fakt', { order: orderRow, deliveryYmd: resolvedYmd }),
+                void reloadOrder('fakt', {
+                  order: orderRow,
+                  deliveryYmd: resolvedYmd,
+                }),
               onTopUpSuccess: afterMoney,
-              pendingOrder: buildPendingOrderDraft('credit', resolvedYmd, orderRow),
+              pendingOrder: buildPendingOrderDraft(
+                'credit',
+                resolvedYmd,
+                orderRow,
+              ),
             });
           }
           return;
         }
-      } else if (user?.paymentMethod === 'coupon' && paymentValue === 'coupon') {
+      } else if (
+        user?.paymentMethod === 'coupon' &&
+        paymentValue === 'coupon'
+      ) {
         if (
           b19 > (user?.paidBootlesFor19 || 0) ||
           b12 > (user?.paidBootlesFor12 || 0)
@@ -232,13 +290,21 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
           const afterCoupon = () => {
             const ymd = repeatOrderDeliveryYmdRef.current;
             const o = repeatTargetOrderRef.current ?? selectedOrder;
-            if (!ymd || !user.mail || !o) return;
-            void reloadOrder('coupon', { order: o, deliveryYmd: ymd, skipBalanceCheck: true });
+            if (!ymd || !clientId || !o) return;
+            void reloadOrder('coupon', {
+              order: o,
+              deliveryYmd: ymd,
+              skipBalanceCheck: true,
+            });
           };
           if (clientHasInvoiceLegalData(user)) {
             void openTopUpModal(undefined, {
               onTopUpSuccess: afterCoupon,
-              pendingOrder: buildPendingOrderDraft('coupon', resolvedYmd, orderRow),
+              pendingOrder: buildPendingOrderDraft(
+                'coupon',
+                resolvedYmd,
+                orderRow,
+              ),
             });
           } else {
             setNotEnoughBalanceModalVisible(true);
@@ -249,24 +315,27 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
     }
 
     try {
-      const orderDateObject = { d: resolvedYmd, time: '' };
+      const orderDateObject = {d: resolvedYmd, time: ''};
       const res = await apiService.addOrder(
-        user.mail,
-        orderRow.address,
+        clientId,
+        resolveRepeatOrderAddress(user, orderRow.address),
         orderRow.products,
-        orderRow.clientNotes,
+        [],
         orderDateObject,
         paymentValue,
-        orderRow.needCall,
-        orderRow.comment,
+        true,
+        '',
       );
       // "Заказ на эту дату уже существует" — сервер мог уже создать этот заказ сам
       // (автосоздание после пополнения баланса через Kaspi), это не ошибка.
-      const alreadyCreatedByServer = !res.success && res.message === 'Заказ на эту дату уже существует';
+      const alreadyCreatedByServer =
+        !res.success && res.message === 'Заказ на эту дату уже существует';
       if (res.success || alreadyCreatedByServer) {
         repeatOrderDeliveryYmdRef.current = null;
         repeatTargetOrderRef.current = null;
-        const showRef = Boolean((res as { showReferralModal?: boolean }).showReferralModal);
+        const showRef = Boolean(
+          (res as {showReferralModal?: boolean}).showReferralModal,
+        );
         const msg = getDeliveryAcceptTextFromYmd(resolvedYmd);
         Alert.alert('Успешно', msg, [
           {
@@ -285,8 +354,54 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
       } else {
         Alert.alert('Ошибка', res.message);
       }
-    } catch {
-      Alert.alert('Ошибка', 'Не удалось оформить заказ');
+    } catch (error: any) {
+      const message = error?.response?.data?.message;
+      if (message === 'Недостаточно средств на балансе') {
+        setPaymentModalVisible(false);
+        const deficit = Math.max(
+          0,
+          Math.ceil(orderSumMoney - Number(user.balance || 0)),
+        );
+        const afterMoney = () => {
+          const ymd = repeatOrderDeliveryYmdRef.current;
+          const o = repeatTargetOrderRef.current ?? selectedOrder;
+          if (!ymd || !clientId || !o) return;
+          void reloadOrder('credit', {
+            order: o,
+            deliveryYmd: ymd,
+            skipBalanceCheck: true,
+          });
+        };
+        if (clientHasInvoiceLegalData(user)) {
+          void openTopUpModal(String(deficit), {
+            onTopUpSuccess: afterMoney,
+            pendingOrder: buildPendingOrderDraft(
+              'credit',
+              resolvedYmd,
+              orderRow,
+            ),
+          });
+        } else {
+          void openTopUpModal(String(deficit), {
+            title: `Не хватает ${deficit.toLocaleString('ru-RU')} ₸`,
+            subtitle: 'Способы пополнения',
+            showCashPayment: true,
+            onCashPayment: () =>
+              void reloadOrder('fakt', {
+                order: orderRow,
+                deliveryYmd: resolvedYmd,
+              }),
+            onTopUpSuccess: afterMoney,
+            pendingOrder: buildPendingOrderDraft(
+              'credit',
+              resolvedYmd,
+              orderRow,
+            ),
+          });
+        }
+      } else {
+        Alert.alert('Ошибка', message || 'Не удалось оформить заказ');
+      }
     }
   };
 
@@ -301,7 +416,8 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
   const onHistoryRepeatDateChosen = (deliveryYmd: string) => {
     setRepeatDateModalVisible(false);
     const order = repeatTargetOrderRef.current ?? selectedOrder;
-    if (!(user?.mail && order)) return;
+    const clientId = getClientMongoId(user);
+    if (!(user && clientId && order)) return;
 
     repeatOrderDeliveryYmdRef.current = deliveryYmd;
 
@@ -319,15 +435,23 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
     if (walletOp === 'credit') {
       const bal = user.balance ?? 0;
       if (Number(bal) >= Number(orderSumMoney)) {
-        void reloadOrder('credit', { order, deliveryYmd, skipBalanceCheck: true });
+        void reloadOrder('credit', {
+          order,
+          deliveryYmd,
+          skipBalanceCheck: true,
+        });
         return;
       }
       const deficit = Math.max(0, Math.ceil(orderSumMoney - Number(bal)));
       const afterTopUp = () => {
         const ymd = repeatOrderDeliveryYmdRef.current;
         const o = repeatTargetOrderRef.current ?? selectedOrder;
-        if (!ymd || !user.mail || !o) return;
-        void reloadOrder('credit', { order: o, deliveryYmd: ymd, skipBalanceCheck: true });
+        if (!ymd || !clientId || !o) return;
+        void reloadOrder('credit', {
+          order: o,
+          deliveryYmd: ymd,
+          skipBalanceCheck: true,
+        });
       };
       if (clientHasInvoiceLegalData(user)) {
         void openTopUpModal(String(deficit), {
@@ -339,7 +463,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
           title: `${deficit.toLocaleString('ru-RU')} ₸`,
           subtitle: 'Способы пополнения',
           showCashPayment: true,
-          onCashPayment: () => void reloadOrder('fakt', { order, deliveryYmd }),
+          onCashPayment: () => void reloadOrder('fakt', {order, deliveryYmd}),
           onTopUpSuccess: afterTopUp,
           pendingOrder: buildPendingOrderDraft('credit', deliveryYmd, order),
         });
@@ -349,14 +473,22 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
 
     if (walletOp === 'coupon') {
       if (b19 <= available19 && b12 <= available12) {
-        void reloadOrder('coupon', { order, deliveryYmd, skipBalanceCheck: true });
+        void reloadOrder('coupon', {
+          order,
+          deliveryYmd,
+          skipBalanceCheck: true,
+        });
         return;
       }
       const afterTopUpCoupon = () => {
         const ymd = repeatOrderDeliveryYmdRef.current;
         const o = repeatTargetOrderRef.current ?? selectedOrder;
-        if (!ymd || !user.mail || !o) return;
-        void reloadOrder('coupon', { order: o, deliveryYmd: ymd, skipBalanceCheck: true });
+        if (!ymd || !clientId || !o) return;
+        void reloadOrder('coupon', {
+          order: o,
+          deliveryYmd: ymd,
+          skipBalanceCheck: true,
+        });
       };
       if (clientHasInvoiceLegalData(user)) {
         void openTopUpModal(undefined, {
@@ -369,13 +501,24 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
       return;
     }
 
+    // Без типичного «кошелька» — форма оплаты повторяет прошлый заказ, но требует подтверждения.
+    if (order.opForm === 'fakt') {
+      setSelectedPayment({label: 'Наличными', value: 'fakt'});
+    } else if (order.opForm === 'credit' || order.opForm === 'coupon') {
+      const balanceValue =
+        user.paymentMethod === 'coupon' ? 'coupon' : 'credit';
+      setSelectedPayment({label: 'С баланса', value: balanceValue});
+    } else {
+      setSelectedPayment(null);
+    }
     setPaymentModalVisible(true);
   };
 
   const filteredOrders = useMemo(() => {
     if (!orders || orders.length === 0) return [];
-    return orders.filter((order) => {
-      const dateStr = typeof order.date === 'string' ? order.date : order.date?.d;
+    return orders.filter(order => {
+      const dateStr =
+        typeof order.date === 'string' ? order.date : order.date?.d;
       if (!dateStr) return false;
       const d = new Date(dateStr);
       return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
@@ -385,13 +528,13 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
   const summary = useMemo(() => {
     let totalBottles = 0;
     let totalOrders = filteredOrders.length;
-    filteredOrders.forEach((order) => {
+    filteredOrders.forEach(order => {
       if (order.products) {
         totalBottles += Number(order.products.b19 || 0);
         totalBottles += Number(order.products.b12 || 0);
       }
     });
-    return { totalBottles, totalOrders };
+    return {totalBottles, totalOrders};
   }, [filteredOrders]);
 
   const goToPrevMonth = () => {
@@ -414,25 +557,29 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <Header 
-          bonus={0}
-          showBackButton={false}
-          showBonus={false}
-        />
+      <Header bonus={0} showBackButton={false} showBonus={false} />
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* Сводка за период */}
         <View style={summaryStyles.wrapper}>
           <Text style={summaryStyles.title}>Сводка за период</Text>
 
           <View style={summaryStyles.monthSelector}>
-            <TouchableOpacity onPress={goToPrevMonth} style={summaryStyles.arrowBtn}>
+            <TouchableOpacity
+              onPress={goToPrevMonth}
+              style={summaryStyles.arrowBtn}>
               <Text style={summaryStyles.arrowText}>{'‹'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setMonthPickerVisible(true)} style={summaryStyles.monthBtn}>
-              <Text style={summaryStyles.monthText}>{MONTH_NAMES[selectedMonth]} {selectedYear}</Text>
+            <TouchableOpacity
+              onPress={() => setMonthPickerVisible(true)}
+              style={summaryStyles.monthBtn}>
+              <Text style={summaryStyles.monthText}>
+                {MONTH_NAMES[selectedMonth]} {selectedYear}
+              </Text>
               <Text style={summaryStyles.calendarIcon}>📅</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={goToNextMonth} style={summaryStyles.arrowBtn}>
+            <TouchableOpacity
+              onPress={goToNextMonth}
+              style={summaryStyles.arrowBtn}>
               <Text style={summaryStyles.arrowText}>{'›'}</Text>
             </TouchableOpacity>
           </View>
@@ -441,11 +588,15 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
             <Text style={summaryStyles.statsLabel}>Итого:</Text>
             <View style={summaryStyles.statsRow}>
               <View style={summaryStyles.statItem}>
-                <Text style={summaryStyles.statValue}>{summary.totalBottles}</Text>
+                <Text style={summaryStyles.statValue}>
+                  {summary.totalBottles}
+                </Text>
                 <Text style={summaryStyles.statDesc}>Бутылей (18,9 л)</Text>
               </View>
               <View style={summaryStyles.statItem}>
-                <Text style={summaryStyles.statValue}>{summary.totalOrders}</Text>
+                <Text style={summaryStyles.statValue}>
+                  {summary.totalOrders}
+                </Text>
                 <Text style={summaryStyles.statDesc}>Заказа</Text>
               </View>
             </View>
@@ -457,64 +608,130 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
             <Text style={styles.subtitle}>Нет заказов за выбранный период</Text>
           </View>
         )}
-        {filteredOrders.length > 0 && filteredOrders.map((order) => (
-          <TouchableOpacity key={order._id} style={[orderBlockStyles.container, { borderColor: order.status === "onTheWay" ? "#DC1818" : "#E3E3E3", borderWidth: order.status === "onTheWay" ? 2 : 0 }]} onPress={() => {
-            navigation.navigate('OrderStatus', { order: order });
-          }}>
+        {filteredOrders.length > 0 &&
+          filteredOrders.map(order => (
+            <TouchableOpacity
+              key={order._id}
+              style={[
+                orderBlockStyles.container,
+                {
+                  borderColor:
+                    order.status === 'onTheWay' ? '#DC1818' : '#E3E3E3',
+                  borderWidth: order.status === 'onTheWay' ? 2 : 0,
+                },
+              ]}
+              onPress={() => {
+                navigation.navigate('OrderStatus', {order: order});
+              }}>
               <View style={orderBlockStyles.orderHeader}>
-                  <Text># <Text style={{fontSize: 18, fontWeight: '600'}}>
-                    {typeof order.date === 'string' ? order.date : order.date?.d || 'Не указана'}
-                  </Text></Text>
-                  <Text style={
-                      [orderBlockStyles.orderStatus, 
-                      order.status === "awaitingOrder" || order.status === "onTheWay" ? { color: "#EB7E00" } : 
-                      order.status === "delivered" ? { color: "#00B01A" } : { color: "#DC1818" }]
-                  }>{order.status === "awaitingOrder" ? "Заказ принят" : order.status === "onTheWay" ? "В пути" : order.status === "delivered" ? "Доставлен" : "Отменен"}</Text>
+                <Text>
+                  #{' '}
+                  <Text style={{fontSize: 18, fontWeight: '600'}}>
+                    {typeof order.date === 'string'
+                      ? order.date
+                      : order.date?.d || 'Не указана'}
+                  </Text>
+                </Text>
+                <Text
+                  style={[
+                    orderBlockStyles.orderStatus,
+                    order.status === 'awaitingOrder' ||
+                    order.status === 'onTheWay'
+                      ? {color: '#EB7E00'}
+                      : order.status === 'delivered'
+                      ? {color: '#00B01A'}
+                      : {color: '#DC1818'},
+                  ]}>
+                  {order.status === 'awaitingOrder'
+                    ? 'Заказ принят'
+                    : order.status === 'onTheWay'
+                    ? 'В пути'
+                    : order.status === 'delivered'
+                    ? 'Доставлен'
+                    : 'Отменен'}
+                </Text>
               </View>
-              <View style={{height: 1, backgroundColor: '#E3E3E3', marginVertical: 12, width: '100%' }} />
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: '#E3E3E3',
+                  marginVertical: 12,
+                  width: '100%',
+                }}
+              />
               <View style={orderBlockStyles.orderBody}>
-                  <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end'}}>
-                      <View>
-                          <View style={orderBlockStyles.orderProduct}>
-                              {order.products && order.products.b12 > 0 && (
-                                  <Text style={orderBlockStyles.orderProductText}>{order.products.b12}x Вода 12,5 л</Text>
-                              )}
-                              {order.products && order.products.b19 > 0 && (
-                                  <Text style={orderBlockStyles.orderProductText}>{order.products.b19}x Вода 18,9 л</Text>
-                              )}
-                          </View>
-                          <View style={{flexDirection: "row", gap: 6, marginTop: 4, alignItems: 'center'}}>
-                            <Image source={require('../assets/pin.png')} style={{width: 16, height: 16}} />
-                            <Text style={orderBlockStyles.orderProductText}>{order.address.name}</Text>
-                          </View>
-                          
-                      </View>
-                      <TouchableOpacity 
-                          style={{backgroundColor: '#DC1818', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 10}}
-                          onPress={(e) => {
-                            // Не переходить в OrderStatus при нажатии «Повторить»
-                            e?.stopPropagation?.();
-                            beginHistoryRepeatFlow(order);
-                          }}
-                      >
-                          <Text style={{color: 'white', fontSize: 14, fontWeight: '600'}}>Повторить</Text>
-                      </TouchableOpacity>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-end',
+                  }}>
+                  <View>
+                    <View style={orderBlockStyles.orderProduct}>
+                      {order.products && order.products.b12 > 0 && (
+                        <Text style={orderBlockStyles.orderProductText}>
+                          {order.products.b12}x Вода 12,5 л
+                        </Text>
+                      )}
+                      {order.products && order.products.b19 > 0 && (
+                        <Text style={orderBlockStyles.orderProductText}>
+                          {order.products.b19}x Вода 18,9 л
+                        </Text>
+                      )}
+                    </View>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        gap: 6,
+                        marginTop: 4,
+                        alignItems: 'center',
+                      }}>
+                      <Image
+                        source={require('../assets/pin.png')}
+                        style={{width: 16, height: 16}}
+                      />
+                      <Text style={orderBlockStyles.orderProductText}>
+                        {order.address.name}
+                      </Text>
+                    </View>
                   </View>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#DC1818',
+                      paddingVertical: 4,
+                      paddingHorizontal: 10,
+                      borderRadius: 10,
+                    }}
+                    onPress={e => {
+                      // Не переходить в OrderStatus при нажатии «Повторить»
+                      e?.stopPropagation?.();
+                      beginHistoryRepeatFlow(order);
+                    }}>
+                    <Text
+                      style={{color: 'white', fontSize: 14, fontWeight: '600'}}>
+                      Повторить
+                    </Text>
+                  </TouchableOpacity>
+                </View>
 
-                  {order.courierAggregator && typeof order.courierAggregator === 'object' && order.courierAggregator.fullName && order.status !== "awaitingOrder" && (
-                      <View style={orderBlockStyles.orderCourier}>
-                          {order.status === "onTheWay" ? (
-                              <Text>К вам едет: </Text>
-                          ) : (
-                              <Text>Доставил курьер: </Text>
-                          )}
-                          <Text style={orderBlockStyles.orderCourierName}>{order.courierAggregator.fullName}</Text>
-                      </View>
+                {order.courierAggregator &&
+                  typeof order.courierAggregator === 'object' &&
+                  order.courierAggregator.fullName &&
+                  order.status !== 'awaitingOrder' && (
+                    <View style={orderBlockStyles.orderCourier}>
+                      {order.status === 'onTheWay' ? (
+                        <Text>К вам едет: </Text>
+                      ) : (
+                        <Text>Доставил курьер: </Text>
+                      )}
+                      <Text style={orderBlockStyles.orderCourierName}>
+                        {order.courierAggregator.fullName}
+                      </Text>
+                    </View>
                   )}
               </View>
-              
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          ))}
         <View style={{height: 40}}></View>
       </ScrollView>
       <Modal
@@ -526,8 +743,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
           setRepeatDateModalVisible(false);
         }}
         transparent={true}
-        animationType="fade"
-      >
+        animationType="fade">
         <TouchableOpacity
           style={styles.modalOverlayReloadOrder}
           onPress={() => {
@@ -535,13 +751,18 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
             repeatTargetOrderRef.current = null;
             setSelectedOrder(null);
             setRepeatDateModalVisible(false);
-          }}
-        >
+          }}>
           <TouchableOpacity
-            style={[styles.modalContainerReloadOrder, { maxHeight: '70%' }]}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <Text style={{ fontSize: 24, fontWeight: '600', color: '#101010', marginBottom: 16, textAlign: 'center' }}>
+            style={[styles.modalContainerReloadOrder, {maxHeight: '70%'}]}
+            onPress={e => e.stopPropagation()}>
+            <Text
+              style={{
+                fontSize: 24,
+                fontWeight: '600',
+                color: '#101010',
+                marginBottom: 16,
+                textAlign: 'center',
+              }}>
               Выберите дату доставки
             </Text>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -549,8 +770,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
                 <TouchableOpacity
                   key={date.value || index}
                   style={styles.modalAddress}
-                  onPress={() => onHistoryRepeatDateChosen(date.value)}
-                >
+                  onPress={() => onHistoryRepeatDateChosen(date.value)}>
                   <Text style={styles.modalAddressText}>{date.label}</Text>
                 </TouchableOpacity>
               ))}
@@ -559,75 +779,176 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
         </TouchableOpacity>
       </Modal>
       <Modal
-          visible={paymentModalVisible}
-          onRequestClose={() => setPaymentModalVisible(false)}
-          transparent={true}
-          animationType="fade"
-      >
-        <TouchableOpacity style={styles.modalOverlayReloadOrder} onPress={() => setPaymentModalVisible(false)}>
-            <TouchableOpacity style={styles.modalContainerReloadOrder} onPress={(e) => e.stopPropagation()}>
-                <Text style={{fontSize: 24, fontWeight: '600', color: '#101010', marginBottom: 16, textAlign: 'center'}}>Способ оплаты</Text>
-                    {!clientHasInvoiceLegalData(user) ? (
-                    <TouchableOpacity style={styles.modalAddress} onPress={() => {
-                        if (selectedPayment?.value === 'fakt') {
-                            setSelectedPayment(null);
-                        } else {
-                            setSelectedPayment({ label: 'Наличными', value: 'fakt' });
-                        }
-                    }}>
-                        <Text style={styles.modalAddressText}>Наличными</Text>
-                        <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: selectedPayment?.value === "fakt" ? '#DC1818' : '#101010' }}>
-                            {selectedPayment?.value === "fakt" && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
-                        </View>
-                    </TouchableOpacity>
-                    ) : null}
-                    {(user?.paymentMethod === 'balance' || user?.paymentMethod === 'coupon') && (
-                    <TouchableOpacity style={styles.modalAddress} onPress={() => {
-                        const balanceValue = user?.paymentMethod === 'coupon' ? 'coupon' : 'credit';
-                        if (selectedPayment?.value === balanceValue) {
-                            setSelectedPayment(null);
-                        } else {
-                            setSelectedPayment({ label: 'С баланса', value: balanceValue });
-                        }
-                    }}>
-                        {user && user?.paymentMethod == 'coupon' ? (
-                            <Text style={styles.modalAddressText}>
-                                С баланса <Text style={{color: "#46a54f"}}>({Number(user?.paidBootles || 0).toLocaleString("ru-RU")} шт)</Text>
-                            </Text>
-                        ) : (
-                            <Text style={styles.modalAddressText}>
-                                С баланса <Text style={{color: "#46a54f"}}>({Number(user?.balance || 0).toLocaleString("ru-RU")} ₸)</Text>
-                            </Text>
-                        )}
-                        <View style={{ justifyContent: 'center', alignItems: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: (selectedPayment?.value === "credit" || selectedPayment?.value === "coupon") ? '#DC1818' : '#101010' }}>
-                            {(selectedPayment?.value === "credit" || selectedPayment?.value === "coupon") && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#DC1818' }} />}
-                        </View>
-                    </TouchableOpacity>
-                    )}
-                    <TouchableOpacity style={styles.button} onPress={() => {
-                        void reloadOrder(undefined, {
-                          order: selectedOrder ?? repeatTargetOrderRef.current,
-                        });
-                    }}>
-                        <Text style={styles.buttonText}>Подтвердить</Text>
-                    </TouchableOpacity>
+        visible={paymentModalVisible}
+        onRequestClose={() => setPaymentModalVisible(false)}
+        transparent={true}
+        animationType="fade">
+        <TouchableOpacity
+          style={styles.modalOverlayReloadOrder}
+          onPress={() => setPaymentModalVisible(false)}>
+          <TouchableOpacity
+            style={styles.modalContainerReloadOrder}
+            onPress={e => e.stopPropagation()}>
+            <Text
+              style={{
+                fontSize: 24,
+                fontWeight: '600',
+                color: '#101010',
+                marginBottom: 16,
+                textAlign: 'center',
+              }}>
+              Способ оплаты
+            </Text>
+            {!clientHasInvoiceLegalData(user) ? (
+              <TouchableOpacity
+                style={styles.modalAddress}
+                onPress={() => {
+                  if (selectedPayment?.value === 'fakt') {
+                    setSelectedPayment(null);
+                  } else {
+                    setSelectedPayment({label: 'Наличными', value: 'fakt'});
+                  }
+                }}>
+                <Text style={styles.modalAddressText}>Наличными</Text>
+                <View
+                  style={{
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    width: 16,
+                    height: 16,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor:
+                      selectedPayment?.value === 'fakt' ? '#DC1818' : '#101010',
+                  }}>
+                  {selectedPayment?.value === 'fakt' && (
+                    <View
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 5,
+                        backgroundColor: '#DC1818',
+                      }}
+                    />
+                  )}
+                </View>
+              </TouchableOpacity>
+            ) : null}
+            {(user?.paymentMethod === 'balance' ||
+              user?.paymentMethod === 'coupon') && (
+              <TouchableOpacity
+                style={styles.modalAddress}
+                onPress={() => {
+                  const balanceValue =
+                    user?.paymentMethod === 'coupon' ? 'coupon' : 'credit';
+                  if (selectedPayment?.value === balanceValue) {
+                    setSelectedPayment(null);
+                  } else {
+                    setSelectedPayment({
+                      label: 'С баланса',
+                      value: balanceValue,
+                    });
+                  }
+                }}>
+                {user && user?.paymentMethod == 'coupon' ? (
+                  <Text style={styles.modalAddressText}>
+                    С баланса{' '}
+                    <Text style={{color: '#46a54f'}}>
+                      ({Number(user?.paidBootles || 0).toLocaleString('ru-RU')}{' '}
+                      шт)
+                    </Text>
+                  </Text>
+                ) : (
+                  <Text style={styles.modalAddressText}>
+                    С баланса{' '}
+                    <Text style={{color: '#46a54f'}}>
+                      ({Number(user?.balance || 0).toLocaleString('ru-RU')} ₸)
+                    </Text>
+                  </Text>
+                )}
+                <View
+                  style={{
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    width: 16,
+                    height: 16,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor:
+                      selectedPayment?.value === 'credit' ||
+                      selectedPayment?.value === 'coupon'
+                        ? '#DC1818'
+                        : '#101010',
+                  }}>
+                  {(selectedPayment?.value === 'credit' ||
+                    selectedPayment?.value === 'coupon') && (
+                    <View
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 5,
+                        backgroundColor: '#DC1818',
+                      }}
+                    />
+                  )}
+                </View>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => {
+                void reloadOrder(undefined, {
+                  order: selectedOrder ?? repeatTargetOrderRef.current,
+                });
+              }}>
+              <Text style={styles.buttonText}>Подтвердить</Text>
             </TouchableOpacity>
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
       {/* Модалка выбора месяца */}
-      <Modal visible={monthPickerVisible} transparent={true} animationType="fade">
-        <TouchableOpacity style={styles.modalOverlayReloadOrder} onPress={() => setMonthPickerVisible(false)} activeOpacity={1}>
-          <TouchableOpacity style={[styles.modalContainerReloadOrder, { width: '85%' }]} onPress={(e) => e.stopPropagation()}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <TouchableOpacity onPress={() => setSelectedYear(selectedYear - 1)}>
-                <Text style={{ fontSize: 22, color: '#333', paddingHorizontal: 12 }}>{'‹'}</Text>
+      <Modal
+        visible={monthPickerVisible}
+        transparent={true}
+        animationType="fade">
+        <TouchableOpacity
+          style={styles.modalOverlayReloadOrder}
+          onPress={() => setMonthPickerVisible(false)}
+          activeOpacity={1}>
+          <TouchableOpacity
+            style={[styles.modalContainerReloadOrder, {width: '85%'}]}
+            onPress={e => e.stopPropagation()}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 20,
+              }}>
+              <TouchableOpacity
+                onPress={() => setSelectedYear(selectedYear - 1)}>
+                <Text
+                  style={{fontSize: 22, color: '#333', paddingHorizontal: 12}}>
+                  {'‹'}
+                </Text>
               </TouchableOpacity>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: '#101010' }}>{selectedYear}</Text>
-              <TouchableOpacity onPress={() => setSelectedYear(selectedYear + 1)}>
-                <Text style={{ fontSize: 22, color: '#333', paddingHorizontal: 12 }}>{'›'}</Text>
+              <Text style={{fontSize: 18, fontWeight: '700', color: '#101010'}}>
+                {selectedYear}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setSelectedYear(selectedYear + 1)}>
+                <Text
+                  style={{fontSize: 22, color: '#333', paddingHorizontal: 12}}>
+                  {'›'}
+                </Text>
               </TouchableOpacity>
             </View>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                justifyContent: 'space-between',
+              }}>
               {MONTH_NAMES.map((name, idx) => (
                 <TouchableOpacity
                   key={idx}
@@ -640,11 +961,16 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
                     paddingVertical: 10,
                     marginBottom: 8,
                     borderRadius: 8,
-                    backgroundColor: selectedMonth === idx ? '#DC1818' : '#F5F5F5',
+                    backgroundColor:
+                      selectedMonth === idx ? '#DC1818' : '#F5F5F5',
                     alignItems: 'center',
-                  }}
-                >
-                  <Text style={{ fontSize: 14, fontWeight: '500', color: selectedMonth === idx ? '#fff' : '#333' }}>
+                  }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: '500',
+                      color: selectedMonth === idx ? '#fff' : '#333',
+                    }}>
                     {name}
                   </Text>
                 </TouchableOpacity>
@@ -659,108 +985,222 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ navigation }) => {
         visible={notEnoughBalanceModalVisible}
         onRequestClose={() => setNotEnoughBalanceModalVisible(false)}
         transparent={true}
-        animationType="fade"
-      >
-        <TouchableOpacity style={styles.modalOverlayReloadOrder} onPress={() => setNotEnoughBalanceModalVisible(false)}>
-          <TouchableOpacity style={styles.modalContainerReloadOrder} onPress={(e) => e.stopPropagation()}>
-            <Image source={require('../assets/wallet.png')} style={{width: 60, height: 60, marginBottom: 12, alignSelf: 'center'}} />
+        animationType="fade">
+        <TouchableOpacity
+          style={styles.modalOverlayReloadOrder}
+          onPress={() => setNotEnoughBalanceModalVisible(false)}>
+          <TouchableOpacity
+            style={styles.modalContainerReloadOrder}
+            onPress={e => e.stopPropagation()}>
+            <Image
+              source={require('../assets/wallet.png')}
+              style={{
+                width: 60,
+                height: 60,
+                marginBottom: 12,
+                alignSelf: 'center',
+              }}
+            />
             {user?.paymentMethod === 'balance' ? (
               <>
-                <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>
-                  Не хватает {(() => {
+                <Text
+                  style={{
+                    fontSize: 20,
+                    fontWeight: '600',
+                    color: '#101010',
+                    marginBottom: 12,
+                    textAlign: 'center',
+                  }}>
+                  Не хватает{' '}
+                  {(() => {
                     const b19 = selectedOrder?.products?.b19 || 0;
                     const b12 = selectedOrder?.products?.b12 || 0;
-                    const sum = b19 * (user?.price19 || 0) + b12 * (user?.price12 || 0);
+                    const sum =
+                      b19 * (user?.price19 || 0) + b12 * (user?.price12 || 0);
                     return sum - (user?.balance || 0);
-                  })()} ₸
+                  })()}{' '}
+                  ₸
                 </Text>
-                <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>Ваш текущий баланс: {user?.balance || 0} ₸.</Text>
-                <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>Для оформления заказа необходимо пополнить счет.</Text>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: '500',
+                    color: '#101010',
+                    textAlign: 'center',
+                  }}>
+                  Ваш текущий баланс: {user?.balance || 0} ₸.
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: '500',
+                    color: '#101010',
+                    textAlign: 'center',
+                  }}>
+                  Для оформления заказа необходимо пополнить счет.
+                </Text>
               </>
             ) : (
               <>
-                <Text style={{fontSize: 20, fontWeight: '600', color: '#101010', marginBottom: 12, textAlign: 'center'}}>Недостаточно бутылей</Text>
-                {(selectedOrder?.products?.b19 || 0) > (user?.paidBootlesFor19 || 0) && (
-                  <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>
-                    18,9л: нужно {selectedOrder?.products?.b19 || 0}, у вас {user?.paidBootlesFor19 || 0} шт
+                <Text
+                  style={{
+                    fontSize: 20,
+                    fontWeight: '600',
+                    color: '#101010',
+                    marginBottom: 12,
+                    textAlign: 'center',
+                  }}>
+                  Недостаточно бутылей
+                </Text>
+                {(selectedOrder?.products?.b19 || 0) >
+                  (user?.paidBootlesFor19 || 0) && (
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: '500',
+                      color: '#101010',
+                      textAlign: 'center',
+                    }}>
+                    18,9л: нужно {selectedOrder?.products?.b19 || 0}, у вас{' '}
+                    {user?.paidBootlesFor19 || 0} шт
                   </Text>
                 )}
-                {(selectedOrder?.products?.b12 || 0) > (user?.paidBootlesFor12 || 0) && (
-                  <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center'}}>
-                    12,5л: нужно {selectedOrder?.products?.b12 || 0}, у вас {user?.paidBootlesFor12 || 0} шт
+                {(selectedOrder?.products?.b12 || 0) >
+                  (user?.paidBootlesFor12 || 0) && (
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: '500',
+                      color: '#101010',
+                      textAlign: 'center',
+                    }}>
+                    12,5л: нужно {selectedOrder?.products?.b12 || 0}, у вас{' '}
+                    {user?.paidBootlesFor12 || 0} шт
                   </Text>
                 )}
-                <Text style={{fontSize: 14, fontWeight: '500', color: '#101010', textAlign: 'center', marginTop: 8}}>Для оформления заказа необходимо пополнить баланс.</Text>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: '500',
+                    color: '#101010',
+                    textAlign: 'center',
+                    marginTop: 8,
+                  }}>
+                  Для оформления заказа необходимо пополнить баланс.
+                </Text>
               </>
             )}
             <TouchableOpacity
-              style={{backgroundColor: '#0d74d0', padding: 16, borderRadius: 8, marginTop: 40}}
+              style={{
+                backgroundColor: '#0d74d0',
+                padding: 16,
+                borderRadius: 8,
+                marginTop: 40,
+              }}
               onPress={() => {
                 setNotEnoughBalanceModalVisible(false);
                 setSelectedPayment(null);
-                const repeatOrder = repeatTargetOrderRef.current ?? selectedOrder;
+                const repeatOrder =
+                  repeatTargetOrderRef.current ?? selectedOrder;
 
                 const afterCoupon = () => {
                   const ymd = repeatOrderDeliveryYmdRef.current;
                   const o = repeatTargetOrderRef.current ?? selectedOrder;
-                  if (!ymd || !user?.mail || !o) return;
-                  void reloadOrder('coupon', { order: o, deliveryYmd: ymd, skipBalanceCheck: true });
+                  if (!ymd || !getClientMongoId(user) || !o) return;
+                  void reloadOrder('coupon', {
+                    order: o,
+                    deliveryYmd: ymd,
+                    skipBalanceCheck: true,
+                  });
                 };
 
                 const afterMoney = () => {
                   const ymd = repeatOrderDeliveryYmdRef.current;
                   const o = repeatTargetOrderRef.current ?? selectedOrder;
-                  if (!ymd || !user?.mail || !o) return;
-                  void reloadOrder('credit', { order: o, deliveryYmd: ymd, skipBalanceCheck: true });
+                  if (!ymd || !getClientMongoId(user) || !o) return;
+                  void reloadOrder('credit', {
+                    order: o,
+                    deliveryYmd: ymd,
+                    skipBalanceCheck: true,
+                  });
                 };
 
                 const ymdForDraft =
-                  repeatOrderDeliveryYmdRef.current || computeNextDeliveryYmd(user ?? null);
+                  repeatOrderDeliveryYmdRef.current ||
+                  computeNextDeliveryYmd(user ?? null);
                 if (user?.paymentMethod === 'balance' && repeatOrder) {
                   const b19 = repeatOrder?.products?.b19 || 0;
                   const b12 = repeatOrder?.products?.b12 || 0;
                   const sum =
-                    typeof repeatOrder.sum === 'number' && Number.isFinite(repeatOrder.sum)
+                    typeof repeatOrder.sum === 'number' &&
+                    Number.isFinite(repeatOrder.sum)
                       ? repeatOrder.sum
                       : b19 * (user?.price19 || 0) + b12 * (user?.price12 || 0);
                   const deficit = sum - (user?.balance || 0);
                   openTopUpModal(String(Math.max(0, Math.ceil(deficit))), {
                     onTopUpSuccess: afterMoney,
-                    pendingOrder: buildPendingOrderDraft('credit', ymdForDraft, repeatOrder),
+                    pendingOrder: buildPendingOrderDraft(
+                      'credit',
+                      ymdForDraft,
+                      repeatOrder,
+                    ),
                   });
                 } else {
                   openTopUpModal(undefined, {
                     onTopUpSuccess: afterCoupon,
-                    pendingOrder: buildPendingOrderDraft('coupon', ymdForDraft, repeatOrder),
+                    pendingOrder: buildPendingOrderDraft(
+                      'coupon',
+                      ymdForDraft,
+                      repeatOrder,
+                    ),
                   });
                 }
-              }}
-            >
+              }}>
               {user?.paymentMethod === 'balance' ? (
                 <Text style={styles.buttonText}>
-                  Пополнить на {(() => {
+                  Пополнить на{' '}
+                  {(() => {
                     const b19 = selectedOrder?.products?.b19 || 0;
                     const b12 = selectedOrder?.products?.b12 || 0;
-                    const sum = b19 * (user?.price19 || 0) + b12 * (user?.price12 || 0);
+                    const sum =
+                      b19 * (user?.price19 || 0) + b12 * (user?.price12 || 0);
                     return sum - (user?.balance || 0);
-                  })()} ₸
+                  })()}{' '}
+                  ₸
                 </Text>
               ) : (
                 <Text style={styles.buttonText}>Пополнить баланс</Text>
               )}
             </TouchableOpacity>
             {!clientHasInvoiceLegalData(user) ? (
-            <TouchableOpacity
-              style={{padding: 16, borderRadius: 8, marginTop: 10, backgroundColor: '#DC1818'}}
-              onPress={() => {
-                setNotEnoughBalanceModalVisible(false);
-                const o = repeatTargetOrderRef.current ?? selectedOrder;
-                const ymd = repeatOrderDeliveryYmdRef.current ?? computeNextDeliveryYmd(user);
-                void reloadOrder('fakt', { order: o ?? undefined, deliveryYmd: ymd });
-              }}
-            >
-              <Text style={{color: '#fff', fontSize: 16, fontWeight: '600', textAlign: 'center'}}>Оплатить наличными</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  padding: 16,
+                  borderRadius: 8,
+                  marginTop: 10,
+                  backgroundColor: '#DC1818',
+                }}
+                onPress={() => {
+                  setNotEnoughBalanceModalVisible(false);
+                  const o = repeatTargetOrderRef.current ?? selectedOrder;
+                  const ymd =
+                    repeatOrderDeliveryYmdRef.current ??
+                    computeNextDeliveryYmd(user);
+                  void reloadOrder('fakt', {
+                    order: o ?? undefined,
+                    deliveryYmd: ymd,
+                  });
+                }}>
+                <Text
+                  style={{
+                    color: '#fff',
+                    fontSize: 16,
+                    fontWeight: '600',
+                    textAlign: 'center',
+                  }}>
+                  Оплатить наличными
+                </Text>
+              </TouchableOpacity>
             ) : null}
           </TouchableOpacity>
         </TouchableOpacity>
@@ -808,10 +1248,10 @@ const styles = StyleSheet.create({
     marginTop: 32,
   },
   buttonText: {
-      color: 'white',
-      fontSize: 18,
-      fontWeight: '600',
-      textAlign: 'center',
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   modalOverlayReloadOrder: {
     flex: 1,
@@ -820,10 +1260,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContainerReloadOrder: {
-      backgroundColor: 'white',
-      padding: 24,
-      borderRadius: 8,
-      width: '80%',
+    backgroundColor: 'white',
+    padding: 24,
+    borderRadius: 8,
+    width: '80%',
   },
   modalAddress: {
     padding: 16,
@@ -836,53 +1276,52 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalAddressText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: '#101010',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#101010',
   },
 });
 
 const orderBlockStyles = StyleSheet.create({
   container: {
-      marginTop: 16,
-      backgroundColor: 'white',
-      borderRadius: 16,
-      padding: 16,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 3.84,
-      elevation: 5,
+    marginTop: 16,
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   orderHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  orderBody: {
-  },
+  orderBody: {},
   orderStatus: {
-      fontSize: 14,
-      fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '600',
   },
   orderProduct: {
-      gap: 8
+    gap: 8,
   },
   orderProductText: {
-      fontSize: 14,
-      color: '#545454',
-      fontWeight: '500',
+    fontSize: 14,
+    color: '#545454',
+    fontWeight: '500',
   },
   orderCourier: {
-      marginTop: 12,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   orderCourierName: {
-      fontSize: 16,
-      color: '#000',
-      fontWeight: '600',
+    fontSize: 16,
+    color: '#000',
+    fontWeight: '600',
   },
 });
 
@@ -892,8 +1331,13 @@ const summaryStyles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4 },
-      android: { elevation: 2 },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 1},
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+      },
+      android: {elevation: 2},
     }),
   },
   title: {
@@ -940,7 +1384,7 @@ const summaryStyles = StyleSheet.create({
   statsCard: {
     backgroundColor: '#FFF',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, {useEffect, useState, useRef} from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -14,14 +14,17 @@ import {
   TouchableWithoutFeedback,
   DeviceEventEmitter,
 } from 'react-native';
-import { Back } from '../components';
-import { useAuth } from '../hooks';
-import { apiService } from '../api/services';
-import { SupportMessage } from '../types';
+import {Back} from '../components';
+import {useAuth} from '../hooks';
+import {apiService} from '../api/services';
+import {SupportMessage} from '../types';
+import {getClientMongoId} from '../utils/clientId';
 
-const ChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { user } = useAuth();
-  const [messages, setMessages] = useState<SupportMessage[]>(user?.supportMessages || []);
+const ChatScreen: React.FC<{navigation: any}> = ({navigation}) => {
+  const {user} = useAuth();
+  const [messages, setMessages] = useState<SupportMessage[]>(
+    user?.supportMessages || [],
+  );
   const [inputText, setInputText] = useState('');
   const flatListRef = useRef<FlatList>(null);
   const isUserScrollingRef = useRef(false);
@@ -32,7 +35,7 @@ const ChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     if (inputText.trim()) {
       // Закрываем клавиатуру перед отправкой
       Keyboard.dismiss();
-      
+
       const newMessage = {
         _id: '',
         text: inputText.trim(),
@@ -41,15 +44,21 @@ const ChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         isRead: false,
       } as SupportMessage;
 
-      const res = await apiService.sendSupportMessage(user?.mail || '', newMessage);
-      console.log("res in ChatScreen.tsx = ", res);
+      const res = await apiService.sendSupportMessage(
+        getClientMongoId(user),
+        newMessage,
+      );
+      console.log('res in ChatScreen.tsx = ', res);
       if (res.success) {
-        const newMessages = [...messages, res.messages[res.messages.length - 1] as SupportMessage];
+        const newMessages = [
+          ...messages,
+          res.messages[res.messages.length - 1] as SupportMessage,
+        ];
         setMessages(newMessages);
         // Прокручиваем вниз после добавления нового сообщения
         setTimeout(() => {
           if (flatListRef.current && shouldAutoScrollRef.current) {
-            flatListRef.current.scrollToEnd({ animated: true });
+            flatListRef.current.scrollToEnd({animated: true});
           }
         }, 100);
       } else {
@@ -59,37 +68,45 @@ const ChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     }
   };
 
-  const renderMessage = ({ item: message }: { item: SupportMessage }) => {
+  const renderMessage = ({item: message}: {item: SupportMessage}) => {
     return (
-      <View 
+      <View
         style={[
           styles.messageContainer,
-          message.isUser ? styles.userMessageContainer : styles.supportMessageContainer
-        ]}
-      >
-        {/* Пузырь с сообщением */}
-        <View style={[
-          styles.messageBubble,
-          message.isUser ? styles.userBubble : styles.supportBubble
+          message.isUser
+            ? styles.userMessageContainer
+            : styles.supportMessageContainer,
         ]}>
-          <Text style={[
-            styles.messageText,
-            message.isUser ? styles.userMessageText : styles.supportMessageText
+        {/* Пузырь с сообщением */}
+        <View
+          style={[
+            styles.messageBubble,
+            message.isUser ? styles.userBubble : styles.supportBubble,
           ]}>
+          <Text
+            style={[
+              styles.messageText,
+              message.isUser
+                ? styles.userMessageText
+                : styles.supportMessageText,
+            ]}>
             {message.text}
           </Text>
         </View>
-        
+
         {/* Информация о сообщении */}
         <View style={styles.messageInfo}>
           <Text style={styles.timestamp}>
-            {new Date(message.timestamp).toLocaleTimeString('ru-RU', { 
-              hour: '2-digit', 
-              minute: '2-digit' 
+            {new Date(message.timestamp).toLocaleTimeString('ru-RU', {
+              hour: '2-digit',
+              minute: '2-digit',
             })}
           </Text>
           {message.isUser && (
-            <Text style={message.isRead ? styles.readStatusRead : styles.readStatus}>
+            <Text
+              style={
+                message.isRead ? styles.readStatusRead : styles.readStatus
+              }>
               {message.isRead ? ' • Прочитано' : ' • Отправлено'}
             </Text>
           )}
@@ -104,55 +121,73 @@ const ChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
   // Загрузка сообщений при монтировании или изменении email
   useEffect(() => {
+    const clientId = getClientMongoId(user);
     const getMessages = async () => {
-      if (user?.mail) {
-        const res = await apiService.getSupportMessages(user.mail);
+      if (clientId) {
+        const res = await apiService.getSupportMessages(clientId);
         if (res.success) {
           setMessages(res.messages as SupportMessage[]);
         }
       }
     };
     getMessages();
-  }, [user?.mail]);
+  }, [user]);
 
   // Автоматический скролл в конец при загрузке сообщений
   useEffect(() => {
-    if (messages.length > 0 && shouldAutoScrollRef.current && !isUserScrollingRef.current) {
+    if (
+      messages.length > 0 &&
+      shouldAutoScrollRef.current &&
+      !isUserScrollingRef.current
+    ) {
       // Используем небольшую задержку для корректного рендеринга
       const timeoutId = setTimeout(() => {
-        if (flatListRef.current && shouldAutoScrollRef.current && !isUserScrollingRef.current) {
-          flatListRef.current.scrollToEnd({ animated: false });
+        if (
+          flatListRef.current &&
+          shouldAutoScrollRef.current &&
+          !isUserScrollingRef.current
+        ) {
+          flatListRef.current.scrollToEnd({animated: false});
         }
       }, 200);
-      
+
       return () => clearTimeout(timeoutId);
     }
   }, [messages.length]);
 
   // Слушатель новых сообщений поддержки через push-уведомления
   useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener('newSupportMessage', (newMessage: SupportMessage) => {
-      console.log('💬 Получено новое сообщение поддержки:', newMessage);
-      setMessages(prevMessages => {
-        // Проверяем, нет ли уже такого сообщения (по _id или по тексту и времени)
-        const exists = prevMessages.some(
-          msg => msg._id === newMessage._id || 
-          (msg.text === newMessage.text && msg.timestamp === newMessage.timestamp)
-        );
-        if (exists) {
-          console.log('⚠️ Сообщение уже существует, пропускаем');
-          return prevMessages;
-        }
-        const updated = [...prevMessages, newMessage];
-        // Скроллим в конец после добавления нового сообщения только если пользователь не прокручивает
-        setTimeout(() => {
-          if (flatListRef.current && shouldAutoScrollRef.current && !isUserScrollingRef.current) {
-            flatListRef.current.scrollToEnd({ animated: true });
+    const subscription = DeviceEventEmitter.addListener(
+      'newSupportMessage',
+      (newMessage: SupportMessage) => {
+        console.log('💬 Получено новое сообщение поддержки:', newMessage);
+        setMessages(prevMessages => {
+          // Проверяем, нет ли уже такого сообщения (по _id или по тексту и времени)
+          const exists = prevMessages.some(
+            msg =>
+              msg._id === newMessage._id ||
+              (msg.text === newMessage.text &&
+                msg.timestamp === newMessage.timestamp),
+          );
+          if (exists) {
+            console.log('⚠️ Сообщение уже существует, пропускаем');
+            return prevMessages;
           }
-        }, 100);
-        return updated;
-      });
-    });
+          const updated = [...prevMessages, newMessage];
+          // Скроллим в конец после добавления нового сообщения только если пользователь не прокручивает
+          setTimeout(() => {
+            if (
+              flatListRef.current &&
+              shouldAutoScrollRef.current &&
+              !isUserScrollingRef.current
+            ) {
+              flatListRef.current.scrollToEnd({animated: true});
+            }
+          }, 100);
+          return updated;
+        });
+      },
+    );
 
     return () => {
       subscription.remove();
@@ -178,17 +213,13 @@ const ChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <Back navigation={navigation} title="Чат поддержка" />
-      
-      <KeyboardAvoidingView 
+
+      <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}>
         {/* Область для скрытия клавиатуры - вне FlatList */}
-        <TouchableWithoutFeedback 
-          onPress={Keyboard.dismiss}
-          accessible={false}
-        >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <View style={styles.touchableArea} />
         </TouchableWithoutFeedback>
 
@@ -201,7 +232,7 @@ const ChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           style={styles.messagesContainer}
           contentContainerStyle={[
             styles.messagesContent,
-            messages.length === 0 && styles.emptyContent
+            messages.length === 0 && styles.emptyContent,
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="always"
@@ -224,7 +255,9 @@ const ChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>Нет сообщений</Text>
-              <Text style={styles.emptySubtext}>Начните разговор с поддержкой</Text>
+              <Text style={styles.emptySubtext}>
+                Начните разговор с поддержкой
+              </Text>
             </View>
           }
         />
@@ -240,14 +273,13 @@ const ChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             multiline
             maxLength={500}
           />
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
               styles.sendButton,
-              !inputText.trim() && styles.sendButtonDisabled
+              !inputText.trim() && styles.sendButtonDisabled,
             ]}
             onPress={sendMessage}
-            disabled={!inputText.trim()}
-          >
+            disabled={!inputText.trim()}>
             <Text style={styles.sendIcon}>➤</Text>
           </TouchableOpacity>
         </View>
@@ -332,7 +364,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,

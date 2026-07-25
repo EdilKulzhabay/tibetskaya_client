@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   legalLinkText: {
-    color: '#DC1818',
+    color: '#0645AD',
     fontSize: 15,
     fontWeight: '500',
     textDecorationLine: 'underline',

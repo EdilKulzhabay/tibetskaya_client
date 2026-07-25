@@ -6,6 +6,7 @@ import { apiService } from '../api/services';
 import { RootStackParamList } from '../types/navigation';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAuth } from '../hooks';
+import { StableImage } from '../components';
 
 type OtpScreenProps = NativeStackScreenProps<RootStackParamList, 'Otp'>;
 const OTP_LENGTH = 6;
@@ -147,6 +148,11 @@ const OtpScreen: React.FC<OtpScreenProps> = ({ navigation, route }) => {
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={styles.container}
         >
+            <TouchableOpacity onPress={() => {navigation.goBack();}} 
+                style={{padding: 8, backgroundColor: '#EFEFEF', borderRadius: 8, position: 'absolute', top: 30, left: 16, zIndex: 1000}}
+            >
+                <StableImage source={require('../assets/arrowBack.png')} style={{width: 24, height: 24}} />
+            </TouchableOpacity>
             <View style={styles.imageContainer}>
                 <Image
                 source={require('../assets/loginBanner.png')} 
@@ -155,8 +161,8 @@ const OtpScreen: React.FC<OtpScreenProps> = ({ navigation, route }) => {
                 />
             </View>
             <View style={styles.content}>
-                <Text style={styles.title}>Дождитесь кода на почте</Text>
-                <Text style={styles.subtitle}>Код отправлен на {form.mail}</Text>
+                <Text style={styles.title}>Дождитесь кода в WhatsApp</Text>
+                <Text style={styles.subtitle}>Код отправлен на {form.phone}</Text>
 
                 <View style={styles.codeContainer}>
                 {code.map((digit, index) => (
@@ -217,6 +223,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: 'white',
+        position: 'relative',
     },
     imageContainer: {
         width: '100%',

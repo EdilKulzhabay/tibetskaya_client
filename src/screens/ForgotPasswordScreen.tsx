@@ -5,14 +5,17 @@ import { apiService } from "../api/services";
 const screenWidth = Dimensions.get('window').width
 
 const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+    const [recoveryMethod, setRecoveryMethod] = useState<'phone' | 'mail'>('phone');
     const [mail, setMail] = useState("")
+    const [phone, setPhone] = useState("")
     const [loading, setLoading] = useState(false);
 
     const handleForgotPassword = async () => {
         setLoading(true);
-        const res = await apiService.sendMailForgotPassword(mail);
+        const identifier = recoveryMethod === 'phone' ? { phone } : { mail };
+        const res = await apiService.sendMailForgotPassword(identifier);
         if (res.success) {
-            navigation.navigate("OtpForgotPassword", {mail});
+            navigation.navigate("OtpForgotPassword", identifier);
         } else {
             Alert.alert("Ошибка", res.message);
         }
@@ -33,20 +36,42 @@ const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
                     Восстановление пароля
                 </Text>
                 <Text style={styles.subtitle}>
-                    Введите почту, чтобы восстановить пароль
+                    {recoveryMethod === 'phone'
+                        ? 'Введите номер телефона, чтобы восстановить пароль'
+                        : 'Введите почту, чтобы восстановить пароль'}
                 </Text>
             </View>
 
             <View style={styles.contentContainer}>
                 <View>
-                    <OutlinedFilledLabelInput
-                        label="Введите почту" 
-                        keyboardType="email-address" 
-                        value={mail} 
-                        onChangeText={(text) => setMail(text)} 
-                        onRightIconPress={() => {}}
-                        autoCapitalize="none"
-                    />
+                    {recoveryMethod === 'phone' ? (
+                        <OutlinedFilledLabelInput
+                            label="Номер телефона"
+                            keyboardType="phone-pad"
+                            value={phone}
+                            onChangeText={(text) => setPhone(text)}
+                            mask="phone"
+                            onRightIconPress={() => {}}
+                        />
+                    ) : (
+                        <OutlinedFilledLabelInput
+                            label="Введите почту"
+                            keyboardType="email-address"
+                            value={mail}
+                            onChangeText={(text) => setMail(text)}
+                            onRightIconPress={() => {}}
+                            autoCapitalize="none"
+                        />
+                    )}
+
+                    <TouchableOpacity
+                        onPress={() => setRecoveryMethod(recoveryMethod === 'phone' ? 'mail' : 'phone')}
+                        style={styles.forgotPassword}
+                    >
+                        <Text style={styles.forgotPasswordText}>
+                            {recoveryMethod === 'phone' ? 'Восстановить через почту' : 'Восстановить через телефон'}
+                        </Text>
+                    </TouchableOpacity>
                 </View>
 
                 <View style={{ marginTop: 60 }}>

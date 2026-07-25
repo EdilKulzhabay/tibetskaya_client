@@ -183,10 +183,12 @@ export type RootStackParamList = {
   DeleteAccount: undefined;
   ForgotPassword: undefined;
   OtpForgotPassword: {
-    mail: string;
+    mail?: string;
+    phone?: string;
   };
   NewPassword: {
-    mail: string;
+    mail?: string;
+    phone?: string;
   };
 };
 

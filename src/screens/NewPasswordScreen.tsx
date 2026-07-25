@@ -4,10 +4,12 @@ import OutlinedFilledLabelInput from "../components/OutlinedFilledLabelInput";
 import { apiService } from "../api/services";
 const screenWidth = Dimensions.get('window').width
 
-const NewPasswordScreen: React.FC<{ navigation: any, route: { params: { mail: string } } }> = ({ navigation, route }: { navigation: any, route: { params: { mail: string } } }) => {
+const NewPasswordScreen: React.FC<{ navigation: any, route: { params: { mail?: string; phone?: string } } }> = ({ navigation, route }: { navigation: any, route: { params: { mail?: string; phone?: string } } }) => {
     const mail = route?.params?.mail;
-    if (!mail) {
-        Alert.alert("Ошибка", "Некорректный email");
+    const phone = route?.params?.phone;
+    const identifier = phone ? { phone } : { mail };
+    if (!mail && !phone) {
+        Alert.alert("Ошибка", "Некорректный телефон или email");
         return;
     }
     const [password, setPassword] = useState("");
@@ -21,7 +23,7 @@ const NewPasswordScreen: React.FC<{ navigation: any, route: { params: { mail: st
             setLoading(false);
             return;
         }
-        const res = await apiService.updateForgottenPassword(mail, password);
+        const res = await apiService.updateForgottenPassword(identifier, password);
         if (res.success) {
             navigation.navigate("Login");
         } else {
