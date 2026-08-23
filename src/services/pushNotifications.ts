@@ -11,6 +11,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import messaging from '@react-native-firebase/messaging';
 import notifee, {AndroidImportance} from '@notifee/react-native';
+import {navigate} from '../navigation/navigationRef';
+import type {OrderData} from '../types/navigation';
 
 const API_URL = 'https://api.tibetskayacrm.kz';
 
@@ -473,11 +475,11 @@ class PushNotificationService {
       await this.displayLocalNotification(title, body, remoteMessage.data);
     });
 
-    // Уведомление открыто из фона
+    // Уведомление открыто из фона (пользователь тапнул по уведомлению)
     const unsubscribeOnNotificationOpenedApp =
       messaging().onNotificationOpenedApp(async remoteMessage => {
         console.log('👆 Открыто из фона:', remoteMessage);
-        await this.handleNotificationData(remoteMessage);
+        await this.handleNotificationData(remoteMessage, {fromTap: true});
       });
 
     // Уведомление открыто при холодном старте (вызывается один раз при запуске)
@@ -486,7 +488,7 @@ class PushNotificationService {
       .then(async remoteMessage => {
         if (remoteMessage) {
           console.log('🚀 Открыто при холодном старте:', remoteMessage);
-          await this.handleNotificationData(remoteMessage);
+          await this.handleNotificationData(remoteMessage, {fromTap: true});
         }
       });
 
@@ -531,9 +533,15 @@ class PushNotificationService {
   }
 
   /**
-   * Обработка данных уведомления
+   * Обработка данных уведомления.
+   * `fromTap` — true, когда обработка вызвана тапом пользователя по уведомлению
+   * (открытие из фона/холодного старта), а не показом на переднем плане —
+   * навигация на экран должна происходить только в этом случае.
    */
-  private async handleNotificationData(remoteMessage: any) {
+  private async handleNotificationData(
+    remoteMessage: any,
+    options: {fromTap?: boolean} = {},
+  ) {
     if (!remoteMessage.data) {
       console.log('⚠️ Нет данных в уведомлении');
       return;
@@ -593,6 +601,15 @@ class PushNotificationService {
           messageData,
         );
         DeviceEventEmitter.emit('newOrderChatMessage', messageData);
+
+        // Тап по уведомлению — переходим в чат с курьером по этому заказу.
+        // CourierChatScreen использует из order только _id, поэтому полный
+        // объект заказа тут не нужен.
+        if (options.fromTap && messageData?.orderId) {
+          navigate('CourierChat', {
+            order: {_id: messageData.orderId} as OrderData,
+          });
+        }
         return;
       } catch (error) {
         console.error('❌ Ошибка обработки сообщения чата с курьером:', error);

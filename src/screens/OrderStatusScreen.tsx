@@ -3,15 +3,16 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Alert,
   DeviceEventEmitter,
   Modal,
   Linking,
-  TextInput,
+  TextInput
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {androidOnlySafeAreaEdges} from '../utils/safeArea';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -411,7 +412,9 @@ const OrderStatusScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, isBannerVisible && styles.safeAreaWithBanner]}>
+    <SafeAreaView
+      style={[styles.safeArea, isBannerVisible && styles.safeAreaWithBanner]}
+      edges={androidOnlySafeAreaEdges}>
       <Back navigation={navigation} title="Заказ" />
       
       {renderOrderContent()}

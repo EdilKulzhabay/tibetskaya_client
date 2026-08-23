@@ -10,6 +10,8 @@ import {
   Share,
   Platform,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
+import {buildReferralShareMessage} from '../utils/referral';
 
 type Props = {
   visible: boolean;
@@ -17,14 +19,26 @@ type Props = {
   referralCode: string;
 };
 
-const ReferralPromoModal: React.FC<Props> = ({ visible, onDismiss, referralCode }) => {
+const ReferralPromoModal: React.FC<Props> = ({
+  visible,
+  onDismiss,
+  referralCode,
+}) => {
+  const [copied, setCopied] = React.useState(false);
+
+  const copyCode = () => {
+    Clipboard.setString(referralCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const invite = async () => {
-    const msg = `Присоединяйся к «Тибетской воде»! Мой реферальный код: ${referralCode}`;
+    const msg = buildReferralShareMessage(referralCode);
     try {
       const result = await Share.share(
         Platform.OS === 'ios'
-          ? { message: msg }
-          : { message: msg, title: 'Тибетская вода' }
+          ? {message: msg}
+          : {message: msg, title: 'Тибетская вода'},
       );
       if (result?.action === Share.sharedAction) {
         onDismiss();
@@ -35,20 +49,40 @@ const ReferralPromoModal: React.FC<Props> = ({ visible, onDismiss, referralCode 
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onDismiss}>
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-            <Image source={require('../assets/refPresent.png')} style={styles.image} resizeMode="contain" />
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scroll}>
+            <Image
+              source={require('../assets/refPresent.png')}
+              style={styles.image}
+              resizeMode="contain"
+            />
             <Text style={styles.title}>Увеличь свой баланс!</Text>
-            <Text style={styles.subtitle}>Поделитесь приложением с другом и получите бонусы</Text>
-            <Text style={styles.body}>
-              Отправьте ваш уникальный реферальный код. Когда ваш друг сделает первый заказ, мы начислим
-              1000 ₸ на ваш баланс. Это выгодно для обоих!
+            <Text style={styles.subtitle}>
+              Поделитесь приложением с другом и получите бонусы
             </Text>
-            <View style={styles.codeBox}>
+            <Text style={styles.body}>
+              Отправьте ваш уникальный реферальный код. Когда ваш друг сделает
+              первый заказ, мы начислим 1000 ₸ на ваш баланс. Это выгодно для
+              обоих!
+            </Text>
+            <TouchableOpacity
+              style={styles.codeBox}
+              activeOpacity={0.7}
+              onPress={copyCode}
+              disabled={!referralCode}>
               <Text style={styles.codeText}>{referralCode || '—'}</Text>
-            </View>
+              <Text style={styles.copyHint}>
+                {copied ? 'Скопировано ✓' : 'Нажмите, чтобы скопировать'}
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.primaryBtn} onPress={invite}>
               <Text style={styles.primaryBtnText}>Пригласить друга</Text>
             </TouchableOpacity>
@@ -121,6 +155,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: '#101010',
     textAlign: 'center',
+  },
+  copyHint: {
+    fontSize: 12,
+    color: '#8A8A8A',
+    textAlign: 'center',
+    marginTop: 4,
   },
   primaryBtn: {
     backgroundColor: '#DC1818',

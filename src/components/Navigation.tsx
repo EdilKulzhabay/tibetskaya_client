@@ -1,156 +1,191 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Platform } from 'react-native';
-import { useNavigation, useNavigationState } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { RootStackParamList } from '../types/navigation';
-import { useAuth } from '../hooks';
+import React, {useEffect} from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+  Platform,
+} from 'react-native';
+import {useNavigation, useNavigationState} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {RootStackParamList} from '../types/navigation';
+import {useAuth} from '../hooks';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const Navigation: React.FC = () => {
-    const navigation = useNavigation<NavigationProp>();
-    const { user, isAuthenticated, loadingState } = useAuth();
-    const insets = useSafeAreaInsets();
-    
-    // Получаем текущий маршрут из состояния навигации
-    const currentScreen = useNavigationState(state => {
-        const route = state?.routes[state.index];
-        return route?.name;
-    });
-    
-    const navigateToScreen = (screenName: keyof RootStackParamList) => {
-        if (currentScreen !== screenName) {
-            navigation.navigate(screenName as any);
-        }
-    };
+  const navigation = useNavigation<NavigationProp>();
+  const {user, isAuthenticated, loadingState} = useAuth();
+  const insets = useSafeAreaInsets();
 
-    const navigationProfileOrLogin = () => {
-        // Не делаем ничего пока загружаются данные
-        if (loadingState === 'loading') {
-            console.log('⏳ Ожидание загрузки данных пользователя...');
-            return;
-        }
+  // Получаем текущий маршрут из состояния навигации
+  const currentScreen = useNavigationState(state => {
+    const route = state?.routes[state.index];
+    return route?.name;
+  });
 
-        // После загрузки проверяем авторизацию
-        if (isAuthenticated && user !== null) {
-            console.log('✅ Пользователь авторизован, переход на Profile');
-            navigateToScreen('Profile');
-        } else {
-            console.log('❌ Пользователь не авторизован, переход на Login');
-            navigateToScreen('Login');
-        }
+  const navigateToScreen = (screenName: keyof RootStackParamList) => {
+    if (currentScreen !== screenName) {
+      navigation.navigate(screenName as any);
+    }
+  };
+
+  const navigationProfileOrLogin = () => {
+    // Не делаем ничего пока загружаются данные
+    if (loadingState === 'loading') {
+      console.log('⏳ Ожидание загрузки данных пользователя...');
+      return;
     }
 
-    // Вычисляем нижний отступ с учетом системной навигации
-    const bottomPadding = Platform.OS === 'android' 
-        ? Math.max(insets.bottom, 15) 
-        : Math.max(insets.bottom, 30);
+    // После загрузки проверяем авторизацию
+    if (isAuthenticated && user !== null) {
+      console.log('✅ Пользователь авторизован, переход на Profile');
+      navigateToScreen('Profile');
+    } else {
+      console.log('❌ Пользователь не авторизован, переход на Login');
+      navigateToScreen('Login');
+    }
+  };
 
-    return (
-        <View style={[styles.container, { paddingBottom: bottomPadding }]}>
-            <TouchableOpacity 
-                style={styles.navBlock} 
-                onPress={() => navigateToScreen('Home')}
-                activeOpacity={0.7}
-            >
-                {currentScreen === 'Home' ? (
-                    <>
-                        <Image source={require('../assets/homeActiveIcon.png')} style={styles.navIcon} />
-                        <Text style={styles.activeText}>Главная</Text>
-                    </>
-                ) : (
-                    <>
-                        <Image source={require('../assets/homeIcon.png')} style={styles.navIcon} />
-                        <Text style={styles.text}>Главная</Text>
-                    </>
-                )}
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-                style={styles.navBlock} 
-                onPress={() => {navigationProfileOrLogin()}}
-                activeOpacity={0.7}
-            >
-                {currentScreen === 'Profile' || currentScreen === 'Login' || currentScreen === 'Register' ? (
-                    <>
-                        <Image source={require('../assets/profileActiveIcon.png')} style={styles.navIcon} />
-                        <Text style={styles.activeText}>Профиль</Text>
-                    </>
-                ) : (
-                    <>
-                        <Image source={require('../assets/profileIcon.png')} style={styles.navIcon} />
-                        <Text style={styles.text}>Профиль</Text>
-                    </>
-                )}
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-                style={styles.navBlock} 
-                onPress={() => navigateToScreen('History')}
-                activeOpacity={0.7}
-            >
-                {currentScreen === 'History' ? (
-                    <>
-                        <Image source={require('../assets/historyActiveIcon.png')} style={styles.navIcon} />
-                        <Text style={styles.activeText}>История</Text>
-                    </>
-                ) : (
-                    <>
-                        <Image source={require('../assets/historyIcon.png')} style={styles.navIcon} />
-                        <Text style={styles.text}>История</Text>
-                    </>
-                )}
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-                style={styles.navBlock} 
-                onPress={() => navigateToScreen('Support')}
-                activeOpacity={0.7}
-            >
-                {currentScreen === 'Support' ? (
-                    <>
-                        <Image source={require('../assets/supportActiveIcon.png')} style={styles.navIcon} />
-                        <Text style={styles.activeText}>Поддержка</Text>
-                    </>
-                ) : (
-                    <>
-                        <Image source={require('../assets/supportIcon.png')} style={styles.navIcon} />
-                        <Text style={styles.text}>Поддержка</Text>
-                    </>
-                )}
-            </TouchableOpacity>
-        </View>
-    );
+  // Вычисляем нижний отступ с учетом системной навигации (только Android,
+  // на iOS достаточно обычного padding контейнера)
+  const bottomPadding = Math.max(insets.bottom, 15);
+
+  return (
+    <View
+      style={[
+        styles.container,
+        Platform.OS === 'android' && {paddingBottom: bottomPadding},
+      ]}>
+      <TouchableOpacity
+        style={styles.navBlock}
+        onPress={() => navigateToScreen('Home')}
+        activeOpacity={0.7}>
+        {currentScreen === 'Home' ? (
+          <>
+            <Image
+              source={require('../assets/homeActiveIcon.png')}
+              style={styles.navIcon}
+            />
+            <Text style={styles.activeText}>Главная</Text>
+          </>
+        ) : (
+          <>
+            <Image
+              source={require('../assets/homeIcon.png')}
+              style={styles.navIcon}
+            />
+            <Text style={styles.text}>Главная</Text>
+          </>
+        )}
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.navBlock}
+        onPress={() => {
+          navigationProfileOrLogin();
+        }}
+        activeOpacity={0.7}>
+        {currentScreen === 'Profile' ||
+        currentScreen === 'Login' ||
+        currentScreen === 'Register' ? (
+          <>
+            <Image
+              source={require('../assets/profileActiveIcon.png')}
+              style={styles.navIcon}
+            />
+            <Text style={styles.activeText}>Профиль</Text>
+          </>
+        ) : (
+          <>
+            <Image
+              source={require('../assets/profileIcon.png')}
+              style={styles.navIcon}
+            />
+            <Text style={styles.text}>Профиль</Text>
+          </>
+        )}
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.navBlock}
+        onPress={() => navigateToScreen('History')}
+        activeOpacity={0.7}>
+        {currentScreen === 'History' ? (
+          <>
+            <Image
+              source={require('../assets/historyActiveIcon.png')}
+              style={styles.navIcon}
+            />
+            <Text style={styles.activeText}>История</Text>
+          </>
+        ) : (
+          <>
+            <Image
+              source={require('../assets/historyIcon.png')}
+              style={styles.navIcon}
+            />
+            <Text style={styles.text}>История</Text>
+          </>
+        )}
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.navBlock}
+        onPress={() => navigateToScreen('Support')}
+        activeOpacity={0.7}>
+        {currentScreen === 'Support' ? (
+          <>
+            <Image
+              source={require('../assets/supportActiveIcon.png')}
+              style={styles.navIcon}
+            />
+            <Text style={styles.activeText}>Поддержка</Text>
+          </>
+        ) : (
+          <>
+            <Image
+              source={require('../assets/supportIcon.png')}
+              style={styles.navIcon}
+            />
+            <Text style={styles.text}>Поддержка</Text>
+          </>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 16,
-        backgroundColor: 'white',
-    },
-    navBlock: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
-    },
-    navIcon: {
-        width: 24,
-        height: 24,
-    },
-    activeText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#EE3F58',
-    },
-    text: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#484C52',
-    },
+  container: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    paddingTop: 8,
+    backgroundColor: 'white',
+  },
+  navBlock: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  navIcon: {
+    width: 24,
+    height: 24,
+  },
+  activeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#EE3F58',
+  },
+  text: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#484C52',
+  },
 });
 
 export default Navigation;

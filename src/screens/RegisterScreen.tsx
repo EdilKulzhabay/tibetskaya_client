@@ -17,6 +17,7 @@ import OutlinedFilledLabelInput from '../components/OutlinedFilledLabelInput';
 import {useEffect, useRef, useState} from 'react';
 import {MySwitchToggle, StableImage} from '../components';
 import {apiService} from '../api/services';
+import {formatReferralCodeInput} from '../utils/referral';
 const screenWidth = Dimensions.get('window').width;
 
 const RegisterScreen: React.FC<{navigation: any}> = ({navigation}) => {
@@ -32,10 +33,10 @@ const RegisterScreen: React.FC<{navigation: any}> = ({navigation}) => {
   });
   const [loading, setLoading] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // Refs для навигации между полями
   const nameRef = useRef<TextInput>(null);
-  const mailRef = useRef<TextInput>(null);
   const phoneRef = useRef<TextInput>(null);
   const passRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
@@ -45,14 +46,16 @@ const RegisterScreen: React.FC<{navigation: any}> = ({navigation}) => {
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
-      () => {
+      event => {
         setIsKeyboardVisible(true);
+        setKeyboardHeight(event.endCoordinates.height);
       },
     );
     const keyboardDidHideListener = Keyboard.addListener(
       'keyboardDidHide',
       () => {
         setIsKeyboardVisible(false);
+        setKeyboardHeight(0);
       },
     );
 
@@ -120,7 +123,9 @@ const RegisterScreen: React.FC<{navigation: any}> = ({navigation}) => {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{paddingBottom: isKeyboardVisible ? 80 : 40}}>
+      contentContainerStyle={{
+        paddingBottom: isKeyboardVisible ? keyboardHeight + 40 : 40,
+      }}>
       <TouchableOpacity
         onPress={() => {
           navigation.goBack();
@@ -161,19 +166,6 @@ const RegisterScreen: React.FC<{navigation: any}> = ({navigation}) => {
           inputRef={nameRef}
           returnKeyType="next"
           blurOnSubmit={false}
-          onSubmitEditing={() => mailRef.current?.focus()}
-        />
-
-        <OutlinedFilledLabelInput
-          label="Почта (необязательно)"
-          value={form.mail}
-          onChangeText={text => setForm({...form, mail: text})}
-          bgWhite={true}
-          inputRef={mailRef}
-          returnKeyType="next"
-          blurOnSubmit={false}
-          keyboardType="email-address"
-          autoCapitalize="none"
           onSubmitEditing={() => phoneRef.current?.focus()}
         />
 
@@ -223,7 +215,7 @@ const RegisterScreen: React.FC<{navigation: any}> = ({navigation}) => {
           label="Реферальный код (необязательно)"
           value={form.referralCode}
           onChangeText={text =>
-            setForm({...form, referralCode: text.toUpperCase()})
+            setForm({...form, referralCode: formatReferralCodeInput(text)})
           }
           bgWhite={true}
           inputRef={referralRef}
@@ -291,6 +283,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'white',
     position: 'relative',
+    marginTop: -30,
   },
   bannerContainer: {
     width: '100%',

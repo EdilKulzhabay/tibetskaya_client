@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Логотип на splash screen ≈ 50% ширины экрана. XML-дровабл не поддерживает
+         проценты напрямую (minSdk 24, до InsetDrawable c процентами нужен API 30),
+         поэтому размер подобран по бакетам ширины экрана (sw*dp) в values-sw*/. -->
+    <dimen name="splash_logo_size">160dp</dimen>
+</resources>

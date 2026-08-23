@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
@@ -12,8 +11,10 @@ import {
   Alert,
   Keyboard,
   TouchableWithoutFeedback,
-  DeviceEventEmitter,
+  DeviceEventEmitter
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {androidOnlySafeAreaEdges} from '../utils/safeArea';
 import { RouteProp, useRoute } from '@react-navigation/native';
 import { Back } from '../components';
 import { apiService } from '../api/services';
@@ -155,7 +156,7 @@ const CourierChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={androidOnlySafeAreaEdges}>
       <Back navigation={navigation} title="Чат с курьером" />
 
       <KeyboardAvoidingView

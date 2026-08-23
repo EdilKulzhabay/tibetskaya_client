@@ -39,7 +39,18 @@
       <meta-data
         android:name="com.google.android.geo.API_KEY"
         android:value="AIzaSyAvQK6oYcA4BCy1Mv6bvS7KDaAFEEP8Xt0"/>
-      
+
+      <!-- Facebook SDK (App Events): см. TZ_Facebook_SDK_Integration -->
+      <meta-data
+        android:name="com.facebook.sdk.ApplicationId"
+        android:value="@string/facebook_app_id" />
+      <meta-data
+        android:name="com.facebook.sdk.AutoLogAppEventsEnabled"
+        android:value="true" />
+      <meta-data
+        android:name="com.facebook.sdk.AdvertiserIDCollectionEnabled"
+        android:value="true" />
+
       <!-- Firebase Cloud Messaging -->
       <meta-data
         android:name="com.google.firebase.messaging.default_notification_icon"

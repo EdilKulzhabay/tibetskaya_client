@@ -3,12 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Linking,
-  Modal,
+  Modal
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {androidOnlySafeAreaEdges} from '../utils/safeArea';
 import { Header, MainPageBanner, Navigation } from '../components';
 import NavButton from '../components/NavButton';
 import { useAuth } from '../hooks';
@@ -24,7 +25,7 @@ const SupportScreen: React.FC<SupportScreenProps> = ({ navigation }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={androidOnlySafeAreaEdges}>
       <Header 
         bonus={user?.balance || 0} 
         showBackButton={false}

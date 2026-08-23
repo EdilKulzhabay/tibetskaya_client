@@ -1,6 +1,5 @@
 import React, {useEffect, useState, useRef} from 'react';
 import {
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
@@ -12,8 +11,10 @@ import {
   Alert,
   Keyboard,
   TouchableWithoutFeedback,
-  DeviceEventEmitter,
+  DeviceEventEmitter
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {androidOnlySafeAreaEdges} from '../utils/safeArea';
 import {Back} from '../components';
 import {useAuth} from '../hooks';
 import {apiService} from '../api/services';
@@ -211,7 +212,7 @@ const ChatScreen: React.FC<{navigation: any}> = ({navigation}) => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={androidOnlySafeAreaEdges}>
       <Back navigation={navigation} title="Чат поддержка" />
 
       <KeyboardAvoidingView

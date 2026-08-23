@@ -2,12 +2,15 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Красная подложка под прозрачные углы макета иконки -->
     <item>
-        <color android:color="#FF0000" />
+        <color android:color="#f91718" />
     </item>
-    <!-- Полноэкранный splash (как приложение только что открылось) -->
-    <item>
+    <!-- Логотип по центру, ширина ≈ 50% экрана (см. values*/dimens.xml), без растягивания -->
+    <item
+        android:width="@dimen/splash_logo_size"
+        android:height="@dimen/splash_logo_size"
+        android:gravity="center">
         <bitmap
-            android:gravity="fill"
+            android:gravity="center"
             android:src="@drawable/splash_screen_logo" />
     </item>
 </layer-list>

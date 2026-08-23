@@ -1,9 +1,11 @@
-import { SafeAreaView, StyleSheet, Text, ScrollView, View, Image, TouchableOpacity } from "react-native";
+import { StyleSheet, Text, ScrollView, View, Image, TouchableOpacity } from "react-native";
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {androidOnlySafeAreaEdges} from '../utils/safeArea';
 import { Back } from "../components";
 
 const WhatIsMyBalanceScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     return (
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={styles.safeArea} edges={androidOnlySafeAreaEdges}>
             <Back navigation={navigation} title="Что такое мой баланс?" />
             <ScrollView style={{}} showsVerticalScrollIndicator={false}>
                 <View style={{

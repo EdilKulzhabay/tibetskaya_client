@@ -5,6 +5,8 @@ import ReactAppDependencyProvider
 import FirebaseCore
 import FirebaseMessaging
 import UserNotifications
+import FBSDKCoreKit
+import AppTrackingTransparency
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate, MessagingDelegate {
@@ -13,13 +15,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
   var reactNativeDelegate: ReactNativeDelegate?
   var reactNativeFactory: RCTReactNativeFactory?
 
+  private var didRequestTrackingAuthorization = false
+
   func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
     // 1. Инициализация Firebase (должно быть первым)
     FirebaseApp.configure()
-    
+
+    // 1.1 Инициализация Facebook SDK (App Events)
+    ApplicationDelegate.shared.application(
+      application,
+      didFinishLaunchingWithOptions: launchOptions
+    )
+
     // 2. Настройка делегатов для push-уведомлений
     UNUserNotificationCenter.current().delegate = self
     Messaging.messaging().delegate = self
@@ -46,7 +56,35 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
     return true
   }
-  
+
+  // MARK: - Facebook SDK
+
+  func application(
+    _ app: UIApplication,
+    open url: URL,
+    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
+  ) -> Bool {
+    ApplicationDelegate.shared.application(app, open: url, options: options)
+  }
+
+  // MARK: - App Tracking Transparency (iOS 14+)
+
+  func applicationDidBecomeActive(_ application: UIApplication) {
+    requestTrackingAuthorizationIfNeeded()
+  }
+
+  private func requestTrackingAuthorizationIfNeeded() {
+    guard !didRequestTrackingAuthorization else { return }
+    didRequestTrackingAuthorization = true
+
+    // Небольшая задержка, чтобы системный диалог ATT не появился поверх ещё не отрисованного UI
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+      ATTrackingManager.requestTrackingAuthorization { status in
+        print("📱 [AppDelegate] ATT authorization status: \(status.rawValue)")
+      }
+    }
+  }
+
   // MARK: - Push Notifications
   
   func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {

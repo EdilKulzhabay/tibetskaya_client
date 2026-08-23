@@ -1,5 +1,4 @@
 import {
-  SafeAreaView,
   StyleSheet,
   View,
   Text,
@@ -9,8 +8,10 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
-  TextInput,
+  TextInput
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {androidOnlySafeAreaEdges} from '../utils/safeArea';
 import Back from '../components/Back';
 import {useAuth} from '../hooks';
 import {useTopUpBalance} from '../context/TopUpBalanceContext';
@@ -22,6 +23,7 @@ import {clientHasInvoiceLegalData} from '../utils/clientInvoiceProfile';
 import {getWalletOpFormForUser} from '../utils/invoiceClientOrderPayment';
 import {buildSelectableDeliveryDates} from '../utils/orderDeliveryDate';
 import {getClientMongoId} from '../utils/clientId';
+import {logOrderPurchaseEvents} from '../utils/facebookEvents';
 
 const calls = [
   {label: 'Позвонить заранее', value: true},
@@ -43,8 +45,8 @@ const AddOrderScreen: React.FC<{navigation: any; route: any}> = ({
   const {user, refreshUserData} = useAuth();
   const {openTopUpModal} = useTopUpBalance();
 
-  const [price12, setPrice12] = useState(user?.price12 || 900);
-  const [price19, setPrice19] = useState(user?.price19 || 1300);
+  const [price12, setPrice12] = useState(user?.price12 || 1100);
+  const [price19, setPrice19] = useState(user?.price19 || 1500);
   const [count12, setCount12] = useState(products.b12 || 0);
   const [count19, setCount19] = useState(products.b19 || 0);
 
@@ -163,8 +165,8 @@ const AddOrderScreen: React.FC<{navigation: any; route: any}> = ({
   useEffect(() => {
     if (user) {
       console.log('💰 Обновляем цены:', user.price12, user.price19);
-      setPrice12(user.price12 || 900);
-      setPrice19(user.price19 || 1300);
+      setPrice12(user.price12 || 1100);
+      setPrice19(user.price19 || 1500);
     }
   }, [user, user?.price12, user?.price19]);
 
@@ -280,6 +282,12 @@ const AddOrderScreen: React.FC<{navigation: any; route: any}> = ({
         const showRef = Boolean(
           (res as {showReferralModal?: boolean}).showReferralModal,
         );
+        logOrderPurchaseEvents({
+          user,
+          products: {b12: count12, b19: count19},
+          totalAmount: count12 * price12 + count19 * price19,
+          orderId: (res as {order?: {_id?: string}}).order?._id,
+        });
         /** Сбрасываем способ оплаты: экран оформления может оставаться в стеке, глобальное пополнение не должно «прилипать» к уже завершённому заказу. */
         setSelectedPayment(null);
         Alert.alert('Успешно', 'Заказ оформлен', [
@@ -472,7 +480,7 @@ const AddOrderScreen: React.FC<{navigation: any; route: any}> = ({
   }, [user, count12, count19, price12, price19]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={androidOnlySafeAreaEdges}>
       <Back navigation={navigation} title="Оформление заказа" />
       <ScrollView
         ref={scrollViewRef}

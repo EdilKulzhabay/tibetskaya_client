@@ -1,4 +1,6 @@
-import { Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {androidOnlySafeAreaEdges} from '../../utils/safeArea';
 import { Back } from "../../components";
 import { RootStackParamList } from "../../types/navigation";
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -162,7 +164,7 @@ const AddOrUpdateAddress: React.FC<Props> = ({ navigation, route }) => {
     }, [address]);
 
     return (
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={styles.safeArea} edges={androidOnlySafeAreaEdges}>
             <Back navigation={navigation} title="Добавить адрес" />
             <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
                 <OutlinedFilledLabelInput

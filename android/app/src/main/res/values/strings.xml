@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Тибетская</string>
+    <!-- Facebook SDK (App Events): см. TZ_Facebook_SDK_Integration -->
+    <string name="facebook_app_id">2325289084670460</string>
 </resources>

@@ -7,10 +7,10 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-  SafeAreaView,
   Dimensions,
-  Platform,
+  Platform
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import type { WebViewNavigation } from 'react-native-webview';
 import { apiService } from '../api/services';

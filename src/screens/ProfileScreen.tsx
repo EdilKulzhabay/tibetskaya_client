@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   ScrollView,
   Image,
@@ -13,6 +12,8 @@ import {
   Platform,
   Share,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {androidOnlySafeAreaEdges} from '../utils/safeArea';
 import {useFocusEffect} from '@react-navigation/native';
 import {
   launchImageLibrary,
@@ -26,6 +27,8 @@ import {profileImageStorage} from '../utils/storage';
 import pushNotificationService from '../services/pushNotifications';
 import {apiService} from '../api/services';
 import {getClientMongoId} from '../utils/clientId';
+import {buildReferralShareMessage} from '../utils/referral';
+import Clipboard from '@react-native-clipboard/clipboard';
 
 interface ProfileScreenProps {
   navigation: any;
@@ -195,7 +198,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({navigation}) => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={androidOnlySafeAreaEdges}>
       {/* <View style={{height: 100}} /> */}
       <View style={styles.header}>
         <View style={{width: 24}} />
@@ -260,40 +263,54 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({navigation}) => {
           <Text style={styles.referralCodeText}>
             {user?.referralCode || 'Загрузка…'}
           </Text>
-          <TouchableOpacity
-            activeOpacity={0.75}
-            onPress={async () => {
-              let code = user?.referralCode;
-              const clientId = getClientMongoId(user);
-              if (!code && clientId) {
-                try {
-                  const res = await apiService.getData(clientId);
-                  code = res.client?.referralCode;
-                  if (res.client) {
-                    await refreshUserData();
+          <View style={styles.referralActionsRow}>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={async () => {
+                let code = user?.referralCode;
+                const clientId = getClientMongoId(user);
+                if (!code && clientId) {
+                  try {
+                    const res = await apiService.getData(clientId);
+                    code = res.client?.referralCode;
+                    if (res.client) {
+                      await refreshUserData();
+                    }
+                  } catch {
+                    Alert.alert(
+                      'Ошибка',
+                      'Не удалось загрузить реферальный код',
+                    );
+                    return;
                   }
-                } catch {
-                  Alert.alert('Ошибка', 'Не удалось загрузить реферальный код');
+                }
+                if (!code) {
+                  Alert.alert('Код недоступен', 'Попробуйте позже');
                   return;
                 }
-              }
-              if (!code) {
-                Alert.alert('Код недоступен', 'Попробуйте позже');
-                return;
-              }
-              const msg = `Присоединяйся к «Тибетской воде»! Мой реферальный код: ${code}`;
-              try {
-                await Share.share(
-                  Platform.OS === 'ios'
-                    ? {message: msg}
-                    : {message: msg, title: 'Тибетская вода'},
-                );
-              } catch {
-                /* отмена шеринга */
-              }
-            }}>
-            <Text style={styles.referralTapHint}>Поделиться</Text>
-          </TouchableOpacity>
+                const msg = buildReferralShareMessage(code);
+                try {
+                  await Share.share(
+                    Platform.OS === 'ios'
+                      ? {message: msg}
+                      : {message: msg, title: 'Тибетская вода'},
+                  );
+                } catch {
+                  /* отмена шеринга */
+                }
+              }}>
+              <Text style={styles.referralTapHint}>Поделиться</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => {
+                if (!user?.referralCode) return;
+                Clipboard.setString(user.referralCode);
+                Alert.alert('Скопировано', 'Реферальный код скопирован');
+              }}>
+              <Text style={styles.referralTapHint}>Копировать код</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* <NavButton title="Аналитика" onPress={() => navigation.navigate('Bonus')} icon={require('../assets/analytics.png')} /> */}
@@ -548,10 +565,14 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: '#101010',
   },
+  referralActionsRow: {
+    flexDirection: 'row',
+    gap: 20,
+    marginTop: 8,
+  },
   referralTapHint: {
     fontSize: 12,
     color: '#DC1818',
-    marginTop: 8,
     fontWeight: '500',
   },
 });

@@ -10,23 +10,24 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import AuthWrapper from './src/components/AuthWrapper';
 import ImagePreloader from './src/components/ImagePreloader';
+import ErrorBoundary from './src/components/ErrorBoundary';
 
 // Импорт наших экранов
 import {
-  HomeScreen, 
-  ProfileScreen, 
-  HistoryScreen, 
-  SupportScreen, 
-  OrderStatusScreen, 
+  HomeScreen,
+  ProfileScreen,
+  HistoryScreen,
+  SupportScreen,
+  OrderStatusScreen,
   BonusScreen,
-  WalletScreen, 
+  WalletScreen,
   ChatScreen,
   CourierChatScreen,
   AddressScreen,
-  AddOrUpdateAddress, 
-  LoginScreen, 
-  RegisterScreen, 
-  RegisterAcceptedScreen, 
+  AddOrUpdateAddress,
+  LoginScreen,
+  RegisterScreen,
+  RegisterAcceptedScreen,
   OtpScreen,
   ChangeDataScreen,
   TarrifsScreen,
@@ -43,17 +44,21 @@ import {
   DeleteAccountScreen,
   ForgotPasswordScreen,
   OtpForgotPasswordScreen,
-  NewPasswordScreen
+  NewPasswordScreen,
 } from './src/screens';
-import { RootStackParamList } from './src/types/navigation';
-import { ScreenLayout } from './src/components';
-import { TopUpBalanceProvider } from './src/context/TopUpBalanceContext';
-import { AuthProvider } from './src/hooks/useAuth';
+import {RootStackParamList} from './src/types/navigation';
+import {navigationRef} from './src/navigation/navigationRef';
+import {ScreenLayout} from './src/components';
+import {TopUpBalanceProvider} from './src/context/TopUpBalanceContext';
+import {AuthProvider} from './src/hooks/useAuth';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 // Функция-обертка для экранов с навигацией
-const withLayout = (Component: React.ComponentType<any>, showNavigation: boolean = true) => {
+const withLayout = (
+  Component: React.ComponentType<any>,
+  showNavigation: boolean = true,
+) => {
   return (props: any) => (
     <ScreenLayout showNavigation={showNavigation}>
       <Component {...props} />
@@ -63,92 +68,171 @@ const withLayout = (Component: React.ComponentType<any>, showNavigation: boolean
 
 function App() {
   const isDarkMode = useColorScheme() === 'light';
-  
+
   // Инициализация push-уведомлений перенесена в useAuth хук
   // Она будет вызываться автоматически при загрузке пользователя или после логина/регистрации
-  
+
   return (
     <SafeAreaProvider>
-      <ImagePreloader>
-        <AuthProvider>
-          <AuthWrapper>
-            <NavigationContainer>
-              <TopUpBalanceProvider>
-              <Stack.Navigator 
-                initialRouteName="Home"
-                screenOptions={{
-                  headerShown: false, // Скрываем стандартный заголовок
-                }}
-              >
-              {/* Все экраны с нижней навигацией */}
-              <Stack.Screen 
-                name="Home" 
-                component={withLayout(HomeScreen)}
-                options={{
-                  gestureEnabled: false, // Отключаем свайп назад
-                }}
-              />
-              <Stack.Screen 
-                name="Profile" 
-                component={withLayout(ProfileScreen)}
-                options={{
-                  gestureEnabled: false, // Отключаем свайп назад
-                }}
-              />
-              <Stack.Screen 
-                name="History" 
-                component={withLayout(HistoryScreen)}
-                options={{
-                  gestureEnabled: false, // Отключаем свайп назад
-                }}
-              />
-              <Stack.Screen 
-                name="Support" 
-                component={withLayout(SupportScreen)}
-                options={{
-                  gestureEnabled: false, // Отключаем свайп назад
-                }}
-              />
-              <Stack.Screen name="OrderStatus" component={withLayout(OrderStatusScreen)} />
-              <Stack.Screen name="Bonus" component={withLayout(BonusScreen)} />
-              <Stack.Screen name="Wallet" component={withLayout(WalletScreen)} />
-              <Stack.Screen name="Chat" component={withLayout(ChatScreen, false)} />
-              <Stack.Screen name="CourierChat" component={withLayout(CourierChatScreen, false)} />
-              <Stack.Screen name="Address" component={withLayout(AddressScreen)} />
-              <Stack.Screen name="AddOrUpdateAddress" component={withLayout(AddOrUpdateAddress)} />
-              <Stack.Screen 
-                name="Login" 
-                component={withLayout(LoginScreen)}
-                options={{
-                  gestureEnabled: false, // Отключаем смахивание
-                  headerLeft: () => null, // Убираем кнопку назад в заголовке
-                }}
-              />
-              <Stack.Screen name="Register" component={withLayout(RegisterScreen)} />
-              <Stack.Screen name="Otp" component={withLayout(OtpScreen)} />
-              <Stack.Screen name="RegisterAccepted" component={withLayout(RegisterAcceptedScreen)} />
-              <Stack.Screen name="ChangeData" component={withLayout(ChangeDataScreen)} />
-              <Stack.Screen name="Tarrifs" component={withLayout(TarrifsScreen)} />
-              <Stack.Screen name="FAQ" component={withLayout(FAQScreen)} />
-              <Stack.Screen name="Hydration" component={withLayout(HydrationScreen)} />
-              <Stack.Screen name="TakePartHydration" component={withLayout(TakePartHydrationScreen)} />
-              <Stack.Screen name="TakePartInvite" component={withLayout(TakePartInviteScreen)} />
-              <Stack.Screen name="StartHydration" component={withLayout(StartHydrationScreen)} />
-              <Stack.Screen name="StartHydration2" component={withLayout(StartHydrationScreen2)} />
-              <Stack.Screen name="AddOrder" component={withLayout(AddOrderScreen)} />
-              <Stack.Screen name="Settings" component={withLayout(SettingsScreen)} />
-              <Stack.Screen name="WhatIsMyBalance" component={withLayout(WhatIsMyBalanceScreen)} />
-              <Stack.Screen name="HowToTopUp" component={withLayout(HowToTopUpScreen)} />
-              <Stack.Screen name="DeleteAccount" component={withLayout(DeleteAccountScreen)} />
-              <Stack.Screen name="ForgotPassword" component={withLayout(ForgotPasswordScreen)} />
-              <Stack.Screen name="OtpForgotPassword" component={withLayout(OtpForgotPasswordScreen)} />
-              <Stack.Screen name="NewPassword" component={withLayout(NewPasswordScreen)} />
-              </Stack.Navigator>
-              </TopUpBalanceProvider>
-            </NavigationContainer>
-          </AuthWrapper>
-        </AuthProvider>
-      </ImagePreloader>
+      <ErrorBoundary>
+        <ImagePreloader>
+          <AuthProvider>
+            <AuthWrapper>
+              <NavigationContainer ref={navigationRef}>
+                <TopUpBalanceProvider>
+                  <Stack.Navigator
+                    initialRouteName="Home"
+                    screenOptions={{
+                      headerShown: false, // Скрываем стандартный заголовок
+                    }}>
+                    {/* Все экраны с нижней навигацией */}
+                    <Stack.Screen
+                      name="Home"
+                      component={withLayout(HomeScreen)}
+                      options={{
+                        gestureEnabled: false, // Отключаем свайп назад
+                      }}
+                    />
+                    <Stack.Screen
+                      name="Profile"
+                      component={withLayout(ProfileScreen)}
+                      options={{
+                        gestureEnabled: false, // Отключаем свайп назад
+                      }}
+                    />
+                    <Stack.Screen
+                      name="History"
+                      component={withLayout(HistoryScreen)}
+                      options={{
+                        gestureEnabled: false, // Отключаем свайп назад
+                      }}
+                    />
+                    <Stack.Screen
+                      name="Support"
+                      component={withLayout(SupportScreen)}
+                      options={{
+                        gestureEnabled: false, // Отключаем свайп назад
+                      }}
+                    />
+                    <Stack.Screen
+                      name="OrderStatus"
+                      component={withLayout(OrderStatusScreen)}
+                    />
+                    <Stack.Screen
+                      name="Bonus"
+                      component={withLayout(BonusScreen)}
+                    />
+                    <Stack.Screen
+                      name="Wallet"
+                      component={withLayout(WalletScreen)}
+                    />
+                    <Stack.Screen
+                      name="Chat"
+                      component={withLayout(ChatScreen, false)}
+                    />
+                    <Stack.Screen
+                      name="CourierChat"
+                      component={withLayout(CourierChatScreen, false)}
+                    />
+                    <Stack.Screen
+                      name="Address"
+                      component={withLayout(AddressScreen)}
+                    />
+                    <Stack.Screen
+                      name="AddOrUpdateAddress"
+                      component={withLayout(AddOrUpdateAddress)}
+                    />
+                    <Stack.Screen
+                      name="Login"
+                      component={withLayout(LoginScreen)}
+                      options={{
+                        gestureEnabled: false, // Отключаем смахивание
+                        headerLeft: () => null, // Убираем кнопку назад в заголовке
+                      }}
+                    />
+                    <Stack.Screen
+                      name="Register"
+                      component={withLayout(RegisterScreen)}
+                    />
+                    <Stack.Screen
+                      name="Otp"
+                      component={withLayout(OtpScreen)}
+                    />
+                    <Stack.Screen
+                      name="RegisterAccepted"
+                      component={withLayout(RegisterAcceptedScreen)}
+                    />
+                    <Stack.Screen
+                      name="ChangeData"
+                      component={withLayout(ChangeDataScreen)}
+                    />
+                    <Stack.Screen
+                      name="Tarrifs"
+                      component={withLayout(TarrifsScreen)}
+                    />
+                    <Stack.Screen
+                      name="FAQ"
+                      component={withLayout(FAQScreen)}
+                    />
+                    <Stack.Screen
+                      name="Hydration"
+                      component={withLayout(HydrationScreen)}
+                    />
+                    <Stack.Screen
+                      name="TakePartHydration"
+                      component={withLayout(TakePartHydrationScreen)}
+                    />
+                    <Stack.Screen
+                      name="TakePartInvite"
+                      component={withLayout(TakePartInviteScreen)}
+                    />
+                    <Stack.Screen
+                      name="StartHydration"
+                      component={withLayout(StartHydrationScreen)}
+                    />
+                    <Stack.Screen
+                      name="StartHydration2"
+                      component={withLayout(StartHydrationScreen2)}
+                    />
+                    <Stack.Screen
+                      name="AddOrder"
+                      component={withLayout(AddOrderScreen)}
+                    />
+                    <Stack.Screen
+                      name="Settings"
+                      component={withLayout(SettingsScreen)}
+                    />
+                    <Stack.Screen
+                      name="WhatIsMyBalance"
+                      component={withLayout(WhatIsMyBalanceScreen)}
+                    />
+                    <Stack.Screen
+                      name="HowToTopUp"
+                      component={withLayout(HowToTopUpScreen)}
+                    />
+                    <Stack.Screen
+                      name="DeleteAccount"
+                      component={withLayout(DeleteAccountScreen)}
+                    />
+                    <Stack.Screen
+                      name="ForgotPassword"
+                      component={withLayout(ForgotPasswordScreen)}
+                    />
+                    <Stack.Screen
+                      name="OtpForgotPassword"
+                      component={withLayout(OtpForgotPasswordScreen)}
+                    />
+                    <Stack.Screen
+                      name="NewPassword"
+                      component={withLayout(NewPasswordScreen)}
+                    />
+                  </Stack.Navigator>
+                </TopUpBalanceProvider>
+              </NavigationContainer>
+            </AuthWrapper>
+          </AuthProvider>
+        </ImagePreloader>
+      </ErrorBoundary>
     </SafeAreaProvider>
   );
 }

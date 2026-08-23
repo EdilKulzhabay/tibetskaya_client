@@ -1,9 +1,11 @@
-import { SafeAreaView, StyleSheet, Text, ScrollView, View, Image, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, ScrollView, View, Image, TouchableOpacity } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {androidOnlySafeAreaEdges} from '../utils/safeArea';
 import { Back } from '../components';
 
 const TakePartInviteScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     return (
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={styles.safeArea} edges={androidOnlySafeAreaEdges}>
             <Back navigation={navigation} title="Принять участие в приглашении" />
             {/* <View style={styles.imageContainer}> */}
                 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, {useState, useEffect, useRef, useCallback} from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,16 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, {Marker, Polyline, PROVIDER_GOOGLE} from 'react-native-maps';
+
+/** Иконка машины курьера на карте — в 2 раза меньше исходного изображения. */
+const courierCarAsset = Image.resolveAssetSource(
+  require('../assets/courierCar.png'),
+);
+const COURIER_CAR_ICON_SIZE = {
+  width: courierCarAsset.width / 8,
+  height: courierCarAsset.height / 8,
+};
 
 interface Location {
   latitude: number;
@@ -24,13 +33,13 @@ interface MapProviderProps {
 
 // Координаты различных районов Алматы
 const ALMATY_LOCATIONS = {
-  center: { latitude: 43.2220, longitude: 76.8512 },
-  samal1: { latitude: 43.2267, longitude: 76.8782 },
-  samal2: { latitude: 43.2156, longitude: 76.8934 },
-  bostandyk: { latitude: 43.2065, longitude: 76.8734 },
-  medeu: { latitude: 43.1969, longitude: 76.8643 },
-  koktem: { latitude: 43.2401, longitude: 76.8234 },
-  almaly: { latitude: 43.2511, longitude: 76.8445 },
+  center: {latitude: 43.222, longitude: 76.8512},
+  samal1: {latitude: 43.2267, longitude: 76.8782},
+  samal2: {latitude: 43.2156, longitude: 76.8934},
+  bostandyk: {latitude: 43.2065, longitude: 76.8734},
+  medeu: {latitude: 43.1969, longitude: 76.8643},
+  koktem: {latitude: 43.2401, longitude: 76.8234},
+  almaly: {latitude: 43.2511, longitude: 76.8445},
 };
 
 const MapProvider: React.FC<MapProviderProps> = ({
@@ -39,27 +48,29 @@ const MapProvider: React.FC<MapProviderProps> = ({
   showCourierRoute = true,
   onCourierLocationUpdate,
 }) => {
-  const [currentCourierLocation, setCurrentCourierLocation] = useState<Location>(
-    courierLocation || ALMATY_LOCATIONS.bostandyk
-  );
+  const [currentCourierLocation, setCurrentCourierLocation] =
+    useState<Location>(courierLocation || ALMATY_LOCATIONS.bostandyk);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
-  
+
   // Маршрут курьера до точки доставки
   const [routeCoordinates, setRouteCoordinates] = useState<Location[]>([
     ALMATY_LOCATIONS.bostandyk, // Начальная точка
-    ALMATY_LOCATIONS.center,    // Центр города
-    ALMATY_LOCATIONS.koktem,    // Промежуточная точка
+    ALMATY_LOCATIONS.center, // Центр города
+    ALMATY_LOCATIONS.koktem, // Промежуточная точка
     deliveryLocation || ALMATY_LOCATIONS.center, // Точка доставки с fallback
   ]);
 
   const mapRef = useRef<MapView>(null);
 
   // Создаем стабильную ссылку на callback
-  const stableOnCourierLocationUpdate = useCallback((location: Location) => {
-    onCourierLocationUpdate?.(location);
-  }, [onCourierLocationUpdate]);
+  const stableOnCourierLocationUpdate = useCallback(
+    (location: Location) => {
+      onCourierLocationUpdate?.(location);
+    },
+    [onCourierLocationUpdate],
+  );
 
   // Симуляция движения курьера
   useEffect(() => {
@@ -71,13 +82,13 @@ const MapProvider: React.FC<MapProviderProps> = ({
         const targetLocation = deliveryLocation || ALMATY_LOCATIONS.center;
         const latDiff = targetLocation.latitude - prevLocation.latitude;
         const lngDiff = targetLocation.longitude - prevLocation.longitude;
-        
+
         // Медленное движение к цели
         const speed = 0.0001; // Скорость движения
-        
+
         const newLocation = {
-          latitude: prevLocation.latitude + (latDiff * speed),
-          longitude: prevLocation.longitude + (lngDiff * speed),
+          latitude: prevLocation.latitude + latDiff * speed,
+          longitude: prevLocation.longitude + lngDiff * speed,
         };
 
         // Уведомляем родительский компонент о новом местоположении через setTimeout
@@ -95,12 +106,15 @@ const MapProvider: React.FC<MapProviderProps> = ({
   // Центрирование карты на области доставки
   const centerMapOnDelivery = () => {
     if (mapRef.current && deliveryLocation) {
-      mapRef.current.animateToRegion({
-        latitude: deliveryLocation.latitude,
-        longitude: deliveryLocation.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }, 1000);
+      mapRef.current.animateToRegion(
+        {
+          latitude: deliveryLocation.latitude,
+          longitude: deliveryLocation.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        },
+        1000,
+      );
     }
   };
 
@@ -111,23 +125,26 @@ const MapProvider: React.FC<MapProviderProps> = ({
       const coordinates = [...routeCoordinates, currentCourierLocation];
       const latitudes = coordinates.map(coord => coord.latitude);
       const longitudes = coordinates.map(coord => coord.longitude);
-      
+
       const minLat = Math.min(...latitudes);
       const maxLat = Math.max(...latitudes);
       const minLng = Math.min(...longitudes);
       const maxLng = Math.max(...longitudes);
-      
+
       const centerLat = (minLat + maxLat) / 2;
       const centerLng = (minLng + maxLng) / 2;
       const latDelta = (maxLat - minLat) * 1.2; // Добавляем отступы
       const lngDelta = (maxLng - minLng) * 1.2;
 
-      mapRef.current.animateToRegion({
-        latitude: centerLat,
-        longitude: centerLng,
-        latitudeDelta: Math.max(latDelta, 0.05),
-        longitudeDelta: Math.max(lngDelta, 0.05),
-      }, 1000);
+      mapRef.current.animateToRegion(
+        {
+          latitude: centerLat,
+          longitude: centerLng,
+          latitudeDelta: Math.max(latDelta, 0.05),
+          longitudeDelta: Math.max(lngDelta, 0.05),
+        },
+        1000,
+      );
     }
   };
 
@@ -142,7 +159,9 @@ const MapProvider: React.FC<MapProviderProps> = ({
       <View style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Карта временно недоступна</Text>
-          <Text style={styles.errorSubtext}>Проверьте подключение к интернету</Text>
+          <Text style={styles.errorSubtext}>
+            Проверьте подключение к интернету
+          </Text>
         </View>
       </View>
     );
@@ -153,13 +172,19 @@ const MapProvider: React.FC<MapProviderProps> = ({
     const timer = setTimeout(() => {
       setMapReady(true);
     }, 5000);
-    
+
     return () => clearTimeout(timer);
   }, []);
 
   if (!mapReady) {
     return (
-      <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white'}}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: 'white',
+        }}>
         <ActivityIndicator size="large" color="#DC1818" />
         <Text style={{fontSize: 16, color: '#545454'}}>Загрузка карты...</Text>
       </View>
@@ -168,12 +193,13 @@ const MapProvider: React.FC<MapProviderProps> = ({
 
   return (
     <View style={styles.container}>
-      <MapView 
+      <MapView
         ref={mapRef}
-        style={styles.map} 
+        style={styles.map}
         provider={mapProvider}
+        userInterfaceStyle="light"
         initialRegion={{
-          latitude: deliveryLocation?.latitude || 43.2220,
+          latitude: deliveryLocation?.latitude || 43.222,
           longitude: deliveryLocation?.longitude || 76.8512,
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
@@ -188,6 +214,18 @@ const MapProvider: React.FC<MapProviderProps> = ({
         // loadingIndicatorColor="#DC1818"
         // loadingBackgroundColor="#f6f6f6"
       >
+        {/* Линия между курьером и местом доставки — рисуем первой и с низким zIndex,
+            чтобы маркеры поверх неё не перекрывались траекторией. */}
+        {currentCourierLocation && deliveryLocation && (
+          <Polyline
+            coordinates={[currentCourierLocation, deliveryLocation]}
+            strokeColor="#000000"
+            strokeWidth={3}
+            lineDashPattern={[5, 5]}
+            zIndex={1}
+          />
+        )}
+
         {/* Маркер места доставки */}
         {deliveryLocation && (
           <Marker
@@ -195,40 +233,40 @@ const MapProvider: React.FC<MapProviderProps> = ({
             title="Место доставки"
             description="Ваш адрес доставки"
             pinColor="red"
+            zIndex={2}
           />
         )}
 
-        {/* Линия между курьером и местом доставки */}
-        {currentCourierLocation && deliveryLocation && (
-          <Polyline
-            coordinates={[currentCourierLocation, deliveryLocation]}
-            strokeColor="#000000"
-            strokeWidth={3}
-            lineDashPattern={[5, 5]}
-          />
-        )}
-
-        {/* Маркер курьера */}
-        {currentCourierLocation && (
-          Platform.OS === 'ios' ? (
+        {/* Маркер курьера — самый высокий zIndex, чтобы иконка всегда была поверх маршрута.
+            На iOS маркер с кастомным дочерним view по умолчанию tracksViewChanges=true —
+            это заставляет MapKit постоянно переснимать вьюху при каждом обновлении
+            currentCourierLocation (раз в секунду), из-за чего снимок маркера отстаёт
+            от нативно отрисовываемой Polyline и та визуально "перекрывает" иконку.
+            Иконка статичная, поэтому отключаем tracksViewChanges. */}
+        {currentCourierLocation &&
+          (Platform.OS === 'ios' ? (
             <Marker
               coordinate={currentCourierLocation}
               title="Курьер"
               description="Ваш курьер едет к вам"
-              anchor={{ x: 0.5, y: 0.5 }}
-            >
-              <Image source={require('../assets/courierCar.png')} style={{width: 40, height: 40}} />
+              anchor={{x: 0.5, y: 0.5}}
+              zIndex={3}
+              tracksViewChanges={false}>
+              <Image
+                source={require('../assets/courierCar.png')}
+                style={COURIER_CAR_ICON_SIZE}
+              />
             </Marker>
           ) : (
             <Marker
               coordinate={currentCourierLocation}
               title="Курьер"
               description="Ваш курьер едет к вам"
-              image={require('../assets/courierCar.png')}
-              anchor={{ x: 0.5, y: 0.5 }}
+              image={{uri: courierCarAsset.uri, ...COURIER_CAR_ICON_SIZE}}
+              anchor={{x: 0.5, y: 0.5}}
+              zIndex={3}
             />
-          )
-        )}
+          ))}
       </MapView>
     </View>
   );
@@ -262,8 +300,8 @@ const styles = StyleSheet.create({
   },
   courierMarker: {
     borderRadius: 20,
-    width: 40,
-    height: 40,
+    width: 20,
+    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
@@ -286,7 +324,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'white',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.3,
     shadowRadius: 3,
     elevation: 5,

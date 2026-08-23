@@ -27,6 +27,12 @@ export interface CourierAggregator {
   phone?: string;
   raiting?: number;
   carNumber?: string;
+  carData?: {
+    brand?: string;
+    model?: string;
+    color?: string;
+    plateNumber?: string;
+  };
   carType?: 'A' | 'B' | 'C';
   transport?: 'A' | 'B' | 'C';
   onTheLine?: boolean;
@@ -60,12 +66,12 @@ export interface OrderDate {
   time: string;
 }
 
-export type OrderStatus = 
-  | 'awaitingOrder' 
-  | 'confirmed' 
-  | 'preparing' 
-  | 'onTheWay' 
-  | 'delivered' 
+export type OrderStatus =
+  | 'awaitingOrder'
+  | 'confirmed'
+  | 'preparing'
+  | 'onTheWay'
+  | 'delivered'
   | 'cancelled';
 
 export interface OrderData {
@@ -95,7 +101,7 @@ export interface OrderData {
   clientPhone: string;
   createdAt: string;
   updatedAt: string;
-  
+
   // Дополнительные поля для совместимости с UI
   orderNumber?: string;
   fullAddress?: string;
@@ -151,7 +157,7 @@ export type RootStackParamList = {
   Chat: undefined;
   Address: undefined;
   AddOrUpdateAddress: {
-    address: AddressData;
+    address: AddressData | null;
   };
   OrderStatus: {
     order: OrderData;

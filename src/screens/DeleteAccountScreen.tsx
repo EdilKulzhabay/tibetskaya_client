@@ -1,12 +1,13 @@
 import {
-  SafeAreaView,
   StyleSheet,
   View,
   Text,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
+  ActivityIndicator
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {androidOnlySafeAreaEdges} from '../utils/safeArea';
 import {useState} from 'react';
 import {Back} from '../components';
 import {clearAllData} from '../utils/storage';
@@ -72,7 +73,7 @@ const DeleteAccountScreen: React.FC<{navigation: any}> = ({navigation}) => {
     );
   };
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={androidOnlySafeAreaEdges}>
       <Back navigation={navigation} title="Удалить аккаунт" />
       <View style={styles.container}>
         <Text style={styles.title}>Внимание!</Text>

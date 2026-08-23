@@ -1,4 +1,6 @@
-import { SafeAreaView, StyleSheet, View, Text, ScrollView, Image, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, Image, TouchableOpacity } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {androidOnlySafeAreaEdges} from '../utils/safeArea';
 import { Back } from '../components';
 import { useAuth } from '../hooks/useAuth';
 import { useTopUpBalance } from '../context/TopUpBalanceContext';
@@ -8,7 +10,7 @@ const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { openTopUpModal } = useTopUpBalance();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={androidOnlySafeAreaEdges}>
       <Back navigation={navigation} title="Мой кошелек" />
 
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>

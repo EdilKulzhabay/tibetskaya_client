@@ -111,6 +111,9 @@ export type PendingOrderDraft = {
   opForm: string;
   needCall: boolean;
   comment: string;
+  /** Сколько бутылей каждого объёма клиент вернёт как обменную тару — без этого
+   * сервер посчитает, что вся тара новая (как раньше), и добавит её стоимость. */
+  emptyBottles?: {b12: number; b19: number};
 };
 
 type TopUpModalOptions = {

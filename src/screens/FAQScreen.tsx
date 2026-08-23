@@ -1,4 +1,6 @@
-import { SafeAreaView, StyleSheet, ScrollView, Text } from 'react-native';
+import { StyleSheet, ScrollView, Text } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {androidOnlySafeAreaEdges} from '../utils/safeArea';
 import { Back } from '../components';
 import CollapsibleSection from '../components/CollapsibleSection';
 import { useState, useEffect } from 'react';
@@ -18,7 +20,7 @@ const FAQScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   }, []);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={androidOnlySafeAreaEdges}>
       <Back navigation={navigation} title="FAQ" />
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {faq && faq.length > 0 && faq.map((item, index) => (

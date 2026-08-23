@@ -1,20 +1,16 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  TouchableOpacity,
-} from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types/navigation';
-import { useTopUpBalance } from '../context/TopUpBalanceContext';
+import {View, Text, StyleSheet, Image, TouchableOpacity} from 'react-native';
+import {useNavigation} from '@react-navigation/native';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {RootStackParamList} from '../types/navigation';
+import {useTopUpBalance} from '../context/TopUpBalanceContext';
 
 interface HeaderProps {
   bonus: number;
   paymentMethod?: string;
   coupon?: number;
+  /** Цена за бутыль 18,9 л клиента — используется для расчёта "хватит на N бут." */
+  price19?: number;
   // Новые props для раздельного отображения бутылок
   paidBootlesFor19?: number;
   paidBootlesFor12?: number;
@@ -33,6 +29,7 @@ const Header: React.FC<HeaderProps> = ({
   bonus,
   paymentMethod,
   coupon,
+  price19 = 1500,
   paidBootlesFor19,
   paidBootlesFor12,
   doesItTake19Bottles,
@@ -41,7 +38,7 @@ const Header: React.FC<HeaderProps> = ({
   onBonusPress: onBonusPressExternal,
 }) => {
   const navigation = useNavigation<NavigationProp>();
-  const { openTopUpModal } = useTopUpBalance();
+  const {openTopUpModal} = useTopUpBalance();
 
   const onBonusPress = () => {
     if (onBonusPressExternal) {
@@ -49,7 +46,7 @@ const Header: React.FC<HeaderProps> = ({
     } else {
       openTopUpModal();
     }
-  }
+  };
 
   // Функция для отображения баланса бутылок с учетом литража
   const renderCouponBalance = () => {
@@ -61,21 +58,38 @@ const Header: React.FC<HeaderProps> = ({
     // Если оба типа бутылок - показываем с литражом
     if (takes19 && takes12) {
       return (
-        <View style={{ flexDirection: 'row', alignItems: "center"}}>
-          <View style={{ flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 16}}>
+          <View
+            style={{flexDirection: 'column', alignItems: 'flex-end', gap: 2}}>
+            <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
               <Text style={styles.bonusText}>{balance19.toLocaleString()}</Text>
-              <Image source={require('../assets/coupon.png')} style={{ width: 24, height: 24 }} />
+              <Image
+                source={require('../assets/coupon.png')}
+                style={{width: 24, height: 24}}
+              />
               <Text style={styles.literText}>18,9 л</Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
               <Text style={styles.bonusText}>{balance12.toLocaleString()}</Text>
-              <Image source={require('../assets/coupon.png')} style={{ width: 24, height: 24 }} />
+              <Image
+                source={require('../assets/coupon.png')}
+                style={{width: 24, height: 24}}
+              />
               <Text style={styles.literText}>12,5 л</Text>
             </View>
           </View>
-          <View style={{marginLeft: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#DC1818', borderRadius: 16, padding: 4}}>
-            <Image source={require('../assets/plus.png')} style={{ width: 16, height: 16 }} />
+          <View
+            style={{
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: '#DC1818',
+              borderRadius: 6,
+              padding: 6,
+            }}>
+            <Image
+              source={require('../assets/whitePlus.png')}
+              style={{width: 14, height: 14}}
+            />
           </View>
         </View>
       );
@@ -84,12 +98,25 @@ const Header: React.FC<HeaderProps> = ({
     // Если только 19л
     if (takes19 && !takes12) {
       return (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 16}}>
           <Text style={styles.bonusText}>{balance19.toLocaleString()}</Text>
-          <Image source={require('../assets/coupon.png')} style={{ width: 30, height: 30 }} />
+          <Image
+            source={require('../assets/coupon.png')}
+            style={{width: 30, height: 30}}
+          />
           <Text style={styles.literText}>18,9 л</Text>
-          <View style={{marginLeft: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#DC1818', borderRadius: 16, padding: 4}}>
-            <Image source={require('../assets/plus.png')} style={{ width: 16, height: 16 }} />
+          <View
+            style={{
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: '#DC1818',
+              borderRadius: 6,
+              padding: 6,
+            }}>
+            <Image
+              source={require('../assets/whitePlus.png')}
+              style={{width: 14, height: 14}}
+            />
           </View>
         </View>
       );
@@ -98,26 +125,52 @@ const Header: React.FC<HeaderProps> = ({
     // Если только 12л
     if (!takes19 && takes12) {
       return (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 16}}>
           <Text style={styles.bonusText}>{balance12.toLocaleString()}</Text>
-          <Image source={require('../assets/coupon.png')} style={{ width: 30, height: 30 }} />
+          <Image
+            source={require('../assets/coupon.png')}
+            style={{width: 30, height: 30}}
+          />
           <Text style={styles.literText}>12,5 л</Text>
-          <View style={{marginLeft: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#DC1818', borderRadius: 16, padding: 4}}>
-            <Image source={require('../assets/plus.png')} style={{ width: 16, height: 16 }} />
+          <View
+            style={{
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: '#DC1818',
+              borderRadius: 6,
+              padding: 6,
+            }}>
+            <Image
+              source={require('../assets/whitePlus.png')}
+              style={{width: 14, height: 14}}
+            />
           </View>
         </View>
       );
     }
 
     // Fallback на старый формат (без флагов)
-    const totalCoupon = coupon || (balance19 + balance12);
+    const totalCoupon = coupon || balance19 + balance12;
     if (totalCoupon > 0) {
       return (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
           <Text style={styles.bonusText}>{totalCoupon.toLocaleString()}</Text>
-          <Image source={require('../assets/coupon.png')} style={{ width: 30, height: 30 }} />
-          <View style={{marginLeft: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#DC1818', borderRadius: 16, padding: 4}}>
-            <Image source={require('../assets/plus.png')} style={{ width: 16, height: 16 }} />
+          <Image
+            source={require('../assets/coupon.png')}
+            style={{width: 30, height: 30}}
+          />
+          <View
+            style={{
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: '#DC1818',
+              borderRadius: 6,
+              padding: 6,
+            }}>
+            <Image
+              source={require('../assets/whitePlus.png')}
+              style={{width: 14, height: 14}}
+            />
           </View>
         </View>
       );
@@ -140,21 +193,78 @@ const Header: React.FC<HeaderProps> = ({
           <TouchableOpacity
             style={styles.bonusContainer}
             onPress={onBonusPress}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            activeOpacity={0.7}
-          >
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+            activeOpacity={0.7}>
             {paymentMethod === 'coupon' ? (
-              renderCouponBalance() ?? (
-                <Text style={styles.bonusText}>0</Text>
-              )
+              renderCouponBalance() ?? <Text style={styles.bonusText}>0</Text>
             ) : (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={styles.bonusText}>
-                  {bonus.toLocaleString()} ₸
-                </Text>
-                <View style={{justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#DC1818', borderRadius: 16, padding: 4}}>
-                  <Image source={require('../assets/plus.png')} style={{ width: 16, height: 16 }} />
+              <View
+                style={{marginTop: Math.trunc(bonus / price19) > 0 ? 10 : 0}}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                  }}>
+                  <View>
+                    <Text
+                      style={{fontSize: 8, fontWeight: '400', color: '#000'}}>
+                      Баланс
+                    </Text>
+                    <Text style={styles.bonusText}>
+                      {bonus.toLocaleString()} ₸
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      backgroundColor: '#DC1818',
+                      borderRadius: 6,
+                      padding: 6,
+                    }}>
+                    <Image
+                      source={require('../assets/whitePlus.png')}
+                      style={{width: 14, height: 14}}
+                    />
+                  </View>
                 </View>
+                {Math.trunc(bonus / price19) > 0 && (
+                  <View
+                    style={{
+                      marginTop: 4,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      borderWidth: 1,
+                      borderColor: '#9CA3AF',
+                      borderRadius: 4,
+                      paddingHorizontal: 4,
+                      paddingVertical: 2,
+                    }}>
+                    <View
+                      style={{
+                        borderWidth: 1,
+                        borderColor: '#1bc839',
+                        borderRadius: '100%',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 1,
+                      }}>
+                      <Image
+                        source={require('../assets/greenCheck.png')}
+                        style={{width: 10, height: 10}}
+                      />
+                    </View>
+                    <Text style={{marginLeft: 4, fontSize: 10}}>
+                      Хватит на{' '}
+                      <Text style={{fontWeight: 500}}>
+                        {Math.trunc(bonus / price19)}
+                      </Text>{' '}
+                      бут.
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
           </TouchableOpacity>
@@ -180,10 +290,9 @@ const styles = StyleSheet.create({
     width: 129,
     height: 48,
   },
-  bonusContainer: {
-  },
+  bonusContainer: {},
   bonusText: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '600',
     color: '#000',
   },

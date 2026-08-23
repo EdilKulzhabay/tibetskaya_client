@@ -1,5 +1,4 @@
 import {
-  SafeAreaView,
   Text,
   View,
   StyleSheet,
@@ -7,8 +6,10 @@ import {
   Image,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
+  Alert
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {androidOnlySafeAreaEdges} from '../utils/safeArea';
 import {Back} from '../components';
 import {useEffect, useState} from 'react';
 import {useAuth} from '../hooks';
@@ -64,7 +65,7 @@ const ChangeDataScreen: React.FC<{navigation: any}> = ({navigation}) => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={androidOnlySafeAreaEdges}>
       <Back navigation={navigation} title="Изменить данные" />
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <OutlinedFilledLabelInput

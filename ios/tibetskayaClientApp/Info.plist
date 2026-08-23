@@ -66,5 +66,34 @@
 	<array>
 		<string>kaspi</string>
 	</array>
+	<!-- Facebook SDK (App Events): см. TZ_Facebook_SDK_Integration -->
+	<key>FacebookAppID</key>
+	<string>2325289084670460</string>
+	<key>FacebookDisplayName</key>
+	<string>Тибетская</string>
+	<key>FacebookAutoLogAppEventsEnabled</key>
+	<true/>
+	<key>FacebookAdvertiserIDCollectionEnabled</key>
+	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>fb2325289084670460</string>
+			</array>
+		</dict>
+	</array>
+	<!-- App Tracking Transparency (iOS 14+): требуется для рекламной атрибуции Facebook SDK -->
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Мы используем эти данные, чтобы показывать вам более релевантную рекламу и измерять её эффективность</string>
+	<!-- SKAdNetwork: собственный идентификатор Meta/Facebook для атрибуции рекламных кампаний -->
+	<key>SKAdNetworkItems</key>
+	<array>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>v9wttpbfk9.skadnetwork</string>
+		</dict>
+	</array>
 </dict>
 </plist>

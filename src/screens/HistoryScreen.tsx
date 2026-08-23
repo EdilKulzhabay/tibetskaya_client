@@ -3,15 +3,16 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   DeviceEventEmitter,
   Alert,
   TouchableOpacity,
   Modal,
   Image,
-  Platform,
+  Platform
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {androidOnlySafeAreaEdges} from '../utils/safeArea';
 import {Header, Navigation, OrderBlock} from '../components';
 import {useFocusEffect} from '@react-navigation/native';
 import {apiService} from '../api/services';
@@ -556,7 +557,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({navigation}) => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={androidOnlySafeAreaEdges}>
       <Header bonus={0} showBackButton={false} showBonus={false} />
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* Сводка за период */}

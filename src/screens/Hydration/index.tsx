@@ -1,4 +1,6 @@
-import { SafeAreaView, StyleSheet, Text, Dimensions, View, TouchableOpacity, Image, Animated, Alert } from 'react-native';
+import { StyleSheet, Text, Dimensions, View, TouchableOpacity, Image, Animated, Alert } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {androidOnlySafeAreaEdges} from '../../utils/safeArea';
 import { Back } from '../../components';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks';
@@ -200,7 +202,7 @@ const HydrationScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={androidOnlySafeAreaEdges}>
       <Back navigation={navigation} title="Гидратация" />
       <View style={styles.container}>
         {/* Главная капля с прогрессом */}

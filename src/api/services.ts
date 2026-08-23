@@ -131,6 +131,9 @@ export const apiService = {
     opForm: string,
     needCall: boolean,
     comment: string,
+    /** Сколько бутылей каждого объёма клиент вернёт как обменную тару — остальное
+     * сервер посчитает как новую тару и добавит в списываемую сумму. */
+    emptyBottles?: {b12: number; b19: number},
   ) => {
     try {
       const fcmToken = await AsyncStorage.getItem('fcmToken');
@@ -143,6 +146,7 @@ export const apiService = {
         opForm,
         needCall,
         comment,
+        emptyBottles,
         notificationToken: fcmToken || '',
       });
       return response.data;

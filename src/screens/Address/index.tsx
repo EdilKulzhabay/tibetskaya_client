@@ -1,4 +1,6 @@
-import { SafeAreaView, Text, View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator } from "react-native";
+import { Text, View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator } from "react-native";
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {androidOnlySafeAreaEdges} from '../../utils/safeArea';
 import { Back } from "../../components";
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../../hooks";
@@ -28,7 +30,7 @@ const AddressScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const [selectedAddress, setSelectedAddress] = useState<any>(null);
 
     return (
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={styles.safeArea} edges={androidOnlySafeAreaEdges}>
             <Back navigation={navigation} title="Адреса" />
             
             {/* Индикатор загрузки */}
