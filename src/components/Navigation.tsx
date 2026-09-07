@@ -164,7 +164,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    paddingTop: 8,
+    paddingTop: 12,
+    paddingBottom: 35,
     backgroundColor: 'white',
   },
   navBlock: {

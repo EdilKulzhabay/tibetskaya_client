@@ -10,14 +10,34 @@ import {
 } from 'react-native';
 import MapView, {Marker, Polyline, PROVIDER_GOOGLE} from 'react-native-maps';
 
-/** Иконка машины курьера на карте — в 2 раза меньше исходного изображения. */
+/** Иконка курьера на карте — белая круглая подложка запечена прямо в файл
+ * (courierMarkerCombined.png), центр в центр с машиной (при генерации сначала
+ * обрезаются собственные прозрачные поля машины по её непрозрачному bbox — иначе
+ * они делают белое кольцо визуально шире/несимметричнее, чем нужно, и выглядит
+ * как «рамка» — а затем машина масштабируется и центрируется внутри круга).
+ *
+ * ВАЖНО про iOS: у `image`-маркера react-native-maps нативный код на iOS
+ * (AIRMapMarker.m / RNMapsMarkerView.mm внутри node_modules/react-native-maps)
+ * читает из переданного JS-объекта ТОЛЬКО `uri` — `width`/`height`/`scale`
+ * полностью игнорируются, а реальный размер маркера берётся из
+ * `self.image.size`, то есть из точечного (point) размера самого файла.
+ * Именно поэтому никакой множитель в JS не может уменьшить иконку на iOS —
+ * единственный рабочий способ задать размер там — сам файл. Поэтому под iOS
+ * используется отдельный набор ассетов (courierMarkerCombinedIOS.png/@2x/@3x/@4x/@5x),
+ * подготовленный сразу на 30×30pt. Android эту логику всегда соблюдал
+ * корректно, поэтому там по-прежнему используется масштабирование через
+ * width/height в `image` (COURIER_CAR_ICON_SCALE 0.525). */
 const courierCarAsset = Image.resolveAssetSource(
-  require('../assets/courierCar.png'),
+  require('../assets/courierMarkerCombined.png'),
 );
+const COURIER_CAR_ICON_SCALE = 0.525;
 const COURIER_CAR_ICON_SIZE = {
-  width: courierCarAsset.width / 8,
-  height: courierCarAsset.height / 8,
+  width: (courierCarAsset.width / 8) * COURIER_CAR_ICON_SCALE,
+  height: (courierCarAsset.height / 8) * COURIER_CAR_ICON_SCALE,
 };
+/** Иконка курьера для iOS — размер (30×30pt) задан самим файлом, а не
+ * JS-параметрами (см. комментарий выше). */
+const COURIER_CAR_ICON_IOS = require('../assets/courierMarkerCombinedIOS.png');
 
 interface Location {
   latitude: number;
@@ -237,36 +257,25 @@ const MapProvider: React.FC<MapProviderProps> = ({
           />
         )}
 
-        {/* Маркер курьера — самый высокий zIndex, чтобы иконка всегда была поверх маршрута.
-            На iOS маркер с кастомным дочерним view по умолчанию tracksViewChanges=true —
-            это заставляет MapKit постоянно переснимать вьюху при каждом обновлении
-            currentCourierLocation (раз в секунду), из-за чего снимок маркера отстаёт
-            от нативно отрисовываемой Polyline и та визуально "перекрывает" иконку.
-            Иконка статичная, поэтому отключаем tracksViewChanges. */}
-        {currentCourierLocation &&
-          (Platform.OS === 'ios' ? (
-            <Marker
-              coordinate={currentCourierLocation}
-              title="Курьер"
-              description="Ваш курьер едет к вам"
-              anchor={{x: 0.5, y: 0.5}}
-              zIndex={3}
-              tracksViewChanges={false}>
-              <Image
-                source={require('../assets/courierCar.png')}
-                style={COURIER_CAR_ICON_SIZE}
-              />
-            </Marker>
-          ) : (
-            <Marker
-              coordinate={currentCourierLocation}
-              title="Курьер"
-              description="Ваш курьер едет к вам"
-              image={{uri: courierCarAsset.uri, ...COURIER_CAR_ICON_SIZE}}
-              anchor={{x: 0.5, y: 0.5}}
-              zIndex={3}
-            />
-          ))}
+        {/* Маркер курьера. zIndex работает только на Android (Google Maps) — Apple
+            Maps этот проп игнорирует. На iOS раньше использовался кастомный дочерний
+            <Image>, который react-native-maps должен снять как снэпшот (через
+            tracksViewChanges) — это асинхронно и гонка с рендером пунктирной
+            Polyline приводила к тому, что линия визуально оказывалась поверх ещё не
+            отрисованной иконки. `image` — нативный UIImage/Bitmap для аннотации без
+            этапа снэпшота, поэтому маркер всегда отрисован раньше и выше линии. */}
+        {currentCourierLocation && (
+          <Marker
+            coordinate={currentCourierLocation}
+            title="Курьер"
+            description="Ваш курьер едет к вам"
+            image={
+              COURIER_CAR_ICON_IOS
+            }
+            anchor={{x: 0.5, y: 0.5}}
+            zIndex={30}
+          />
+        )}
       </MapView>
     </View>
   );

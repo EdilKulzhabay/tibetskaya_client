@@ -61,14 +61,14 @@
 	</array>
 	<key>NSPushNotificationsUsageDescription</key>
 	<string>Мы используем уведомления для уведомления о новых заказах</string>
-	<!-- Kaspi Pay / ApiPay: iOS разрешает canOpenURL для перечисленных схем (часть диплинков kaspi://) -->
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>kaspi</string>
 	</array>
-	<!-- Facebook SDK (App Events): см. TZ_Facebook_SDK_Integration -->
 	<key>FacebookAppID</key>
 	<string>2325289084670460</string>
+	<key>FacebookClientToken</key>
+	<string>fa1830b110838d10149b0d94b005fc7c</string>
 	<key>FacebookDisplayName</key>
 	<string>Тибетская</string>
 	<key>FacebookAutoLogAppEventsEnabled</key>
@@ -84,16 +84,21 @@
 			</array>
 		</dict>
 	</array>
-	<!-- App Tracking Transparency (iOS 14+): требуется для рекламной атрибуции Facebook SDK -->
 	<key>NSUserTrackingUsageDescription</key>
 	<string>Мы используем эти данные, чтобы показывать вам более релевантную рекламу и измерять её эффективность</string>
-	<!-- SKAdNetwork: собственный идентификатор Meta/Facebook для атрибуции рекламных кампаний -->
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>
 			<key>SKAdNetworkIdentifier</key>
 			<string>v9wttpbfk9.skadnetwork</string>
 		</dict>
+	</array>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Inter-Medium.ttf</string>
+		<string>Inter-Bold.ttf</string>
+		<string>Inter-Regular.ttf</string>
+		<string>Inter-SemiBold.ttf</string>
 	</array>
 </dict>
 </plist>

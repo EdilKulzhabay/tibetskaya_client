@@ -11,6 +11,7 @@ export {default as CourierChatScreen} from './CourierChatScreen';
 export {default as AddressScreen} from './Address';
 export {default as AddOrUpdateAddress} from './Address/AddOrUpdateAddress';
 export {default as LoginScreen} from './LoginScreen';
+export {default as LoginOtpScreen} from './LoginOtpScreen';
 export {default as RegisterScreen} from './RegisterScreen';
 export {default as OtpScreen} from './OtpScreen';
 export {default as RegisterAcceptedScreen} from './RegisterAcceptedScreen';

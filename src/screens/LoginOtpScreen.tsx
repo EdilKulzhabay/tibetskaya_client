@@ -13,25 +13,19 @@ import {
   Keyboard,
 } from 'react-native';
 import {apiService} from '../api/services';
+import {useAuth} from '../hooks';
 import {StableImage} from '../components';
 
 const OTP_LENGTH = 6;
 const screenWidth = Dimensions.get('window').width;
 
-const OtpForgotPasswordScreen: React.FC<{
+const LoginOtpScreen: React.FC<{
   navigation: any;
-  route: {params: {mail?: string; phone?: string}};
-}> = ({
-  navigation,
-  route,
-}: {
-  navigation: any;
-  route: {params: {mail?: string; phone?: string}};
-}) => {
-  const mail = route?.params?.mail;
-  const phone = route?.params?.phone;
-  const identifier = phone ? {phone} : {mail};
-  const hasIdentifier = !!mail || !!phone;
+  route: {params: {phone: string}};
+}> = ({navigation, route}) => {
+  const phone = route.params.phone;
+  const {saveUserData} = useAuth();
+
   const [code, setCode] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [timer, setTimer] = useState(59);
   const inputs = useRef<Array<TextInput | null>>([]);
@@ -39,7 +33,6 @@ const OtpForgotPasswordScreen: React.FC<{
   const handleChange = async (text: string, index: number) => {
     const newCode = [...code];
 
-    // Если текст пустой (удаление), очищаем текущий инпут и переходим к предыдущему
     if (text === '') {
       newCode[index] = '';
       setCode(newCode);
@@ -49,43 +42,50 @@ const OtpForgotPasswordScreen: React.FC<{
       return;
     }
 
-    // Если введен символ, сохраняем его
     newCode[index] = text;
     setCode(newCode);
 
-    // Переходим к следующему инпуту
     if (text && index < OTP_LENGTH - 1) {
       inputs.current[index + 1]?.focus();
     }
 
-    // Если код полностью введен, проверяем его
     if (index === OTP_LENGTH - 1 && text) {
       const fullCode = newCode.join('');
       if (fullCode.length === OTP_LENGTH) {
-        Keyboard.dismiss(); // Скрываем клавиатуру
-
-        const res = await apiService.codeConfirmForgotPassword(
-          identifier,
-          fullCode,
-        );
-        console.log('res in otp = ', res);
-        if (res.success) {
-          navigation.navigate('NewPassword', identifier);
-        } else {
-          Alert.alert('Ошибка', res.message);
+        Keyboard.dismiss();
+        try {
+          const res = await apiService.clientLoginOtp(phone, fullCode);
+          if (res.success) {
+            await saveUserData(res);
+            navigation.navigate('Home');
+          } else {
+            Alert.alert('Ошибка', res.message);
+          }
+        } catch (err: unknown) {
+          const msg =
+            (err as {response?: {data?: {message?: string}}})?.response?.data
+              ?.message || 'Неверный код или ошибка сети';
+          Alert.alert('Ошибка', msg);
         }
       }
     }
   };
 
   const handleResendCode = async () => {
-    const response = await apiService.sendMailForgotPassword(identifier);
-    if (response.success) {
-      console.log('response in otp = ', response);
-      setTimer(59);
-      // Очищаем все поля при повторной отправке кода
-      setCode(Array(OTP_LENGTH).fill(''));
-      inputs.current[0]?.focus();
+    try {
+      const response = await apiService.sendLoginOtp(phone);
+      if (response.success) {
+        setTimer(59);
+        setCode(Array(OTP_LENGTH).fill(''));
+        inputs.current[0]?.focus();
+      } else {
+        Alert.alert('Ошибка', response.message);
+      }
+    } catch (err: unknown) {
+      const msg =
+        (err as {response?: {data?: {message?: string}}})?.response?.data
+          ?.message || 'Не удалось отправить код повторно';
+      Alert.alert('Ошибка', msg);
     }
   };
 
@@ -102,17 +102,6 @@ const OtpForgotPasswordScreen: React.FC<{
       return () => clearInterval(interval);
     }
   }, [timer]);
-
-  useEffect(() => {
-    if (!hasIdentifier) {
-      Alert.alert('Ошибка', 'Некорректный телефон или email');
-      navigation.navigate('Login');
-    }
-  }, [hasIdentifier, navigation]);
-
-  if (!hasIdentifier) {
-    return null;
-  }
 
   return (
     <KeyboardAvoidingView
@@ -144,12 +133,8 @@ const OtpForgotPasswordScreen: React.FC<{
         />
       </View>
       <View style={styles.content}>
-        <Text style={styles.title}>Дождитесь кода из сообщения</Text>
-        <Text style={styles.subtitle}>
-          {phone
-            ? `Код отправлен в WhatsApp на ${phone}`
-            : `Код отправлен на почту ${mail}`}
-        </Text>
+        <Text style={styles.title}>Дождитесь кода в WhatsApp</Text>
+        <Text style={styles.subtitle}>Код отправлен на {phone}</Text>
 
         <View style={styles.codeContainer}>
           {code.map((digit, index) => (
@@ -161,7 +146,6 @@ const OtpForgotPasswordScreen: React.FC<{
               value={digit}
               onChangeText={text => handleChange(text, index)}
               onKeyPress={({nativeEvent}) => {
-                // Обработка нажатия клавиши "Назад"
                 if (nativeEvent.key === 'Backspace' && !digit && index > 0) {
                   inputs.current[index - 1]?.focus();
                 }
@@ -201,6 +185,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'white',
     position: 'relative',
+    marginTop: -30,
   },
   imageContainer: {
     width: '100%',
@@ -267,4 +252,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OtpForgotPasswordScreen;
+export default LoginOtpScreen;

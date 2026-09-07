@@ -65,6 +65,9 @@ export interface User {
   invoiceLegalData?: string;
   /** До какого часа (времени Алматы) принимаются заказы на «сегодня» — приходит с CRM */
   orderSameDayUntilHour?: number;
+  /** Актуальная версия приложения, настроенная суперадмином в CRM — сравнивается с
+   * локальной APP_VERSION (см. utils/appVersion.ts), чтобы показать модалку обновления. */
+  latestAppVersion?: string;
 }
 
 export interface ApiResponse<T> {
@@ -92,8 +95,6 @@ export interface RegisterData {
   mail: string;
   userName: string;
   phone: string;
-  password: string;
-  confirmPassword?: string;
   termsAccepted: boolean;
   privacyAccepted: boolean;
   /** Необязательно: код приглашения (12 латинских букв, можно с дефисами) */

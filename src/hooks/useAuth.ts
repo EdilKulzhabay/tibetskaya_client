@@ -136,6 +136,7 @@ const useAuthState = (): UseAuthReturn => {
         savedCard: clientData.savedCard,
         invoiceLegalData: clientData.invoiceLegalData,
         orderSameDayUntilHour: clientData.orderSameDayUntilHour,
+        latestAppVersion: clientData.latestAppVersion,
       };
 
       // Сохраняем пользователя и токены из сервера

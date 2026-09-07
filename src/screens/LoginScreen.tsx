@@ -15,17 +15,12 @@ import {
 } from 'react-native';
 import OutlinedFilledLabelInput from '../components/OutlinedFilledLabelInput';
 import {apiService} from '../api/services';
-import {useAuth} from '../hooks/useAuth';
 import {useFocusEffect} from '@react-navigation/native';
 import StableImage from '../components/StableImage';
 const screenWidth = Dimensions.get('window').width;
 
 const LoginScreen: React.FC<{navigation: any}> = ({navigation}) => {
-  const {saveUserData} = useAuth();
-  const [loginMethod, setLoginMethod] = useState<'phone' | 'mail'>('phone');
-  const [mail, setMail] = useState('');
   const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -71,20 +66,16 @@ const LoginScreen: React.FC<{navigation: any}> = ({navigation}) => {
   );
 
   const handleLogin = async () => {
+    if (phone.replace(/\D/g, '').length !== 11) {
+      Alert.alert('Ошибка', 'Введите полный номер телефона');
+      return;
+    }
     setLoading(true);
-    const res = await apiService.clientLogin(
-      loginMethod === 'phone'
-        ? {phone: phone.trim(), password: password.trim()}
-        : {mail: mail.trim(), password: password.trim()},
-    );
+    const res = await apiService.sendLoginOtp(phone.trim());
+    setLoading(false);
     if (res.success) {
-      // Передаем весь ответ сервера (включая токены)
-      setLoading(false);
-      await saveUserData(res);
-      Alert.alert('Успешно', `Добро пожаловать, ${res.clientData.userName}!`);
-      navigation.navigate('Home');
+      navigation.navigate('LoginOtp', {phone: phone.trim()});
     } else {
-      setLoading(false);
       Alert.alert('Ошибка', res.message);
     }
   };
@@ -127,55 +118,14 @@ const LoginScreen: React.FC<{navigation: any}> = ({navigation}) => {
 
       <View style={styles.contentContainer}>
         <View>
-          {loginMethod === 'phone' ? (
-            <OutlinedFilledLabelInput
-              label="Номер телефона"
-              keyboardType="phone-pad"
-              value={phone}
-              onChangeText={text => setPhone(text)}
-              mask="phone"
-              onRightIconPress={() => {}}
-            />
-          ) : (
-            <OutlinedFilledLabelInput
-              label="Введите почту"
-              keyboardType="email-address"
-              value={mail}
-              onChangeText={text => setMail(text)}
-              onRightIconPress={() => {}}
-              autoCapitalize="none"
-            />
-          )}
-
           <OutlinedFilledLabelInput
-            label="Введите пароль"
-            keyboardType="default"
-            value={password}
-            onChangeText={text => setPassword(text)}
+            label="Номер телефона"
+            keyboardType="phone-pad"
+            value={phone}
+            onChangeText={text => setPhone(text)}
+            mask="phone"
             onRightIconPress={() => {}}
-            isPassword={true}
-            autoCapitalize="none"
           />
-
-          <TouchableOpacity
-            onPress={() =>
-              setLoginMethod(loginMethod === 'phone' ? 'mail' : 'phone')
-            }
-            style={styles.forgotPassword}>
-            <Text style={styles.forgotPasswordText}>
-              {loginMethod === 'phone'
-                ? 'Войти через почту'
-                : 'Войти через телефон'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => {
-              navigation.navigate('ForgotPassword');
-            }}
-            style={styles.forgotPassword}>
-            <Text style={styles.forgotPasswordText}>Забыли пароль?</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={{marginTop: 60}}>
@@ -207,7 +157,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'white',
     position: 'relative',
-    marginTop: -30
+    marginTop: -30,
   },
   bannerContainer: {
     width: '100%',
@@ -233,15 +183,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     justifyContent: 'space-between',
     // minHeight: Dimensions.get('window').height - (screenWidth / 1.76 + 38 + 24 + 20)
-  },
-  forgotPassword: {
-    marginTop: 5,
-    alignItems: 'flex-end',
-  },
-  forgotPasswordText: {
-    color: '#DC1818',
-    fontWeight: '500',
-    fontSize: 14,
   },
   registerContainer: {
     marginTop: 20,

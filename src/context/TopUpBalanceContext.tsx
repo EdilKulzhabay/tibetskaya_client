@@ -28,6 +28,7 @@ import RNFS from 'react-native-fs';
 import Share from 'react-native-share';
 import {useAuth} from '../hooks/useAuth';
 import PaymentWebView from '../components/PaymentWebView';
+import {navigate} from '../navigation/navigationRef';
 import {getClientMongoId} from '../utils/clientId';
 import {clientHasInvoiceLegalData} from '../utils/clientInvoiceProfile';
 import {apiService} from '../api/services';
@@ -208,6 +209,10 @@ export const TopUpBalanceProvider: React.FC<{children: React.ReactNode}> = ({
 
   const openTopUpModal = useCallback(
     (initialSum?: string, options: TopUpModalOptions = {}) => {
+      if (!user) {
+        navigate('Login', undefined);
+        return;
+      }
       cashPaymentActionRef.current = options.onCashPayment ?? null;
       topUpSuccessActionRef.current = options.onTopUpSuccess ?? null;
       void (async () => {
@@ -727,11 +732,11 @@ export const TopUpBalanceProvider: React.FC<{children: React.ReactNode}> = ({
                 <View style={{marginLeft: 12, maxWidth: '65%'}}>
                   <Text
                     style={{fontSize: 16, fontWeight: '500', color: '#101828'}}>
-                    Наличными курьеру
+                    Оплата курьеру
                   </Text>
                   <Text
                     style={{fontSize: 14, fontWeight: '400', color: '#4A5565'}}>
-                    QR, переводом или наличными
+                    QR или наличными
                   </Text>
                 </View>
                 <View
@@ -1103,7 +1108,7 @@ export const TopUpBalanceProvider: React.FC<{children: React.ReactNode}> = ({
               />
 
               <View style={styles.bottomSheetQuickAmounts}>
-                {[2600, 5000, 10000].map(amount => (
+                {[3000, 5000, 10000].map(amount => (
                   <TouchableOpacity
                     key={amount}
                     onPress={() => setTopUpSum(amount.toString())}

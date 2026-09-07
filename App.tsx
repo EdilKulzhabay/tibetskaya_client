@@ -3,7 +3,7 @@
  * @format
  */
 
-import React from 'react';
+import React, {useEffect} from 'react';
 import {StatusBar, useColorScheme} from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
@@ -26,6 +26,7 @@ import {
   AddressScreen,
   AddOrUpdateAddress,
   LoginScreen,
+  LoginOtpScreen,
   RegisterScreen,
   RegisterAcceptedScreen,
   OtpScreen,
@@ -51,6 +52,12 @@ import {navigationRef} from './src/navigation/navigationRef';
 import {ScreenLayout} from './src/components';
 import {TopUpBalanceProvider} from './src/context/TopUpBalanceContext';
 import {AuthProvider} from './src/hooks/useAuth';
+import {captureDeferredFbclid} from './src/utils/metaAttribution';
+import {Settings} from 'react-native-fbsdk-next';
+
+// Facebook SDK нужно явно инициализировать на JS-стороне — без этого
+// вызова AppEventsLogger.logEvent() падает с FacebookSdkNotInitializedException.
+Settings.initializeSDK();
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -71,6 +78,10 @@ function App() {
 
   // Инициализация push-уведомлений перенесена в useAuth хук
   // Она будет вызываться автоматически при загрузке пользователя или после логина/регистрации
+
+  useEffect(() => {
+    captureDeferredFbclid();
+  }, []);
 
   return (
     <SafeAreaProvider>
@@ -149,6 +160,10 @@ function App() {
                         gestureEnabled: false, // Отключаем смахивание
                         headerLeft: () => null, // Убираем кнопку назад в заголовке
                       }}
+                    />
+                    <Stack.Screen
+                      name="LoginOtp"
+                      component={withLayout(LoginOtpScreen)}
                     />
                     <Stack.Screen
                       name="Register"

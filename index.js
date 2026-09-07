@@ -3,6 +3,10 @@
  */
 
 import {AppRegistry} from 'react-native';
+// Должно быть первым импортом — отключает системное масштабирование шрифта
+// (специальные возможности: крупный текст, полужирный текст и т.п.) для всех
+// Text/TextInput в приложении, до рендера любого компонента.
+import './src/utils/disableFontScaling';
 import App from './App';
 import {name as appName} from './app.json';
 import messaging from '@react-native-firebase/messaging';
@@ -25,14 +29,17 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
   }
 
   console.log('🔴🔴🔴 ФОНОВОЕ УВЕДОМЛЕНИЕ ПОЛУЧЕНО! 🔴🔴🔴');
-  console.log('📬 Полные данные сообщения:', JSON.stringify(remoteMessage, null, 2));
+  console.log(
+    '📬 Полные данные сообщения:',
+    JSON.stringify(remoteMessage, null, 2),
+  );
   console.log('📋 Notification:', remoteMessage.notification);
   console.log('📦 Data:', remoteMessage.data);
   console.log('🆔 Message ID:', remoteMessage.messageId);
-  
+
   // Обработка данных заказа
   if (remoteMessage.data) {
-    const { newStatus, order, orderId, orderStatus } = remoteMessage.data;
+    const {newStatus, order, orderId, orderStatus} = remoteMessage.data;
     console.log('✅ Статус (newStatus):', newStatus);
     console.log('✅ Статус заказа (orderStatus):', orderStatus);
     console.log('✅ ID заказа:', orderId);
@@ -42,11 +49,14 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
         const orderData = typeof order === 'string' ? JSON.parse(order) : order;
         console.log('✅ Статус из данных заказа:', orderData.status);
       } catch (error) {
-        console.error('❌ Ошибка парсинга заказа в фоновом обработчике:', error);
+        console.error(
+          '❌ Ошибка парсинга заказа в фоновом обработчике:',
+          error,
+        );
       }
     }
   }
-  
+
   return Promise.resolve();
 });
 

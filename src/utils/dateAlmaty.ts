@@ -31,3 +31,11 @@ export function addDaysYmd(ymd: string, days: number): string {
   t.setUTCDate(t.getUTCDate() + days);
   return t.toISOString().split('T')[0];
 }
+
+/** Календарная дата YYYY-MM-DD в виде «5 сентября» — без сдвига дня из-за локального часового пояса устройства. */
+export function formatYmdRu(ymd: string): string {
+  return parseYmdUtcNoon(ymd).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+  });
+}

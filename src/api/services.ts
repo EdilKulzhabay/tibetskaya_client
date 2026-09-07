@@ -2,6 +2,7 @@
 import api from './axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {RegisterData, SupportMessage} from '../types';
+import {consumeStoredFbclid} from '../utils/metaAttribution';
 
 // Примеры API-сервисов
 export const apiService = {
@@ -35,25 +36,44 @@ export const apiService = {
 
   clientRegister: async (RegisterData: RegisterData) => {
     try {
-      const response = await api.post('/clientRegister', RegisterData);
+      const fbclid = await consumeStoredFbclid();
+      const response = await api.post('/clientRegister', {
+        ...RegisterData,
+        ...(fbclid ? {fbclid} : {}),
+      });
       return response.data;
     } catch (error) {
       throw error;
     }
   },
 
-  clientLogin: async (data: {
-    mail?: string;
-    phone?: string;
-    password: string;
-  }) => {
+  /** Отправляет OTP-код в WhatsApp для входа по номеру телефона (без пароля) */
+  sendLoginOtp: async (phone: string) => {
     try {
-      const response = await api.post('/clientLogin', data);
+      const response = await api.post('/sendLoginOtp', {phone});
       return response.data;
     } catch (error) {
+      const msg =
+        (error as {response?: {data?: {message?: string}}})?.response?.data
+          ?.message || 'Не удалось отправить код';
       return {
         success: false,
-        message: 'Не удалось войти в систему',
+        message: msg,
+      };
+    }
+  },
+
+  clientLoginOtp: async (phone: string, code: string) => {
+    try {
+      const response = await api.post('/clientLoginOtp', {phone, code});
+      return response.data;
+    } catch (error) {
+      const msg =
+        (error as {response?: {data?: {message?: string}}})?.response?.data
+          ?.message || 'Не удалось войти в систему';
+      return {
+        success: false,
+        message: msg,
       };
     }
   },
@@ -256,6 +276,25 @@ export const apiService = {
       return response.data;
     } catch (error) {
       throw error;
+    }
+  },
+  submitOrderReview: async (
+    orderId: string,
+    rating: number,
+    comment: string,
+  ) => {
+    try {
+      const response = await api.post('/submitOrderReviewMobile', {
+        orderId,
+        rating,
+        comment,
+      });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error?.response?.data?.message || 'Не удалось отправить отзыв',
+      };
     }
   },
   updateOrderData: async (orderId: string, field: string, value: any) => {

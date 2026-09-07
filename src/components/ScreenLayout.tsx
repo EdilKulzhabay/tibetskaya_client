@@ -13,6 +13,7 @@ const ScreenLayout: React.FC<ScreenLayoutProps> = ({
 }) => {
   return (
     <View style={styles.container}>
+      <View style={{backgroundColor: "#fff", height: 30, width: "100%"}} />
       <View style={styles.content}>{children}</View>
       {showNavigation && <Navigation />}
     </View>
@@ -26,7 +27,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingTop: 30,
   },
 });
 

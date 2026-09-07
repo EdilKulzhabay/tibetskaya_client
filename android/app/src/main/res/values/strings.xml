@@ -2,4 +2,5 @@
     <string name="app_name">Тибетская</string>
     <!-- Facebook SDK (App Events): см. TZ_Facebook_SDK_Integration -->
     <string name="facebook_app_id">2325289084670460</string>
+    <string name="facebook_client_token">fa1830b110838d10149b0d94b005fc7c</string>
 </resources>

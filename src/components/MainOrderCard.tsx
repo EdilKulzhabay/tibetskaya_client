@@ -8,14 +8,22 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import MapProvider from './MapProvider';
 import {OrderAddress, OrderData, OrderProduct} from '../types/navigation';
+import {getDateYmdAlmaty, nextYmd, formatYmdRu} from '../utils/dateAlmaty';
 
 /** Объём бутыли, доступный в форме создания заказа на главном экране. */
 export type OrderVolume = 'b19' | 'b12';
+
+/** Один элемент общей карусели заказов со статусом — какой карточкой его рендерить. */
+type StatusCarouselItem =
+  | {kind: 'active'; order: OrderData}
+  | {kind: 'deliveredToday'; order: OrderData}
+  | {kind: 'cancelled'; order: OrderData};
 
 export interface CreateOrderPayload {
   quantity19: number;
@@ -35,12 +43,17 @@ interface MainOrderCardProps {
   lastOrder: OrderData | null;
   price19: number;
   price12: number;
+  /** У клиента заполнены юр. данные для счёта (`invoiceLegalData`) — для таких клиентов
+   * пустая тара возвращается по умолчанию, вопрос «Есть пустые бутыли?» не показываем. */
+  hasInvoiceLegalData?: boolean;
   onChangeAddress?: () => void;
   onChatWithCourier: (order: OrderData) => void;
   onRepeatOrder: (order: OrderData) => void;
   onCreateOrder: (payload: CreateOrderPayload) => void;
   /** Отмена заказа со статусом «Заказ принят». */
   onCancelOrder: (order: OrderData) => void;
+  /** Открывает модалку отзыва для конкретного доставленного заказа. */
+  onLeaveReview?: (order: OrderData) => void;
 }
 
 const RED = '#DC1818';
@@ -107,12 +120,23 @@ function formatDateTimeNumeric(isoDate: string | undefined): string {
   return `${datePart} в ${timePart}`;
 }
 
+/** «Доставка сегодня/завтра/{дата}» по календарной дате заказа (`order.date.d`, YYYY-MM-DD
+ * по Алматы) — так же, как эта дата выбирается при создании заказа (см. utils/dateAlmaty). */
+function getDeliveryLabel(order: OrderData): string {
+  const ymd = order.date?.d;
+  if (!ymd) return 'Доставка';
+  const todayYmd = getDateYmdAlmaty(new Date());
+  if (ymd === todayYmd) return 'Доставка сегодня';
+  if (ymd === nextYmd(todayYmd)) return 'Доставка завтра';
+  return `Доставка ${formatYmdRu(ymd)}`;
+}
+
 /** Пояснение к причинам отмены, которые клиент сам выбирает в OrderStatusScreen —
  * для остальных значений (в т.ч. свободный текст «Другое») показываем только сам `reason`. */
 const CANCEL_REASON_DETAILS: Record<string, string> = {
-  'Не буду дома': 'Клиента не будет на месте в момент доставки',
-  'Неправильно указал дату': 'Нужно оформить заказ на другую дату',
-  Передумал: 'Клиент отказался от заказа',
+  'Никого нет по адресу': 'Клиента не будет на месте в момент доставки',
+  'Неправильная дата': 'Нужно оформить заказ на другую дату',
+  'Передумал(а)': 'Клиент отказался от заказа',
 };
 
 function getCancelReasonDisplay(reason: string | undefined): {
@@ -163,11 +187,13 @@ const MainOrderCard: React.FC<MainOrderCardProps> = ({
   lastOrder,
   price19,
   price12,
+  hasInvoiceLegalData,
   onChangeAddress,
   onChatWithCourier,
   onRepeatOrder,
   onCreateOrder,
   onCancelOrder,
+  onLeaveReview,
 }) => {
   /** Все активные заказы клиента (в пути показываем раньше принятых). */
   const activeOrders = useMemo(() => {
@@ -181,15 +207,15 @@ const MainOrderCard: React.FC<MainOrderCardProps> = ({
   }, [orders]);
   const hasActiveOrder = activeOrders.length > 0;
 
-  /** Все заказы, доставленные сегодня. `orders` (из getActiveOrdersMobile) уже включает
-   * их с бэкенда, но подмешиваем и `lastOrder` на случай рассинхронизации двух запросов. */
+  /** Все заказы, доставленные сегодня — показываем вместе с активными, а не только
+   * когда активных заказов нет. `orders` (из getActiveOrdersMobile) уже включает их
+   * с бэкенда, но подмешиваем и `lastOrder` на случай рассинхронизации двух запросов. */
   const deliveredTodayOrders = useMemo(() => {
-    if (hasActiveOrder) return [];
     const today = new Date();
     const isDeliveredToday = (order: OrderData | null | undefined): boolean =>
       !!order &&
       order.status === 'delivered' &&
-      isSameDay(order.updatedAt, today);
+      isSameDay(order.deliveredTime || order.updatedAt, today);
 
     const fromOrders = orders.filter(isDeliveredToday);
     const merged = isDeliveredToday(lastOrder)
@@ -201,51 +227,72 @@ const MainOrderCard: React.FC<MainOrderCardProps> = ({
 
     return [...merged].sort(
       (a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+        new Date(b.deliveredTime || b.updatedAt).getTime() -
+        new Date(a.deliveredTime || a.updatedAt).getTime(),
     );
-  }, [hasActiveOrder, orders, lastOrder]);
+  }, [orders, lastOrder]);
   const hasDeliveredToday = deliveredTodayOrders.length > 0;
 
-  const cancelledLastOrder = useMemo(() => {
-    if (hasActiveOrder) return null;
-    if (!lastOrder || lastOrder.status !== 'cancelled') return null;
-    return lastOrder;
-  }, [hasActiveOrder, lastOrder]);
+  /** Все заказы, отменённые сегодня — определяем не по времени самой отмены
+   * (`updatedAt`), а по дате доставки заказа (`date.d`, YYYY-MM-DD по Алматы) —
+   * так же, как эта дата выбирается при создании заказа (см. utils/dateAlmaty). */
+  const cancelledTodayOrders = useMemo(() => {
+    const todayYmd = getDateYmdAlmaty(new Date());
+    const isCancelledToday = (order: OrderData | null | undefined): boolean =>
+      !!order && order.status === 'cancelled' && order.date?.d === todayYmd;
 
-  /** «Повторить заказ» показываем, только если на сегодня нет доставленных заказов
-   * (те стоят карточкой до конца дня — см. deliveredTodayOrders) и у клиента вообще
-   * есть завершённый (доставленный) заказ в истории. */
+    const fromOrders = orders.filter(isCancelledToday);
+    const merged = isCancelledToday(lastOrder)
+      ? [
+          ...fromOrders.filter(order => order._id !== lastOrder?._id),
+          lastOrder as OrderData,
+        ]
+      : fromOrders;
+
+    return [...merged].sort(
+      (a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    );
+  }, [orders, lastOrder]);
+  const hasCancelledToday = cancelledTodayOrders.length > 0;
+
+  /** «Повторить заказ» показываем, только если на сегодня нет активных, доставленных
+   * или отменённых заказов (те стоят карточкой до конца дня — см. deliveredTodayOrders
+   * и cancelledTodayOrders) и у клиента вообще есть заказ в истории. */
   const repeatOrder = useMemo(() => {
     if (hasActiveOrder) return null;
     if (hasDeliveredToday) return null;
-    if (cancelledLastOrder) return null;
-    if (!lastOrder || lastOrder.status !== 'delivered') return null;
+    if (hasCancelledToday) return null;
+    if (!lastOrder) return null;
     return lastOrder;
-  }, [hasActiveOrder, hasDeliveredToday, cancelledLastOrder, lastOrder]);
+  }, [hasActiveOrder, hasDeliveredToday, hasCancelledToday, lastOrder]);
 
-  /** Индекс текущей карточки в карусели активных заказов — для точек-индикаторов под ней. */
-  const [activeOrderCarouselIndex, setActiveOrderCarouselIndex] = useState(0);
-  const handleActiveOrdersScroll = (
+  /** Все заказы со статусом, показываемые клиенту прямо сейчас (активные, доставленные
+   * сегодня, отменённые сегодня) — рендерятся в одной общей карусели. */
+  const statusOrders: StatusCarouselItem[] = useMemo(() => {
+    return [
+      ...activeOrders.map(order => ({kind: 'active' as const, order})),
+      ...deliveredTodayOrders.map(order => ({
+        kind: 'deliveredToday' as const,
+        order,
+      })),
+      ...cancelledTodayOrders.map(order => ({
+        kind: 'cancelled' as const,
+        order,
+      })),
+    ];
+  }, [activeOrders, deliveredTodayOrders, cancelledTodayOrders]);
+
+  /** Индекс текущей карточки в общей карусели заказов — для точек-индикаторов под ней. */
+  const [statusOrderCarouselIndex, setStatusOrderCarouselIndex] = useState(0);
+  const handleStatusOrdersScroll = (
     event: NativeSyntheticEvent<NativeScrollEvent>,
   ) => {
     const index = Math.round(
       event.nativeEvent.contentOffset.x /
         (ACTIVE_ORDER_CARD_WIDTH + ACTIVE_ORDER_CARD_GAP),
     );
-    setActiveOrderCarouselIndex(index);
-  };
-
-  /** Индекс текущей карточки в карусели заказов, доставленных сегодня. */
-  const [deliveredOrderCarouselIndex, setDeliveredOrderCarouselIndex] =
-    useState(0);
-  const handleDeliveredOrdersScroll = (
-    event: NativeSyntheticEvent<NativeScrollEvent>,
-  ) => {
-    const index = Math.round(
-      event.nativeEvent.contentOffset.x /
-        (ACTIVE_ORDER_CARD_WIDTH + ACTIVE_ORDER_CARD_GAP),
-    );
-    setDeliveredOrderCarouselIndex(index);
+    setStatusOrderCarouselIndex(index);
   };
 
   /** «Изменить» на карточке повтора (или «Заказать ещё») раскрывает форму создания
@@ -261,114 +308,80 @@ const MainOrderCard: React.FC<MainOrderCardProps> = ({
    * заказов (создание с нуля) или он решил собрать заказ сам через «Изменить». */
   const showCreateOrderBlock = !lastOrder || isEditingRepeatOrder;
 
+  const renderStatusOrderCard = (item: StatusCarouselItem) => {
+    switch (item.kind) {
+      case 'active':
+        return (
+          <ActiveOrderCard
+            order={item.order}
+            onChatWithCourier={onChatWithCourier}
+            onCancelOrder={onCancelOrder}
+          />
+        );
+      case 'deliveredToday':
+        return (
+          <DeliveredTodayCard
+            order={item.order}
+            onLeaveReview={onLeaveReview}
+          />
+        );
+      case 'cancelled':
+        return <CancelledOrderCard order={item.order} />;
+    }
+  };
+
   return (
     <>
-      {activeOrders.length === 1 ? (
-        <ActiveOrderCard
-          order={activeOrders[0]}
-          onChatWithCourier={onChatWithCourier}
-          onCancelOrder={onCancelOrder}
-        />
-      ) : (
-        activeOrders.length > 1 && (
-          <View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={ACTIVE_ORDER_CARD_WIDTH + ACTIVE_ORDER_CARD_GAP}
-              decelerationRate="fast"
-              onScroll={handleActiveOrdersScroll}
-              scrollEventThrottle={16}
-              contentContainerStyle={styles.activeOrdersCarousel}>
-              {activeOrders.map((order, index) => (
-                <View
-                  key={order._id}
-                  style={[
-                    styles.activeOrderCarouselItem,
-                    index !== activeOrders.length - 1 && {
-                      marginRight: ACTIVE_ORDER_CARD_GAP,
-                    },
-                  ]}>
-                  <CarouselIndexBadge
-                    index={index}
-                    total={activeOrders.length}
+      {statusOrders.length === 1
+        ? renderStatusOrderCard(statusOrders[0])
+        : statusOrders.length > 1 && (
+            <View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={ACTIVE_ORDER_CARD_WIDTH + ACTIVE_ORDER_CARD_GAP}
+                decelerationRate="fast"
+                onScroll={handleStatusOrdersScroll}
+                scrollEventThrottle={16}
+                contentContainerStyle={styles.activeOrdersCarousel}>
+                {statusOrders.map((item, index) => (
+                  <View
+                    key={item.order._id}
+                    style={[
+                      styles.activeOrderCarouselItem,
+                      index !== statusOrders.length - 1 && {
+                        marginRight: ACTIVE_ORDER_CARD_GAP,
+                      },
+                    ]}>
+                    <CarouselIndexBadge
+                      index={index}
+                      total={statusOrders.length}
+                    />
+                    {renderStatusOrderCard(item)}
+                  </View>
+                ))}
+              </ScrollView>
+              <View style={styles.activeOrdersDotsRow}>
+                {statusOrders.map((item, index) => (
+                  <View
+                    key={item.order._id}
+                    style={[
+                      styles.activeOrdersDot,
+                      index === statusOrderCarouselIndex &&
+                        styles.activeOrdersDotActive,
+                    ]}
                   />
-                  <ActiveOrderCard
-                    order={order}
-                    onChatWithCourier={onChatWithCourier}
-                    onCancelOrder={onCancelOrder}
-                  />
-                </View>
-              ))}
-            </ScrollView>
-            <View style={styles.activeOrdersDotsRow}>
-              {activeOrders.map((order, index) => (
-                <View
-                  key={order._id}
-                  style={[
-                    styles.activeOrdersDot,
-                    index === activeOrderCarouselIndex &&
-                      styles.activeOrdersDotActive,
-                  ]}
-                />
-              ))}
+                ))}
+              </View>
             </View>
-          </View>
-        )
-      )}
-
-      {hasDeliveredToday &&
-        (deliveredTodayOrders.length === 1 ? (
-          <DeliveredTodayCard order={deliveredTodayOrders[0]} />
-        ) : (
-          <View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={ACTIVE_ORDER_CARD_WIDTH + ACTIVE_ORDER_CARD_GAP}
-              decelerationRate="fast"
-              onScroll={handleDeliveredOrdersScroll}
-              scrollEventThrottle={16}
-              contentContainerStyle={styles.activeOrdersCarousel}>
-              {deliveredTodayOrders.map((order, index) => (
-                <View
-                  key={order._id}
-                  style={[
-                    styles.activeOrderCarouselItem,
-                    index !== deliveredTodayOrders.length - 1 && {
-                      marginRight: ACTIVE_ORDER_CARD_GAP,
-                    },
-                  ]}>
-                  <CarouselIndexBadge
-                    index={index}
-                    total={deliveredTodayOrders.length}
-                  />
-                  <DeliveredTodayCard order={order} />
-                </View>
-              ))}
-            </ScrollView>
-            <View style={styles.activeOrdersDotsRow}>
-              {deliveredTodayOrders.map((order, index) => (
-                <View
-                  key={order._id}
-                  style={[
-                    styles.activeOrdersDot,
-                    index === deliveredOrderCarouselIndex &&
-                      styles.activeOrdersDotActive,
-                  ]}
-                />
-              ))}
-            </View>
-          </View>
-        ))}
-
-      {cancelledLastOrder && <CancelledOrderCard order={cancelledLastOrder} />}
+          )}
 
       {repeatOrder && !isEditingRepeatOrder && (
         <RepeatOrderCard
           order={repeatOrder}
           onRepeatOrder={onRepeatOrder}
           onEdit={() => setIsEditingRepeatOrder(true)}
+          hasInvoiceLegalData={!!hasInvoiceLegalData}
         />
       )}
 
@@ -381,6 +394,7 @@ const MainOrderCard: React.FC<MainOrderCardProps> = ({
           <CreateOrderCard
             price19={price19}
             price12={price12}
+            hasInvoiceLegalData={!!hasInvoiceLegalData}
             onCreateOrder={onCreateOrder}
           />
         </>
@@ -438,9 +452,20 @@ const AddressSummaryCard: React.FC<{
   address: OrderAddress | null;
   onChangeAddress?: () => void;
 }> = ({address, onChangeAddress}) => {
-  if (!address) return null;
+  const title = address ? address.name || 'Адрес доставки' : 'Адрес доставки';
+  const subtitle = address
+    ? address.actual
+    : 'Для заказа нужно добавить адрес доставки';
   return (
-    <View style={styles.addressCard}>
+    <TouchableOpacity
+      style={styles.addressCard}
+      onPress={onChangeAddress}
+      disabled={!onChangeAddress}
+      activeOpacity={onChangeAddress ? 0.7 : 1}
+      accessibilityRole="button"
+      accessibilityLabel={
+        address ? 'Изменить адрес доставки' : 'Добавить адрес доставки'
+      }>
       <View style={styles.topAddressRow}>
         <Image
           source={require('../assets/pin.png')}
@@ -448,30 +473,28 @@ const AddressSummaryCard: React.FC<{
         />
         <View style={styles.topAddressTextWrap}>
           <Text style={styles.addressTitle} numberOfLines={1}>
-            {address.name || 'Адрес доставки'}
+            {title}
           </Text>
           <Text
             style={styles.addressText}
             numberOfLines={1}
             ellipsizeMode="tail">
-            {address.actual}
+            {subtitle}
           </Text>
         </View>
       </View>
       {onChangeAddress && (
-        <TouchableOpacity
-          style={styles.changeAddressButton}
-          onPress={onChangeAddress}
-          accessibilityRole="button"
-          accessibilityLabel="Изменить адрес доставки">
-          <Text style={styles.changeAddressText}>Изменить</Text>
+        <View style={styles.changeAddressButton}>
+          <Text style={styles.changeAddressText}>
+            {address ? 'Изменить' : 'Добавить'}
+          </Text>
           <Image
             source={require('../assets/redChevronRight.png')}
             style={{width: 16, height: 16}}
           />
-        </TouchableOpacity>
+        </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -533,6 +556,23 @@ const ActiveOrderCard: React.FC<{
     ? {latitude: order.address.point.lat, longitude: order.address.point.lon}
     : {latitude: 43.222, longitude: 76.8512};
 
+  /** «Имя · Марка Модель · Гос. номер» — части, которых нет в данных курьера, опускаем. */
+  const courierCarLabel = [
+    courierAggregator?.carData?.brand,
+    courierAggregator?.carData?.model,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const courierPlateNumber =
+    courierAggregator?.carData?.plateNumber || courierAggregator?.carNumber;
+  const courierInfoLine = [
+    courierAggregator?.fullName,
+    courierCarLabel,
+    courierPlateNumber,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   const [isMapExpanded, setIsMapExpanded] = useState(false);
 
   return (
@@ -571,9 +611,18 @@ const ActiveOrderCard: React.FC<{
         </View>
       </View>
       {isOnTheWay && (
-        <Text style={styles.cardSubtitleMuted}>
-          Заказ №{getOrderNumber(order)}
-        </Text>
+        <>
+          {!courierInfoLine && (
+            <Text style={styles.cardSubtitleMuted}>
+              Заказ №{getOrderNumber(order)}
+            </Text>
+          )}
+          {!!courierInfoLine && (
+            <Text style={styles.cardSubtitleMuted}>
+              Курьер: {courierInfoLine}
+            </Text>
+          )}
+        </>
       )}
 
       <View
@@ -585,7 +634,7 @@ const ActiveOrderCard: React.FC<{
           <ProductRows products={order.products} onTint />
           <AddressRow address={order.address} />
           <View style={styles.metaRow}>
-            <Text style={styles.metaText}>Доставка сегодня</Text>
+            <Text style={styles.metaText}>{getDeliveryLabel(order)}</Text>
           </View>
         </View>
 
@@ -665,7 +714,10 @@ const ActiveOrderCard: React.FC<{
   );
 };
 
-const DeliveredTodayCard: React.FC<{order: OrderData}> = ({order}) => (
+const DeliveredTodayCard: React.FC<{
+  order: OrderData;
+  onLeaveReview?: (order: OrderData) => void;
+}> = ({order, onLeaveReview}) => (
   <View style={[styles.card, styles.cardDelivered]}>
     <View style={styles.cardHeaderRow}>
       <View style={styles.cardHeaderTitleGroup}>
@@ -675,12 +727,15 @@ const DeliveredTodayCard: React.FC<{order: OrderData}> = ({order}) => (
         <Text style={styles.cardTitle}>Заказ доставлен</Text>
       </View>
       <View style={styles.datePill}>
-        <Text style={styles.datePillText}>{formatDate(order.updatedAt)}</Text>
+        <Text style={styles.datePillText}>
+          {formatDate(order.deliveredTime || order.updatedAt)}
+        </Text>
       </View>
     </View>
 
     <Text style={styles.cardSubtitleMuted}>
-      Заказ №{getOrderNumber(order)} · Сегодня, {formatTime(order.updatedAt)}
+      Заказ №{getOrderNumber(order)} · Сегодня,{' '}
+      {formatTime(order.deliveredTime || order.updatedAt)}
     </Text>
 
     <View style={styles.sideBySideRow}>
@@ -693,12 +748,23 @@ const DeliveredTodayCard: React.FC<{order: OrderData}> = ({order}) => (
 
     <View style={styles.deliveredNotice}>
       <Text style={styles.deliveredNoticeTitle}>
-        Заказ успешно доставлен в {formatTime(order.updatedAt)}
+        Заказ успешно доставлен в{' '}
+        {formatTime(order.deliveredTime || order.updatedAt)}
       </Text>
       <Text style={styles.deliveredNoticeSubtitle}>
         Спасибо, что выбираете нас. Ждем вас снова
       </Text>
     </View>
+
+    {!order.clientReview && onLeaveReview && (
+      <TouchableOpacity
+        style={styles.leaveReviewButton}
+        onPress={() => onLeaveReview(order)}
+        accessibilityRole="button"
+        accessibilityLabel="Оставить отзыв">
+        <Text style={styles.leaveReviewButtonText}>Оставить отзыв</Text>
+      </TouchableOpacity>
+    )}
   </View>
 );
 
@@ -757,7 +823,8 @@ const RepeatOrderCard: React.FC<{
   order: OrderData;
   onRepeatOrder: (order: OrderData) => void;
   onEdit: () => void;
-}> = ({order, onRepeatOrder, onEdit}) => (
+  hasInvoiceLegalData?: boolean;
+}> = ({order, onRepeatOrder, onEdit, hasInvoiceLegalData}) => (
   <View style={styles.card}>
     <View style={styles.cardHeaderTitleGroup}>
       <View style={styles.repeatIconWrap}>
@@ -782,12 +849,14 @@ const RepeatOrderCard: React.FC<{
       <BottlePairImage products={order.products} />
     </View>
 
-    <View style={styles.totalRow}>
-      <Text style={styles.totalLabel}>Итого:</Text>
-      <Text style={styles.totalValue}>
-        {(order.sum || 0).toLocaleString('ru-RU')} ₸
-      </Text>
-    </View>
+    {!hasInvoiceLegalData && (
+      <View style={styles.totalRow}>
+        <Text style={styles.totalLabel}>Итого:</Text>
+        <Text style={styles.totalValue}>
+          {(order.sum || 0).toLocaleString('ru-RU')} ₸
+        </Text>
+      </View>
+    )}
 
     <View style={styles.repeatButtonsRow}>
       <TouchableOpacity
@@ -811,27 +880,45 @@ const RepeatOrderCard: React.FC<{
 const CreateOrderCard: React.FC<{
   price19: number;
   price12: number;
+  /** У клиента заполнены юр. данные для счёта — пустая тара возвращается по умолчанию,
+   * вопрос «Есть пустые бутыли?» для него не показываем. */
+  hasInvoiceLegalData: boolean;
   onCreateOrder: (payload: CreateOrderPayload) => void;
-}> = ({price19, price12, onCreateOrder}) => {
+}> = ({price19, price12, hasInvoiceLegalData, onCreateOrder}) => {
   const [volume, setVolume] = useState<OrderVolume>('b19');
   const [quantities, setQuantities] = useState<Record<OrderVolume, number>>({
-    b19: MIN_QUANTITY_B19,
+    b19: 0,
     b12: 0,
   });
-  /** «Есть пустые бутыли?» — отдельный ответ и счётчик на каждый объём. */
+  /** «Есть пустые бутыли?» — отдельный ответ и счётчик на каждый объём. У клиентов
+   * с заполненными юр. данными для счёта (`hasInvoiceLegalData`) ответ по умолчанию «да»,
+   * а сам вопрос не показываем — см. `styles.yesNoRow` ниже. */
+  const defaultHasEmptyBottles = (): Record<OrderVolume, boolean | null> => ({
+    b19: hasInvoiceLegalData ? true : null,
+    b12: hasInvoiceLegalData ? true : null,
+  });
   const [hasEmptyBottles, setHasEmptyBottles] = useState<
     Record<OrderVolume, boolean | null>
-  >({b19: null, b12: null});
+  >(defaultHasEmptyBottles);
   const [emptyBottlesCount, setEmptyBottlesCount] = useState<
     Record<OrderVolume, number>
   >({b19: 0, b12: 0});
   const [isResetModalVisible, setIsResetModalVisible] = useState(false);
+  /** Черновик ввода количества бутылей текущего объёма — пока клиент печатает,
+   * храним сырой текст отдельно, чтобы не терять промежуточные состояния поля
+   * (например, пустую строку при стирании перед вводом нового числа). */
+  const [quantityDraft, setQuantityDraft] = useState<string | null>(null);
+
+  useEffect(() => {
+    setQuantityDraft(null);
+  }, [volume]);
 
   const handleConfirmReset = () => {
     setVolume('b19');
-    setQuantities({b19: MIN_QUANTITY_B19, b12: 0});
-    setHasEmptyBottles({b19: null, b12: null});
+    setQuantities({b19: 0, b12: 0});
+    setHasEmptyBottles(defaultHasEmptyBottles());
     setEmptyBottlesCount({b19: 0, b12: 0});
+    setQuantityDraft(null);
     setIsResetModalVisible(false);
   };
 
@@ -839,9 +926,15 @@ const CreateOrderCard: React.FC<{
   const totalQuantity = quantities.b19 + quantities.b12;
   const belowMinimumOrder =
     totalQuantity > 0 && totalQuantity < MIN_QUANTITY_B19;
+  /** У клиентов с заполненными юр. данными для счёта возврат тары не спрашиваем и
+   * не показываем — считаем, что все бутыли возвращаются (см. defaultHasEmptyBottles). */
   const effectiveEmptyBottlesCount: Record<OrderVolume, number> = {
-    b19: Math.min(emptyBottlesCount.b19, quantities.b19),
-    b12: Math.min(emptyBottlesCount.b12, quantities.b12),
+    b19: hasInvoiceLegalData
+      ? quantities.b19
+      : Math.min(emptyBottlesCount.b19, quantities.b19),
+    b12: hasInvoiceLegalData
+      ? quantities.b12
+      : Math.min(emptyBottlesCount.b12, quantities.b12),
   };
 
   const changeQuantity = (targetVolume: OrderVolume, delta: number) => {
@@ -849,6 +942,17 @@ const CreateOrderCard: React.FC<{
       ...prev,
       [targetVolume]: Math.max(0, prev[targetVolume] + delta),
     }));
+  };
+
+  /** Клиент вручную вводит количество бутылей (для крупных заказов, где неудобно
+   * нажимать «+» много раз) — коммитим черновик поля при потере фокуса. Пустое или
+   * нечисловое значение откатываем к текущему количеству, а не обнуляем заказ. */
+  const commitQuantityDraft = () => {
+    const parsed = quantityDraft === null ? NaN : parseInt(quantityDraft, 10);
+    if (Number.isFinite(parsed)) {
+      setQuantities(prev => ({...prev, [volume]: Math.max(0, parsed)}));
+    }
+    setQuantityDraft(null);
   };
 
   const changeEmptyBottlesCount = (delta: number) => {
@@ -996,7 +1100,23 @@ const CreateOrderCard: React.FC<{
                   />
                 </TouchableOpacity>
                 <View>
-                  <Text style={styles.stepperValue}>{quantities[volume]}</Text>
+                  <TextInput
+                    style={styles.stepperValueInput}
+                    value={
+                      quantityDraft !== null
+                        ? quantityDraft
+                        : String(quantities[volume])
+                    }
+                    onFocus={() => setQuantityDraft(String(quantities[volume]))}
+                    onChangeText={text =>
+                      setQuantityDraft(text.replace(/[^0-9]/g, ''))
+                    }
+                    onBlur={commitQuantityDraft}
+                    keyboardType="number-pad"
+                    maxLength={5}
+                    selectTextOnFocus
+                    accessibilityLabel="Количество бутылей"
+                  />
                   <Text style={styles.stepperCaption}>
                     {bottleWord(quantities[volume])}
                   </Text>
@@ -1015,7 +1135,7 @@ const CreateOrderCard: React.FC<{
               </View>
             </View>
 
-            {hasEmptyBottles[volume] === true && (
+            {!hasInvoiceLegalData && hasEmptyBottles[volume] === true && (
               <View style={styles.expandedSection}>
                 <Text style={styles.stepperLabel}>
                   Пустые бутыли для возврата
@@ -1074,131 +1194,137 @@ const CreateOrderCard: React.FC<{
               </Text>
             )}
 
-            <Text style={styles.stepperLabel}>
-              Есть пустые бутыли {VOLUME_LABEL[volume]}?
-            </Text>
-            <View style={styles.yesNoRow}>
-              <TouchableOpacity
-                style={[
-                  styles.yesNoButton,
-                  hasEmptyBottles[volume] === true &&
-                    styles.yesNoButtonSelected,
-                ]}
-                onPress={() => {
-                  setHasEmptyBottles(prev => ({...prev, [volume]: true}));
-                  setEmptyBottlesCount(prev => ({
-                    ...prev,
-                    [volume]:
-                      prev[volume] > 0
-                        ? Math.min(prev[volume], quantities[volume])
-                        : quantities[volume],
-                  }));
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={`Есть пустые бутыли ${VOLUME_LABEL[volume]}`}>
-                <View
-                  style={[
-                    styles.yesNoIndicator,
-                    hasEmptyBottles[volume] === true &&
-                      styles.yesNoIndicatorSelected,
-                  ]}>
-                  {hasEmptyBottles[volume] === true && (
-                    <Text style={styles.yesNoIndicatorCheck}>✓</Text>
-                  )}
-                </View>
-                <Text
-                  style={[
-                    styles.yesNoButtonText,
-                    hasEmptyBottles[volume] === true &&
-                      styles.yesNoButtonTextSelected,
-                  ]}>
-                  Да
+            {!hasInvoiceLegalData && (
+              <>
+                <Text style={styles.stepperLabel}>
+                  Есть пустые бутыли {VOLUME_LABEL[volume]}?
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.yesNoButton,
-                  hasEmptyBottles[volume] === false &&
-                    styles.yesNoButtonSelected,
-                ]}
-                onPress={() =>
-                  setHasEmptyBottles(prev => ({...prev, [volume]: false}))
-                }
-                accessibilityRole="button"
-                accessibilityLabel={`Нет пустых бутылей ${VOLUME_LABEL[volume]}`}>
-                <View
-                  style={[
-                    styles.yesNoIndicator,
-                    hasEmptyBottles[volume] === false &&
-                      styles.yesNoIndicatorSelected,
-                  ]}>
-                  {hasEmptyBottles[volume] === false && (
-                    <Text style={styles.yesNoIndicatorCheck}>✓</Text>
-                  )}
+                <View style={styles.yesNoRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.yesNoButton,
+                      hasEmptyBottles[volume] === true &&
+                        styles.yesNoButtonSelected,
+                    ]}
+                    onPress={() => {
+                      setHasEmptyBottles(prev => ({...prev, [volume]: true}));
+                      setEmptyBottlesCount(prev => ({
+                        ...prev,
+                        [volume]:
+                          prev[volume] > 0
+                            ? Math.min(prev[volume], quantities[volume])
+                            : quantities[volume],
+                      }));
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Есть пустые бутыли ${VOLUME_LABEL[volume]}`}>
+                    <View
+                      style={[
+                        styles.yesNoIndicator,
+                        hasEmptyBottles[volume] === true &&
+                          styles.yesNoIndicatorSelected,
+                      ]}>
+                      {hasEmptyBottles[volume] === true && (
+                        <Text style={styles.yesNoIndicatorCheck}>✓</Text>
+                      )}
+                    </View>
+                    <Text
+                      style={[
+                        styles.yesNoButtonText,
+                        hasEmptyBottles[volume] === true &&
+                          styles.yesNoButtonTextSelected,
+                      ]}>
+                      Да
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.yesNoButton,
+                      hasEmptyBottles[volume] === false &&
+                        styles.yesNoButtonSelected,
+                    ]}
+                    onPress={() =>
+                      setHasEmptyBottles(prev => ({...prev, [volume]: false}))
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={`Нет пустых бутылей ${VOLUME_LABEL[volume]}`}>
+                    <View
+                      style={[
+                        styles.yesNoIndicator,
+                        hasEmptyBottles[volume] === false &&
+                          styles.yesNoIndicatorSelected,
+                      ]}>
+                      {hasEmptyBottles[volume] === false && (
+                        <Text style={styles.yesNoIndicatorCheck}>✓</Text>
+                      )}
+                    </View>
+                    <Text
+                      style={[
+                        styles.yesNoButtonText,
+                        hasEmptyBottles[volume] === false &&
+                          styles.yesNoButtonTextSelected,
+                      ]}>
+                      Нет
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-                <Text
-                  style={[
-                    styles.yesNoButtonText,
-                    hasEmptyBottles[volume] === false &&
-                      styles.yesNoButtonTextSelected,
-                  ]}>
-                  Нет
-                </Text>
-              </TouchableOpacity>
-            </View>
+              </>
+            )}
           </View>
         </View>
 
         <View style={styles.divider} />
 
-        <View style={styles.totalBreakdown}>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Итого:</Text>
-            <Text style={styles.totalValue}>
-              {total.toLocaleString('ru-RU')} ₸
-            </Text>
+        {!hasInvoiceLegalData && (
+          <View style={styles.totalBreakdown}>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Итого:</Text>
+              <Text style={styles.totalValue}>
+                {total.toLocaleString('ru-RU')} ₸
+              </Text>
+            </View>
+            {quantities.b19 > 0 && (
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>
+                  Вода {VOLUME_LABEL.b19} ({quantities.b19} шт)
+                </Text>
+                <Text style={styles.breakdownValue}>
+                  {waterSum19.toLocaleString('ru-RU')} ₸
+                </Text>
+              </View>
+            )}
+            {quantities.b12 > 0 && (
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>
+                  Вода {VOLUME_LABEL.b12} ({quantities.b12} шт)
+                </Text>
+                <Text style={styles.breakdownValue}>
+                  {waterSum12.toLocaleString('ru-RU')} ₸
+                </Text>
+              </View>
+            )}
+            {newTareByVolume.b19 > 0 && (
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>
+                  Новая тара {VOLUME_LABEL.b19} ({newTareByVolume.b19} шт.)
+                </Text>
+                <Text style={styles.breakdownValue}>
+                  {tareSum19.toLocaleString('ru-RU')} ₸
+                </Text>
+              </View>
+            )}
+            {newTareByVolume.b12 > 0 && (
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>
+                  Новая тара {VOLUME_LABEL.b12} ({newTareByVolume.b12} шт.)
+                </Text>
+                <Text style={styles.breakdownValue}>
+                  {tareSum12.toLocaleString('ru-RU')} ₸
+                </Text>
+              </View>
+            )}
           </View>
-          {quantities.b19 > 0 && (
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>
-                Вода {VOLUME_LABEL.b19} ({quantities.b19} шт)
-              </Text>
-              <Text style={styles.breakdownValue}>
-                {waterSum19.toLocaleString('ru-RU')} ₸
-              </Text>
-            </View>
-          )}
-          {quantities.b12 > 0 && (
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>
-                Вода {VOLUME_LABEL.b12} ({quantities.b12} шт)
-              </Text>
-              <Text style={styles.breakdownValue}>
-                {waterSum12.toLocaleString('ru-RU')} ₸
-              </Text>
-            </View>
-          )}
-          {newTareByVolume.b19 > 0 && (
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>
-                Новая тара {VOLUME_LABEL.b19} ({newTareByVolume.b19} шт.)
-              </Text>
-              <Text style={styles.breakdownValue}>
-                {tareSum19.toLocaleString('ru-RU')} ₸
-              </Text>
-            </View>
-          )}
-          {newTareByVolume.b12 > 0 && (
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>
-                Новая тара {VOLUME_LABEL.b12} ({newTareByVolume.b12} шт.)
-              </Text>
-              <Text style={styles.breakdownValue}>
-                {tareSum12.toLocaleString('ru-RU')} ₸
-              </Text>
-            </View>
-          )}
-        </View>
+        )}
 
         <TouchableOpacity
           style={[
@@ -1664,6 +1790,19 @@ const styles = StyleSheet.create({
     color: '#3E6B45',
     marginTop: 4,
   },
+  leaveReviewButton: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: RED,
+    borderRadius: 10,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  leaveReviewButtonText: {
+    color: RED,
+    fontSize: 15,
+    fontWeight: '600',
+  },
   repeatIconWrap: {
     width: 40,
     height: 40,
@@ -1881,6 +2020,15 @@ const styles = StyleSheet.create({
     color: '#101010',
     minWidth: 24,
     textAlign: 'center',
+  },
+  stepperValueInput: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#101010',
+    minWidth: 40,
+    textAlign: 'center',
+    padding: 0,
+    margin: 0,
   },
   minOrderNote: {
     marginTop: 8,

@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   Modal,
   Image,
-  Platform
+  Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {androidOnlySafeAreaEdges} from '../utils/safeArea';
@@ -261,7 +261,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({navigation}) => {
             });
           } else {
             void openTopUpModal(String(deficit), {
-              title: `Не хватает ${deficit.toLocaleString('ru-RU')} ₸`,
+              title: `${deficit.toLocaleString('ru-RU')} ₸`,
               subtitle: 'Способы пополнения',
               showCashPayment: true,
               onCashPayment: () =>
@@ -384,7 +384,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({navigation}) => {
           });
         } else {
           void openTopUpModal(String(deficit), {
-            title: `Не хватает ${deficit.toLocaleString('ru-RU')} ₸`,
+            title: `${deficit.toLocaleString('ru-RU')} ₸`,
             subtitle: 'Способы пополнения',
             showCashPayment: true,
             onCashPayment: () =>
@@ -521,8 +521,15 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({navigation}) => {
       const dateStr =
         typeof order.date === 'string' ? order.date : order.date?.d;
       if (!dateStr) return false;
-      const d = new Date(dateStr);
-      return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+      // Сравниваем компоненты YYYY-MM-DD напрямую, без new Date(): парсинг ISO-даты
+      // как UTC-полуночи с последующим чтением getMonth()/getFullYear() в локальном
+      // часовом поясе устройства сдвигал дату у клиентов не в часовом поясе Алматы,
+      // из-за чего заказы пропадали из истории на границах месяца.
+      const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
+      if (!match) return false;
+      const year = Number(match[1]);
+      const month = Number(match[2]) - 1;
+      return month === selectedMonth && year === selectedYear;
     });
   }, [orders, selectedMonth, selectedYear]);
 

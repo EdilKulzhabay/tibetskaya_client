@@ -8,7 +8,12 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    
+
+    <!-- Нужно для Facebook SDK (com.facebook.sdk.AdvertiserIDCollectionEnabled ниже) —
+         без этого разрешения на Android 13+ рекламный идентификатор заменяется нулями,
+         что ломает атрибуцию покупок в Facebook Ads. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
+
     <!-- Удаляем разрешения, добавляемые react-native-image-picker, т.к. используем Photo Picker API -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove" />
@@ -44,6 +49,9 @@
       <meta-data
         android:name="com.facebook.sdk.ApplicationId"
         android:value="@string/facebook_app_id" />
+      <meta-data
+        android:name="com.facebook.sdk.ClientToken"
+        android:value="@string/facebook_client_token" />
       <meta-data
         android:name="com.facebook.sdk.AutoLogAppEventsEnabled"
         android:value="true" />

@@ -10,9 +10,13 @@ import {
   Image,
   Alert,
   Platform,
+  AppState,
   ActivityIndicator,
   Animated,
   Share,
+  TextInput,
+  Linking,
+  KeyboardAvoidingView,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {androidOnlySafeAreaEdges} from '../utils/safeArea';
@@ -37,7 +41,14 @@ import {getClientMongoId} from '../utils/clientId';
 import {getWalletOpFormForUser} from '../utils/invoiceClientOrderPayment';
 import {resolveRepeatOrderAddress} from '../utils/orderAddress';
 import ReferralPromoModal from '../components/ReferralPromoModal';
+import NewVersionModal from '../components/NewVersionModal';
+import ReviewModal from '../components/ReviewModal';
 import {buildReferralShareMessage} from '../utils/referral';
+import {
+  APP_VERSION,
+  shouldShowNewVersionModal,
+  markNewVersionModalShown,
+} from '../utils/appVersion';
 import {
   computeNextDeliveryYmd,
   buildSelectableDeliveryDates,
@@ -191,6 +202,26 @@ const HomeScreen: React.FC = () => {
   const [repeatAvailableDates, setRepeatAvailableDates] = useState<
     {value: string; label: string}[]
   >([]);
+  /** Отмена заказа со статусом «Заказ принят» — модалка причины отмены показывается
+   * сразу на главном экране, без перехода на OrderStatusScreen. */
+  const [cancelOrderModalVisible, setCancelOrderModalVisible] = useState(false);
+  const [orderToCancel, setOrderToCancel] = useState<OrderData | null>(null);
+  const [selectedCancelReason, setSelectedCancelReason] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+  const [otherCancelReasonText, setOtherCancelReasonText] = useState('');
+  const [isCancellingOrder, setIsCancellingOrder] = useState(false);
+  const [newVersionModalVisible, setNewVersionModalVisible] = useState(false);
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [reviewOrder, setReviewOrder] = useState<OrderData | null>(null);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const cancelReasons = [
+    {id: 'not_home', label: 'Никого нет по адресу'},
+    {id: 'wrong_date', label: 'Неправильная дата'},
+    {id: 'changed_mind', label: 'Передумал(а)'},
+    {id: 'other', label: 'Другое'},
+  ];
 
   const platformSentClientIdRef = useRef<string | null>(null);
   const currentUserIdRef = useRef<string | null>(null);
@@ -207,10 +238,24 @@ const HomeScreen: React.FC = () => {
     if (clientId && platformSentClientIdRef.current !== clientId) {
       platformSentClientIdRef.current = clientId;
       apiService.updateData(clientId, 'platform', Platform.OS);
-      const APP_VERSION = '1.7.0';
-      apiService.updateData(clientId, 'appVersion', APP_VERSION.toString());
+      apiService.updateData(clientId, 'appVersion', APP_VERSION);
     }
   }, [clientId]);
+
+  // Модалка «Доступна новая версия» — не чаще раза в день, только если версия
+  // из CRM (user.latestAppVersion) отличается от установленной APP_VERSION.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const show = await shouldShowNewVersionModal(user?.latestAppVersion);
+      if (!cancelled && show) {
+        setNewVersionModalVisible(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.latestAppVersion]);
 
   // Очистка заказов при выходе из системы
   useFocusEffect(
@@ -241,27 +286,6 @@ const HomeScreen: React.FC = () => {
     repeatOrderDeliveryYmdRef.current = null;
   }, [clientId]);
 
-  useFocusEffect(
-    useCallback(() => {
-      // Запрашиваем активные заказы каждый раз при переходе на экран
-      if (clientId) {
-        getLastOrder(clientId);
-        refreshUserData();
-        apiService
-          .getActiveOrders(clientId)
-          .then((res: any) => {
-            if (currentUserIdRef.current !== clientId) {
-              return;
-            }
-            setOrders(res.orders);
-          })
-          .catch(error => {
-            console.error('Ошибка при получении активных заказов:', error);
-          });
-      }
-    }, [clientId, refreshUserData]),
-  );
-
   const getLastOrder = useCallback(
     async (clientIdOverride?: string) => {
       const clientId = clientIdOverride ?? getClientMongoId(user);
@@ -289,6 +313,47 @@ const HomeScreen: React.FC = () => {
     },
     [user],
   );
+
+  /** Обновляет активные заказы и `lastOrder` — используется и при переходе на этот
+   * экран (react-navigation focus), и при возврате приложения из фона (AppState
+   * ниже). `useFocusEffect` сам по себе не срабатывает повторно, если экран всё
+   * это время оставался в фокусе навигации — например когда приложение просто
+   * свернули и открыли заново, из-за чего статусы заказов «зависали» старыми. */
+  const refreshHomeOrders = useCallback(() => {
+    if (!clientId) return;
+    getLastOrder(clientId);
+    // silent: true — иначе на время запроса loadingState в useAuth становится
+    // 'loading', а Navigation.tsx молча блокирует тап по «Профиль», пока фоновый
+    // рефреш (фокус экрана / возврат приложения из фона) не закончится.
+    refreshUserData({silent: true});
+    apiService
+      .getActiveOrders(clientId)
+      .then((res: any) => {
+        if (currentUserIdRef.current !== clientId) {
+          return;
+        }
+        setOrders(res.orders);
+      })
+      .catch(error => {
+        console.error('Ошибка при получении активных заказов:', error);
+      });
+  }, [clientId, getLastOrder, refreshUserData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Запрашиваем активные заказы каждый раз при переходе на экран
+      refreshHomeOrders();
+    }, [refreshHomeOrders]),
+  );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active' && navigation.isFocused()) {
+        refreshHomeOrders();
+      }
+    });
+    return () => subscription.remove();
+  }, [navigation, refreshHomeOrders]);
 
   /** Порядковый номер запроса getActiveOrders — если более старый ответ приходит
    * после более нового (или после live-обновления статуса из пуша), он отбрасывается,
@@ -383,16 +448,12 @@ const HomeScreen: React.FC = () => {
       (user as {fullName?: string}).fullName?.trim() ||
       '';
     const phone = user.phone?.trim() || '';
-    if (!fullName || !phone) {
+    if (!phone) {
       setMasterCallConfirmModalVisible(false);
-      Alert.alert(
-        'Данные профиля',
-        'Укажите имя и телефон в разделе «Мои данные».',
-        [
-          {text: 'Отмена', style: 'cancel'},
-          {text: 'Перейти', onPress: () => navigation.navigate('ChangeData')},
-        ],
-      );
+      Alert.alert('Данные профиля', 'Укажите телефон в разделе «Мои данные».', [
+        {text: 'Отмена', style: 'cancel'},
+        {text: 'Перейти', onPress: () => navigation.navigate('ChangeData')},
+      ]);
       return;
     }
     setMasterCallLoading(true);
@@ -458,6 +519,12 @@ const HomeScreen: React.FC = () => {
             orderId,
           );
           return;
+        }
+
+        // Заказ только что доставлен и ещё не получал отзыв — предлагаем оценить
+        if (newStatus === 'delivered' && !orderData.clientReview) {
+          setReviewOrder(orderData);
+          setReviewModalVisible(true);
         }
 
         // Обновляем состояние заказов
@@ -595,7 +662,7 @@ const HomeScreen: React.FC = () => {
               });
             } else {
               void openTopUpModal(String(deficit), {
-                title: `Не хватает ${deficit.toLocaleString('ru-RU')} ₸`,
+                title: `${deficit.toLocaleString('ru-RU')} ₸`,
                 subtitle: 'Способы пополнения',
                 showCashPayment: true,
                 onCashPayment: () =>
@@ -673,7 +740,7 @@ const HomeScreen: React.FC = () => {
             });
           } else {
             void openTopUpModal(String(deficit), {
-              title: `Не хватает ${deficit.toLocaleString('ru-RU')} ₸`,
+              title: `${deficit.toLocaleString('ru-RU')} ₸`,
               subtitle: 'Способы пополнения',
               showCashPayment: true,
               onCashPayment: () =>
@@ -765,17 +832,125 @@ const HomeScreen: React.FC = () => {
 
     repeatOrderDeliveryYmdRef.current = deliveryYmd;
 
-    // Первый заказ клиента без истории — дата выбрана, дальше подтверждение оплаты с баланса.
+    // Первый заказ клиента без истории — дата выбрана. У клиентов с талонами/кошельком
+    // (invoiceLegalData) списываем сразу, без подтверждающей модалки «Способ оплаты».
     if (pendingFirstOrder) {
-      setFirstOrderModalVisible(true);
+      if (user && clientHasInvoiceLegalData(user)) {
+        const walletOp = getWalletOpFormForUser(user);
+        if (walletOp === 'coupon') {
+          const available19 = Number(user?.paidBootlesFor19 || 0);
+          const available12 = Number(user?.paidBootlesFor12 || 0);
+          if (
+            pendingFirstOrder.quantity19 > available19 ||
+            pendingFirstOrder.quantity12 > available12
+          ) {
+            const orderToRetry = pendingFirstOrder;
+            const afterTopUpCoupon = () =>
+              void submitFirstOrder(orderToRetry, 'coupon');
+            void openTopUpModal(undefined, {
+              onTopUpSuccess: afterTopUpCoupon,
+              pendingOrder: buildFirstOrderPendingDraft(
+                orderToRetry,
+                deliveryYmd,
+                'coupon',
+              ),
+            });
+            return;
+          }
+          void submitFirstOrder(pendingFirstOrder, 'coupon');
+          return;
+        }
+        if (walletOp === 'credit') {
+          void submitFirstOrder(pendingFirstOrder, 'credit');
+          return;
+        }
+      }
+      // Первый заказ всегда оплачивается с баланса: если средств хватает — списываем
+      // сразу, если нет — submitFirstOrder сам откроет bottom sheet пополнения.
+      // В обоих случаях минуем промежуточную модалку подтверждения способа оплаты.
+      void submitFirstOrder(pendingFirstOrder);
       return;
     }
 
     if (!lastOrder) return;
 
-    // Заказ, собранный вручную через «Изменить», всегда даёт явный выбор способа
-    // оплаты (включая наличные) — без автосписания с баланса.
+    // Заказ, собранный вручную через «Изменить»: у любого клиента с оплатой с кошелька
+    // (баланс или купон бутылей — не только invoiceLegalData) списываем сразу без
+    // подтверждающей модалки «Способ оплаты», если средств хватает; иначе — bottom sheet
+    // пополнения (с опцией «наличными» для обычных клиентов). Саму модалку выбора способа
+    // оплаты показываем только клиентам без кошелька вовсе.
     if (pendingCustomOrder) {
+      const walletOp = getWalletOpFormForUser(user);
+      if (walletOp === 'credit') {
+        const bal = Number(user.balance ?? 0);
+        if (bal >= Number(pendingCustomOrder.total)) {
+          void reloadOrder('credit', {deliveryYmd, skipBalanceCheck: true});
+          return;
+        }
+        const deficit = Math.max(0, Math.ceil(pendingCustomOrder.total - bal));
+        const afterTopUp = () => {
+          const ymd = repeatOrderDeliveryYmdRef.current;
+          if (!ymd || !getClientMongoId(user)) return;
+          void reloadOrder('credit', {
+            deliveryYmd: ymd,
+            skipBalanceCheck: true,
+          });
+        };
+        const pendingOrder = buildFirstOrderPendingDraft(
+          pendingCustomOrder,
+          deliveryYmd,
+          'credit',
+        );
+        if (clientHasInvoiceLegalData(user)) {
+          void openTopUpModal(String(deficit), {
+            onTopUpSuccess: afterTopUp,
+            pendingOrder,
+          });
+        } else {
+          void openTopUpModal(String(deficit), {
+            title: `${deficit.toLocaleString('ru-RU')} ₸`,
+            subtitle: 'Способы пополнения',
+            showCashPayment: true,
+            onCashPayment: () => void reloadOrder('fakt', {deliveryYmd}),
+            onTopUpSuccess: afterTopUp,
+            pendingOrder,
+          });
+        }
+        return;
+      }
+      if (walletOp === 'coupon') {
+        const available19 = Number(user?.paidBootlesFor19 || 0);
+        const available12 = Number(user?.paidBootlesFor12 || 0);
+        if (
+          pendingCustomOrder.quantity19 <= available19 &&
+          pendingCustomOrder.quantity12 <= available12
+        ) {
+          void reloadOrder('coupon', {deliveryYmd, skipBalanceCheck: true});
+          return;
+        }
+        const afterTopUpCoupon = () => {
+          const ymd = repeatOrderDeliveryYmdRef.current;
+          if (!ymd || !getClientMongoId(user)) return;
+          void reloadOrder('coupon', {
+            deliveryYmd: ymd,
+            skipBalanceCheck: true,
+          });
+        };
+        const pendingOrder = buildFirstOrderPendingDraft(
+          pendingCustomOrder,
+          deliveryYmd,
+          'coupon',
+        );
+        if (clientHasInvoiceLegalData(user)) {
+          void openTopUpModal(undefined, {
+            onTopUpSuccess: afterTopUpCoupon,
+            pendingOrder,
+          });
+        } else {
+          setNotEnoughBalanceModalVisible(true);
+        }
+        return;
+      }
       setSelectedPayment(null);
       setPaymentModalVisible(true);
       return;
@@ -912,7 +1087,10 @@ const HomeScreen: React.FC = () => {
   };
 
   /** Оформление первого заказа клиента — всегда с баланса, адрес всегда первый в списке. */
-  const submitFirstOrder = async (payload: CreateOrderPayload) => {
+  const submitFirstOrder = async (
+    payload: CreateOrderPayload,
+    opForm: 'credit' | 'coupon' = 'credit',
+  ) => {
     const clientId = getClientMongoId(user);
     if (!user || !clientId || !homeAddress) return;
 
@@ -921,11 +1099,15 @@ const HomeScreen: React.FC = () => {
     const products = {b12: payload.quantity12, b19: payload.quantity19};
     const balance = Number(user.balance || 0);
 
-    if (balance < payload.total) {
+    if (opForm === 'credit' && balance < payload.total) {
       setFirstOrderModalVisible(false);
       const deficit = Math.max(0, Math.ceil(payload.total - balance));
-      const afterTopUp = () => void submitFirstOrder(payload);
-      const pendingOrder = buildFirstOrderPendingDraft(payload, deliveryYmd);
+      const afterTopUp = () => void submitFirstOrder(payload, opForm);
+      const pendingOrder = buildFirstOrderPendingDraft(
+        payload,
+        deliveryYmd,
+        opForm,
+      );
       if (clientHasInvoiceLegalData(user)) {
         void openTopUpModal(String(deficit), {
           onTopUpSuccess: afterTopUp,
@@ -933,13 +1115,34 @@ const HomeScreen: React.FC = () => {
         });
       } else {
         void openTopUpModal(String(deficit), {
-          title: `Не хватает ${deficit.toLocaleString('ru-RU')} ₸`,
+          title: `${deficit.toLocaleString('ru-RU')} ₸`,
           subtitle: 'Способы пополнения',
           onTopUpSuccess: afterTopUp,
           pendingOrder,
         });
       }
       return;
+    }
+
+    if (opForm === 'coupon') {
+      const available19 = Number(user?.paidBootlesFor19 || 0);
+      const available12 = Number(user?.paidBootlesFor12 || 0);
+      if (
+        payload.quantity19 > available19 ||
+        payload.quantity12 > available12
+      ) {
+        setFirstOrderModalVisible(false);
+        const afterTopUpCoupon = () => void submitFirstOrder(payload, 'coupon');
+        void openTopUpModal(undefined, {
+          onTopUpSuccess: afterTopUpCoupon,
+          pendingOrder: buildFirstOrderPendingDraft(
+            payload,
+            deliveryYmd,
+            'coupon',
+          ),
+        });
+        return;
+      }
     }
 
     setFirstOrderSubmitting(true);
@@ -950,7 +1153,7 @@ const HomeScreen: React.FC = () => {
         products,
         [],
         {d: deliveryYmd, time: ''},
-        'credit',
+        opForm,
         true,
         '',
         getEmptyBottlesForBackend(payload),
@@ -1010,7 +1213,7 @@ const HomeScreen: React.FC = () => {
           });
         } else {
           void openTopUpModal(String(deficit), {
-            title: `Не хватает ${deficit.toLocaleString('ru-RU')} ₸`,
+            title: `${deficit.toLocaleString('ru-RU')} ₸`,
             subtitle: 'Способы пополнения',
             onTopUpSuccess: afterTopUp,
             pendingOrder,
@@ -1026,6 +1229,14 @@ const HomeScreen: React.FC = () => {
 
   const handleCreateOrderFromMainCard = useCallback(
     (payload: CreateOrderPayload) => {
+      if (!user) {
+        navigation.navigate('Login');
+        return;
+      }
+      if (!user?.addresses?.length) {
+        setAddressModalVisible(true);
+        return;
+      }
       repeatOrderDeliveryYmdRef.current = null;
       setRepeatAvailableDates(buildSelectableDeliveryDates(user ?? null));
       if (!lastOrder) {
@@ -1040,7 +1251,7 @@ const HomeScreen: React.FC = () => {
       setPendingCustomOrder(payload);
       setRepeatDateModalVisible(true);
     },
-    [lastOrder, user],
+    [lastOrder, user, navigation],
   );
 
   const handleChatWithCourierFromMainCard = useCallback(
@@ -1050,12 +1261,56 @@ const HomeScreen: React.FC = () => {
     [navigation],
   );
 
-  const handleCancelOrderFromMainCard = useCallback(
-    (order: OrderData) => {
-      navigation.navigate('OrderStatus', {order});
-    },
-    [navigation],
-  );
+  const handleCancelOrderFromMainCard = useCallback((order: OrderData) => {
+    setOrderToCancel(order);
+    setSelectedCancelReason(null);
+    setOtherCancelReasonText('');
+    setCancelOrderModalVisible(true);
+  }, []);
+
+  const handleConfirmCancelOrder = async () => {
+    if (!orderToCancel) return;
+    if (!selectedCancelReason?.id) {
+      Alert.alert('Ошибка', 'Пожалуйста, выберите причину отмены заказа');
+      return;
+    }
+    if (selectedCancelReason.id === 'other' && !otherCancelReasonText.trim()) {
+      Alert.alert('Ошибка', 'Пожалуйста, укажите причину отмены');
+      return;
+    }
+
+    const reason =
+      selectedCancelReason.id === 'other'
+        ? otherCancelReasonText
+        : selectedCancelReason.label;
+
+    setIsCancellingOrder(true);
+    try {
+      await apiService.cancelOrder(orderToCancel._id, reason);
+      setCancelOrderModalVisible(false);
+      setOrderToCancel(null);
+      const clientId = getClientMongoId(user);
+      try {
+        // Отмена заказа возвращает средства на баланс — без этого клиент видит
+        // старый баланс на этом же экране, пока не уйдёт и не вернётся назад.
+        await refreshUserData();
+        await getLastOrder();
+        if (clientId) {
+          const activeRes = await apiService.getActiveOrders(clientId);
+          if (activeRes?.orders) {
+            setOrders(activeRes.orders);
+          }
+        }
+      } catch (e) {
+        console.error('Ошибка обновления после отмены заказа:', e);
+      }
+    } catch (error) {
+      console.error('Ошибка при отмене заказа:', error);
+      Alert.alert('Ошибка', 'Не удалось отменить заказ. Попробуйте позже.');
+    } finally {
+      setIsCancellingOrder(false);
+    }
+  };
 
   /** Делает выбранный адрес домашним — переносит его в начало списка, так как это единственный сигнал «активного» адреса в модели пользователя. */
   const handleSelectHomeAddress = useCallback(
@@ -1081,24 +1336,95 @@ const HomeScreen: React.FC = () => {
 
   const handleAddAddressFromModal = useCallback(() => {
     setAddressModalVisible(false);
+    if (!user) {
+      navigation.navigate('Login');
+      return;
+    }
     navigation.navigate('AddOrUpdateAddress', {address: null});
-  }, [navigation]);
+  }, [navigation, user]);
+
+  const handleUpdateApp = useCallback(async () => {
+    await markNewVersionModalShown();
+    setNewVersionModalVisible(false);
+    const androidStoreUrl = 'market://details?id=com.tibetskayaclientapp';
+    const androidFallbackUrl =
+      'https://play.google.com/store/apps/details?id=com.tibetskayaclientapp';
+    const iosStoreUrl =
+      'https://apps.apple.com/kz/app/tibetskaya-client/id6752863490';
+    try {
+      if (Platform.OS === 'ios') {
+        await Linking.openURL(iosStoreUrl);
+        return;
+      }
+      const supported = await Linking.canOpenURL(androidStoreUrl);
+      await Linking.openURL(supported ? androidStoreUrl : androidFallbackUrl);
+    } catch (error) {
+      console.error('❌ Не удалось открыть стор для обновления:', error);
+      await Linking.openURL(androidFallbackUrl).catch(() => {});
+    }
+  }, []);
+
+  const handleRemindVersionLater = useCallback(async () => {
+    await markNewVersionModalShown();
+    setNewVersionModalVisible(false);
+  }, []);
+
+  const handleSubmitReview = useCallback(
+    async (rating: number, comment: string) => {
+      if (!reviewOrder) return;
+      setReviewSubmitting(true);
+      try {
+        const res = await apiService.submitOrderReview(
+          reviewOrder._id,
+          rating,
+          comment,
+        );
+        if (res?.success) {
+          setOrders(prev =>
+            prev.map(o =>
+              o._id === reviewOrder._id ? {...o, clientReview: rating} : o,
+            ),
+          );
+          setLastOrder((prev: OrderData | null) =>
+            prev && prev._id === reviewOrder._id
+              ? {...prev, clientReview: rating}
+              : prev,
+          );
+        } else {
+          Alert.alert('Ошибка', res?.message || 'Не удалось отправить отзыв');
+        }
+      } catch (error) {
+        console.error('❌ Ошибка отправки отзыва:', error);
+        Alert.alert('Ошибка', 'Не удалось отправить отзыв. Попробуйте позже.');
+      } finally {
+        setReviewSubmitting(false);
+        setReviewModalVisible(false);
+        setReviewOrder(null);
+      }
+    },
+    [reviewOrder],
+  );
+
+  const handleDismissReview = useCallback(() => {
+    setReviewModalVisible(false);
+    setReviewOrder(null);
+  }, []);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={androidOnlySafeAreaEdges}>
+      <Header
+        bonus={user?.balance || 0}
+        paymentMethod={user?.paymentMethod || 'balance'}
+        coupon={user?.paidBootles || 0}
+        price19={user?.price19 || 1500}
+        paidBootlesFor19={user?.paidBootlesFor19 || 0}
+        paidBootlesFor12={user?.paidBootlesFor12 || 0}
+        doesItTake19Bottles={user?.doesItTake19Bottles}
+        doesItTake12Bottles={user?.doesItTake12Bottles}
+        showBonus={true}
+        onBonusPress={openTopUpModal}
+      />
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <Header
-          bonus={user?.balance || 0}
-          paymentMethod={user?.paymentMethod || 'balance'}
-          coupon={user?.paidBootles || 0}
-          price19={user?.price19 || 1500}
-          paidBootlesFor19={user?.paidBootlesFor19 || 0}
-          paidBootlesFor12={user?.paidBootlesFor12 || 0}
-          doesItTake19Bottles={user?.doesItTake19Bottles}
-          doesItTake12Bottles={user?.doesItTake12Bottles}
-          showBonus={true}
-          onBonusPress={openTopUpModal}
-        />
         <View style={styles.content}>
           <MainOrderCard
             address={homeAddress}
@@ -1106,11 +1432,18 @@ const HomeScreen: React.FC = () => {
             lastOrder={lastOrder}
             price19={user?.price19 || 1500}
             price12={user?.price12 || 1100}
-            onChangeAddress={() => setAddressModalVisible(true)}
+            hasInvoiceLegalData={clientHasInvoiceLegalData(user)}
+            onChangeAddress={() =>
+              user ? setAddressModalVisible(true) : navigation.navigate('Login')
+            }
             onChatWithCourier={handleChatWithCourierFromMainCard}
             onRepeatOrder={startRepeatLastOrderFlow}
             onCreateOrder={handleCreateOrderFromMainCard}
             onCancelOrder={handleCancelOrderFromMainCard}
+            onLeaveReview={order => {
+              setReviewOrder(order);
+              setReviewModalVisible(true);
+            }}
           />
 
           <UsefulServices
@@ -1724,6 +2057,20 @@ const HomeScreen: React.FC = () => {
         referralCode={user?.referralCode || ''}
       />
 
+      <NewVersionModal
+        visible={newVersionModalVisible}
+        onUpdate={handleUpdateApp}
+        onRemindLater={handleRemindVersionLater}
+      />
+
+      <ReviewModal
+        visible={reviewModalVisible}
+        order={reviewOrder}
+        submitting={reviewSubmitting}
+        onSubmit={handleSubmitReview}
+        onDismiss={handleDismissReview}
+      />
+
       <Modal
         visible={addressModalVisible}
         onRequestClose={() => setAddressModalVisible(false)}
@@ -1913,6 +2260,106 @@ const HomeScreen: React.FC = () => {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      <Modal
+        visible={cancelOrderModalVisible}
+        onRequestClose={() => {
+          if (!isCancellingOrder) setCancelOrderModalVisible(false);
+        }}
+        transparent={true}
+        animationType="fade">
+        <KeyboardAvoidingView
+          style={styles.modalKeyboardAvoidingReloadOrder}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <TouchableOpacity
+            style={styles.modalOverlayReloadOrder}
+            onPress={() => {
+              if (!isCancellingOrder) setCancelOrderModalVisible(false);
+            }}>
+            <TouchableOpacity
+              style={styles.modalContainerReloadOrder}
+              onPress={e => e.stopPropagation()}>
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: '600',
+                  color: '#101010',
+                  marginBottom: 8,
+                  textAlign: 'center',
+                }}>
+                Причина отмены заказа
+              </Text>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: '#545454',
+                  marginBottom: 16,
+                  textAlign: 'center',
+                }}>
+                Выберите причину отмены заказа
+              </Text>
+              {cancelReasons.map(reason => (
+                <TouchableOpacity
+                  key={reason.id}
+                  style={styles.modalAddress}
+                  onPress={() => setSelectedCancelReason(reason)}>
+                  <Text style={styles.modalAddressText}>{reason.label}</Text>
+                  <View
+                    style={{
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      width: 16,
+                      height: 16,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor:
+                        selectedCancelReason?.id === reason.id
+                          ? '#DC1818'
+                          : '#101010',
+                    }}>
+                    {selectedCancelReason?.id === reason.id && (
+                      <View
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: 5,
+                          backgroundColor: '#DC1818',
+                        }}
+                      />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+              {selectedCancelReason?.id === 'other' && (
+                <TextInput
+                  style={{
+                    borderWidth: 1,
+                    borderColor: '#E3E3E3',
+                    borderRadius: 10,
+                    padding: 12,
+                    marginTop: 8,
+                    marginBottom: 8,
+                    fontSize: 14,
+                    color: '#101010',
+                  }}
+                  placeholder="Укажите причину отмены"
+                  value={otherCancelReasonText}
+                  onChangeText={setOtherCancelReasonText}
+                  multiline
+                />
+              )}
+              <TouchableOpacity
+                style={[styles.button, {marginTop: 16}]}
+                disabled={isCancellingOrder}
+                onPress={handleConfirmCancelOrder}>
+                <Text style={styles.buttonText}>
+                  {isCancellingOrder ? 'Отменяем...' : 'Подтвердить'}
+                </Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1994,6 +2441,9 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
     paddingBottom: 40,
+  },
+  modalKeyboardAvoidingReloadOrder: {
+    flex: 1,
   },
   modalOverlayReloadOrder: {
     flex: 1,

@@ -24,3 +24,5 @@ export {default as ScreenLayout} from './ScreenLayout';
 export {default as StableImage} from './StableImage';
 export {default as ReferralPromoModal} from './ReferralPromoModal';
 export {default as UsefulServices} from './UsefulServices';
+export {default as NewVersionModal} from './NewVersionModal';
+export {default as ReviewModal} from './ReviewModal';

@@ -50,15 +50,15 @@ const Header: React.FC<HeaderProps> = ({
 
   // Функция для отображения баланса бутылок с учетом литража
   const renderCouponBalance = () => {
-    const takes19 = doesItTake19Bottles === true;
-    const takes12 = doesItTake12Bottles === true;
+    const takes19 = true;
+    const takes12 = true;
     const balance19 = paidBootlesFor19 || 0;
     const balance12 = paidBootlesFor12 || 0;
 
     // Если оба типа бутылок - показываем с литражом
     if (takes19 && takes12) {
       return (
-        <View style={{flexDirection: 'row', alignItems: 'center', gap: 16}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
           <View
             style={{flexDirection: 'column', alignItems: 'flex-end', gap: 2}}>
             <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
@@ -98,7 +98,7 @@ const Header: React.FC<HeaderProps> = ({
     // Если только 19л
     if (takes19 && !takes12) {
       return (
-        <View style={{flexDirection: 'row', alignItems: 'center', gap: 16}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
           <Text style={styles.bonusText}>{balance19.toLocaleString()}</Text>
           <Image
             source={require('../assets/coupon.png')}
@@ -125,7 +125,7 @@ const Header: React.FC<HeaderProps> = ({
     // Если только 12л
     if (!takes19 && takes12) {
       return (
-        <View style={{flexDirection: 'row', alignItems: 'center', gap: 16}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
           <Text style={styles.bonusText}>{balance12.toLocaleString()}</Text>
           <Image
             source={require('../assets/coupon.png')}

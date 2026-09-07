@@ -91,6 +91,7 @@ export interface OrderData {
   opForm?: string;
   comment?: string;
   clientReview: number;
+  clientReviewComment?: string;
   clientNotes: string[];
   income: number;
   aquaMarketAddress: string;
@@ -101,6 +102,7 @@ export interface OrderData {
   clientPhone: string;
   createdAt: string;
   updatedAt: string;
+  deliveredTime?: string | null;
 
   // Дополнительные поля для совместимости с UI
   orderNumber?: string;
@@ -141,7 +143,6 @@ export interface RegisterData {
   mail: string;
   userName: string;
   phone: string;
-  password: string;
   termsAccepted: boolean;
   privacyAccepted: boolean;
   referralCode?: string;
@@ -166,6 +167,9 @@ export type RootStackParamList = {
     order: OrderData;
   };
   Login: undefined;
+  LoginOtp: {
+    phone: string;
+  };
   Register: undefined;
   Otp: {
     data: RegisterData;

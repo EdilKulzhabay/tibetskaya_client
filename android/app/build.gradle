@@ -92,8 +92,8 @@ android {
         applicationId "com.tibetskayaclientapp"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 17
-        versionName "1.7.0"
+        versionCode 21
+        versionName "1.9.0"
     }
     signingConfigs {
         debug {
@@ -132,4 +132,9 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // react-native-fbsdk-next declares this as `implementation` (not `api`), so it's
+    // not on :app's compile classpath by default — needed here to call FacebookSdk.sdkInitialize()
+    // directly from MainApplication.kt. Version must match react-native-fbsdk-next/android/build.gradle.
+    implementation "com.facebook.android:facebook-android-sdk:18.+"
 }

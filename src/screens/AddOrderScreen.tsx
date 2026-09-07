@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
-  TextInput
+  TextInput,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {androidOnlySafeAreaEdges} from '../utils/safeArea';
@@ -180,7 +180,12 @@ const AddOrderScreen: React.FC<{navigation: any; route: any}> = ({
     const payment = options.paymentOverride ?? selectedPayment;
 
     if (!selectedAddress) {
-      Alert.alert('Ошибка', 'Пожалуйста, выберите адрес доставки');
+      Alert.alert(
+        'Ошибка',
+        user?.addresses?.length
+          ? 'Пожалуйста, выберите адрес доставки'
+          : 'Сначала добавьте адрес доставки, чтобы оформить заказ',
+      );
       setLoading(false);
       isSubmittingRef.current = false;
       return;
@@ -409,23 +414,26 @@ const AddOrderScreen: React.FC<{navigation: any; route: any}> = ({
       }
     }
 
-    if (
-      user?.paymentMethod === 'balance' &&
-      user?.balance != null &&
-      user.balance < lineTotal
-    ) {
-      submitOrderAfterTopUpRef.current = true;
-      if (invoice) {
-        void openTopUpModal(
-          String(Math.max(0, Math.ceil(lineTotal - user.balance))),
-          {
-            onTopUpSuccess: () => continueOrderAfterTopUpRef.current(),
-            pendingOrder: buildPendingOrderDraft('credit'),
-          },
-        );
-      } else {
-        openNotEnoughBalanceTopUp(lineTotal - user.balance, true);
+    if (user?.paymentMethod === 'balance' && user?.balance != null) {
+      if (user.balance < lineTotal) {
+        submitOrderAfterTopUpRef.current = true;
+        if (invoice) {
+          void openTopUpModal(
+            String(Math.max(0, Math.ceil(lineTotal - user.balance))),
+            {
+              onTopUpSuccess: () => continueOrderAfterTopUpRef.current(),
+              pendingOrder: buildPendingOrderDraft('credit'),
+            },
+          );
+        } else {
+          openNotEnoughBalanceTopUp(lineTotal - user.balance, true);
+        }
+        return;
       }
+      // Баланса хватает — оплачиваем с баланса сразу, без модалки выбора способа оплаты
+      void handleOrder({
+        paymentOverride: {label: 'С баланса', value: 'credit'},
+      });
       return;
     }
 
@@ -790,6 +798,19 @@ const AddOrderScreen: React.FC<{navigation: any; route: any}> = ({
               }}>
               Выберите адрес доставки
             </Text>
+            {!user?.addresses?.length && (
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: '400',
+                  color: '#6A7282',
+                  textAlign: 'center',
+                  marginBottom: 16,
+                }}>
+                У вас пока нет сохранённых адресов. Сначала добавьте адрес,
+                чтобы оформить заказ.
+              </Text>
+            )}
             {user?.addresses?.map((address, index) => (
               <TouchableOpacity
                 key={address._id || index}

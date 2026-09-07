@@ -25,8 +25,6 @@ const RegisterScreen: React.FC<{navigation: any}> = ({navigation}) => {
     userName: '',
     mail: '',
     phone: '',
-    password: '',
-    confirmPassword: '',
     referralCode: '',
     termsAccepted: false,
     privacyAccepted: false,
@@ -38,8 +36,6 @@ const RegisterScreen: React.FC<{navigation: any}> = ({navigation}) => {
   // Refs для навигации между полями
   const nameRef = useRef<TextInput>(null);
   const phoneRef = useRef<TextInput>(null);
-  const passRef = useRef<TextInput>(null);
-  const confirmRef = useRef<TextInput>(null);
   const referralRef = useRef<TextInput>(null);
 
   // Отслеживание состояния клавиатуры
@@ -66,21 +62,12 @@ const RegisterScreen: React.FC<{navigation: any}> = ({navigation}) => {
   }, []);
 
   const handleRegister = async () => {
-    if (
-      !form.userName ||
-      !form.phone ||
-      !form.password ||
-      !form.confirmPassword
-    ) {
+    if (!form.userName || !form.phone) {
       Alert.alert('Ошибка', 'Пожалуйста, заполните все поля');
       return;
     }
     if (form.phone.replace(/\D/g, '').length !== 11) {
       Alert.alert('Ошибка', 'Введите полный номер телефона');
-      return;
-    }
-    if (form.password !== form.confirmPassword) {
-      Alert.alert('Ошибка', 'Пароли не совпадают');
       return;
     }
     if (!form.termsAccepted || !form.privacyAccepted) {
@@ -96,8 +83,6 @@ const RegisterScreen: React.FC<{navigation: any}> = ({navigation}) => {
       mail: form.mail.trim(),
       userName: form.userName.trim(),
       phone: form.phone.trim(),
-      password: form.password.trim(),
-      confirmPassword: form.confirmPassword.trim(),
       referralCode: form.referralCode.trim().toUpperCase(),
     };
     setForm(nextForm);
@@ -178,34 +163,6 @@ const RegisterScreen: React.FC<{navigation: any}> = ({navigation}) => {
           onRightIconPress={() => {}}
           bgWhite={true}
           inputRef={phoneRef}
-          returnKeyType="next"
-          blurOnSubmit={false}
-          onSubmitEditing={() => passRef.current?.focus()}
-        />
-
-        <OutlinedFilledLabelInput
-          label="Пароль"
-          value={form.password}
-          onChangeText={text => setForm({...form, password: text})}
-          bgWhite={true}
-          onRightIconPress={() => {}}
-          isPassword={true}
-          autoCapitalize="none"
-          inputRef={passRef}
-          returnKeyType="next"
-          blurOnSubmit={false}
-          onSubmitEditing={() => confirmRef.current?.focus()}
-        />
-
-        <OutlinedFilledLabelInput
-          label="Подтвердите пароль"
-          value={form.confirmPassword}
-          onChangeText={text => setForm({...form, confirmPassword: text})}
-          bgWhite={true}
-          onRightIconPress={() => {}}
-          isPassword={true}
-          autoCapitalize="none"
-          inputRef={confirmRef}
           returnKeyType="next"
           blurOnSubmit={false}
           onSubmitEditing={() => referralRef.current?.focus()}

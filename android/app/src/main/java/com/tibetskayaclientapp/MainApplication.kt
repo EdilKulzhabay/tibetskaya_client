@@ -4,6 +4,7 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import com.facebook.FacebookSdk
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
@@ -38,6 +39,17 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
+    // Должно выполниться до SoLoader.init/загрузки RN-моста — иначе TurboModuleManager
+    // может создать FBAccessTokenModule раньше, чем FacebookSdk будет инициализирован,
+    // и приложение падает с FacebookSdkNotInitializedException.
+    // Обёрнуто в try/catch: без com.facebook.sdk.ClientToken в манифесте (нужен
+    // Client Token из Meta App Dashboard) sdkInitialize сам бросает исключение —
+    // без catch это валит весь процесс на каждом старте приложения.
+    try {
+      FacebookSdk.sdkInitialize(applicationContext)
+    } catch (e: Exception) {
+      android.util.Log.w("MainApplication", "Facebook SDK init failed: ${e.message}")
+    }
     SoLoader.init(this, OpenSourceMergedSoMapping)
     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
       // If you opted-in for the New Architecture, we load the native entry point for this app.

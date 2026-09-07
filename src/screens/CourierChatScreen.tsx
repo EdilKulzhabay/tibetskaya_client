@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, {useEffect, useState, useRef} from 'react';
 import {
   StyleSheet,
   Text,
@@ -11,21 +11,21 @@ import {
   Alert,
   Keyboard,
   TouchableWithoutFeedback,
-  DeviceEventEmitter
+  DeviceEventEmitter,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {androidOnlySafeAreaEdges} from '../utils/safeArea';
-import { RouteProp, useRoute } from '@react-navigation/native';
-import { Back } from '../components';
-import { apiService } from '../api/services';
-import { OrderChatMessage } from '../types';
-import { RootStackParamList } from '../types/navigation';
+import {RouteProp, useRoute} from '@react-navigation/native';
+import {Back} from '../components';
+import {apiService} from '../api/services';
+import {OrderChatMessage} from '../types';
+import {RootStackParamList} from '../types/navigation';
 
 type CourierChatRouteProp = RouteProp<RootStackParamList, 'CourierChat'>;
 
-const CourierChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+const CourierChatScreen: React.FC<{navigation: any}> = ({navigation}) => {
   const route = useRoute<CourierChatRouteProp>();
-  const { order } = route.params;
+  const {order} = route.params;
   const [messages, setMessages] = useState<OrderChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const flatListRef = useRef<FlatList>(null);
@@ -45,7 +45,7 @@ const CourierChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         setMessages(newMessages);
         setTimeout(() => {
           if (flatListRef.current && shouldAutoScrollRef.current) {
-            flatListRef.current.scrollToEnd({ animated: true });
+            flatListRef.current.scrollToEnd({animated: true});
           }
         }, 100);
       } else {
@@ -54,23 +54,26 @@ const CourierChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     }
   };
 
-  const renderMessage = ({ item: message }: { item: OrderChatMessage }) => {
+  const renderMessage = ({item: message}: {item: OrderChatMessage}) => {
     const isClient = message.sender === 'client';
     return (
       <View
         style={[
           styles.messageContainer,
-          isClient ? styles.userMessageContainer : styles.supportMessageContainer
-        ]}
-      >
-        <View style={[
-          styles.messageBubble,
-          isClient ? styles.userBubble : styles.supportBubble
+          isClient
+            ? styles.userMessageContainer
+            : styles.supportMessageContainer,
         ]}>
-          <Text style={[
-            styles.messageText,
-            isClient ? styles.userMessageText : styles.supportMessageText
+        <View
+          style={[
+            styles.messageBubble,
+            isClient ? styles.userBubble : styles.supportBubble,
           ]}>
+          <Text
+            style={[
+              styles.messageText,
+              isClient ? styles.userMessageText : styles.supportMessageText,
+            ]}>
             {message.text}
           </Text>
         </View>
@@ -79,7 +82,7 @@ const CourierChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           <Text style={styles.timestamp}>
             {new Date(message.timestamp).toLocaleTimeString('ru-RU', {
               hour: '2-digit',
-              minute: '2-digit'
+              minute: '2-digit',
             })}
           </Text>
         </View>
@@ -102,10 +105,18 @@ const CourierChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   }, [order._id]);
 
   useEffect(() => {
-    if (messages.length > 0 && shouldAutoScrollRef.current && !isUserScrollingRef.current) {
+    if (
+      messages.length > 0 &&
+      shouldAutoScrollRef.current &&
+      !isUserScrollingRef.current
+    ) {
       const timeoutId = setTimeout(() => {
-        if (flatListRef.current && shouldAutoScrollRef.current && !isUserScrollingRef.current) {
-          flatListRef.current.scrollToEnd({ animated: false });
+        if (
+          flatListRef.current &&
+          shouldAutoScrollRef.current &&
+          !isUserScrollingRef.current
+        ) {
+          flatListRef.current.scrollToEnd({animated: false});
         }
       }, 200);
 
@@ -114,27 +125,36 @@ const CourierChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   }, [messages.length]);
 
   useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener('newOrderChatMessage', (newMessage: OrderChatMessage & { orderId?: string }) => {
-      if (newMessage.orderId && newMessage.orderId !== order._id) {
-        return;
-      }
-      setMessages(prevMessages => {
-        const exists = prevMessages.some(
-          msg => msg._id === newMessage._id ||
-          (msg.text === newMessage.text && msg.timestamp === newMessage.timestamp)
-        );
-        if (exists) {
-          return prevMessages;
+    const subscription = DeviceEventEmitter.addListener(
+      'newOrderChatMessage',
+      (newMessage: OrderChatMessage & {orderId?: string}) => {
+        if (newMessage.orderId && newMessage.orderId !== order._id) {
+          return;
         }
-        const updated = [...prevMessages, newMessage];
-        setTimeout(() => {
-          if (flatListRef.current && shouldAutoScrollRef.current && !isUserScrollingRef.current) {
-            flatListRef.current.scrollToEnd({ animated: true });
+        setMessages(prevMessages => {
+          const exists = prevMessages.some(
+            msg =>
+              msg._id === newMessage._id ||
+              (msg.text === newMessage.text &&
+                msg.timestamp === newMessage.timestamp),
+          );
+          if (exists) {
+            return prevMessages;
           }
-        }, 100);
-        return updated;
-      });
-    });
+          const updated = [...prevMessages, newMessage];
+          setTimeout(() => {
+            if (
+              flatListRef.current &&
+              shouldAutoScrollRef.current &&
+              !isUserScrollingRef.current
+            ) {
+              flatListRef.current.scrollToEnd({animated: true});
+            }
+          }, 100);
+          return updated;
+        });
+      },
+    );
 
     return () => {
       subscription.remove();
@@ -162,12 +182,8 @@ const CourierChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
-        <TouchableWithoutFeedback
-          onPress={Keyboard.dismiss}
-          accessible={false}
-        >
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <View style={styles.touchableArea} />
         </TouchableWithoutFeedback>
 
@@ -179,7 +195,7 @@ const CourierChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           style={styles.messagesContainer}
           contentContainerStyle={[
             styles.messagesContent,
-            messages.length === 0 && styles.emptyContent
+            messages.length === 0 && styles.emptyContent,
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="always"
@@ -200,7 +216,9 @@ const CourierChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>Нет сообщений</Text>
-              <Text style={styles.emptySubtext}>Начните разговор с курьером</Text>
+              <Text style={styles.emptySubtext}>
+                Начните разговор с курьером
+              </Text>
             </View>
           }
         />
@@ -218,11 +236,10 @@ const CourierChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           <TouchableOpacity
             style={[
               styles.sendButton,
-              !inputText.trim() && styles.sendButtonDisabled
+              !inputText.trim() && styles.sendButtonDisabled,
             ]}
             onPress={sendMessage}
-            disabled={!inputText.trim()}
-          >
+            disabled={!inputText.trim()}>
             <Text style={styles.sendIcon}>➤</Text>
           </TouchableOpacity>
         </View>
@@ -276,7 +293,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
@@ -328,6 +345,7 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     padding: 16,
+    marginBottom: 25,
     backgroundColor: 'white',
     alignItems: 'center',
   },

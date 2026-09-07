@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -9,29 +9,37 @@ import {
   DeviceEventEmitter,
   Modal,
   Linking,
-  TextInput
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {androidOnlySafeAreaEdges} from '../utils/safeArea';
-import { useRoute, useNavigation } from '@react-navigation/native';
-import type { RouteProp } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types/navigation';
-import { AwaitingOrderView, OnTheWayView, Back } from '../components';
-import { apiService } from '../api/services';
+import {useRoute, useNavigation} from '@react-navigation/native';
+import type {RouteProp} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {RootStackParamList} from '../types/navigation';
+import {AwaitingOrderView, OnTheWayView, Back} from '../components';
+import {apiService} from '../api/services';
 
 type OrderStatusRouteProp = RouteProp<RootStackParamList, 'OrderStatus'>;
-type OrderStatusNavigationProp = NativeStackNavigationProp<RootStackParamList, 'OrderStatus'>;
+type OrderStatusNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'OrderStatus'
+>;
 
 const OrderStatusScreen: React.FC = () => {
   const route = useRoute<OrderStatusRouteProp>();
   const navigation = useNavigation<OrderStatusNavigationProp>();
-  
+
   // Получаем данные заказа из параметров и храним в state
   const [order, setOrder] = useState(route.params.order);
   const [isCourierModalVisible, setIsCourierModalVisible] = useState(false);
   const [isBannerVisible, setIsBannerVisible] = useState(false);
-  const [courierData, setCourierData] = useState<{ fullName?: string; phone?: string } | null>(null);
+  const [courierData, setCourierData] = useState<{
+    fullName?: string;
+    phone?: string;
+  } | null>(null);
   const [shouldShowCourierModal, setShouldShowCourierModal] = useState(false);
   const [isCancelModalVisible, setIsCancelModalVisible] = useState(false);
   const [selectedCancelReason, setSelectedCancelReason] = useState<any>(null);
@@ -46,40 +54,55 @@ const OrderStatusScreen: React.FC = () => {
   // Подписка на обновления статуса текущего заказа
   useEffect(() => {
     let isMounted = true;
-    
+
     const subscription = DeviceEventEmitter.addListener(
       'orderStatusUpdated',
-      async ({ orderId, newStatus }) => {
+      async ({orderId, newStatus}) => {
         // Проверяем, что компонент все еще смонтирован
         if (!isMounted) {
           return;
         }
-        
+
         // Проверяем наличие обязательных данных
         if (!orderId || !newStatus) {
-          console.warn('⚠️ OrderStatusScreen: Неполные данные обновления заказа:', { orderId, newStatus });
+          console.warn(
+            '⚠️ OrderStatusScreen: Неполные данные обновления заказа:',
+            {orderId, newStatus},
+          );
           return;
         }
         const fetchOrder = async () => {
           const orderData = await apiService.getOrder(orderId);
           return orderData;
-        }
+        };
         const orderData = await fetchOrder();
         if (!orderData) {
-          console.warn('⚠️ OrderStatusScreen: Не удалось получить данные заказа:', orderId);
+          console.warn(
+            '⚠️ OrderStatusScreen: Не удалось получить данные заказа:',
+            orderId,
+          );
           return;
         }
-        
+
         // Проверяем, это обновление для текущего заказа?
         if (orderId === order._id) {
-          console.log('🔄 OrderStatusScreen: Статус заказа обновлен: orderId', orderId);
-          console.log('🔄 OrderStatusScreen: Статус заказа обновлен: newStatus', newStatus);
-          console.log('🔄 OrderStatusScreen: Статус заказа обновлен: orderData', orderData);
-          
+          console.log(
+            '🔄 OrderStatusScreen: Статус заказа обновлен: orderId',
+            orderId,
+          );
+          console.log(
+            '🔄 OrderStatusScreen: Статус заказа обновлен: newStatus',
+            newStatus,
+          );
+          console.log(
+            '🔄 OrderStatusScreen: Статус заказа обновлен: orderData',
+            orderData,
+          );
+
           // Обновляем состояние заказа с защитой от null
           setOrder(orderData.order);
         }
-      }
+      },
     );
 
     return () => {
@@ -90,34 +113,34 @@ const OrderStatusScreen: React.FC = () => {
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case "awaitingOrder":
-        return "Заказ принят";
-      case "onTheWay":
-        return "В пути";
-      case "delivered":
-        return "Доставлен";
+      case 'awaitingOrder':
+        return 'Заказ принят';
+      case 'onTheWay':
+        return 'В пути';
+      case 'delivered':
+        return 'Доставлен';
       default:
-        return "Отменен";
+        return 'Отменен';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "awaitingOrder":
-      case "onTheWay":
-        return "#EB7E00";
-      case "delivered":
-        return "#00B01A";
+      case 'awaitingOrder':
+      case 'onTheWay':
+        return '#EB7E00';
+      case 'delivered':
+        return '#00B01A';
       default:
-        return "#DC1818";
+        return '#DC1818';
     }
   };
 
   const cancelReasons = [
-    { id: 'not_home', label: 'Не буду дома' },
-    { id: 'wrong_date', label: 'Неправильно указал дату' },
-    { id: 'changed_mind', label: 'Передумал' },
-    { id: 'other', label: 'Другое' },
+    {id: 'not_home', label: 'Никого нет по адресу'},
+    {id: 'wrong_date', label: 'Неправильная дата'},
+    {id: 'changed_mind', label: 'Передумал(а)'},
+    {id: 'other', label: 'Другое'},
   ];
 
   const readyReviews = [
@@ -147,7 +170,11 @@ const OrderStatusScreen: React.FC = () => {
 
     setIsSubmittingReview(true);
     try {
-      const response = await apiService.updateOrderData(order._id, "clientNotes", selectedReviews);
+      const response = await apiService.updateOrderData(
+        order._id,
+        'clientNotes',
+        selectedReviews,
+      );
       if (response.success) {
         // Обновляем заказ с новыми отзывами
         const updatedOrder = response.order;
@@ -185,7 +212,10 @@ const OrderStatusScreen: React.FC = () => {
     }
 
     try {
-      const reason = selectedCancelReason?.id === 'other' ? otherReasonText : selectedCancelReason?.label;
+      const reason =
+        selectedCancelReason?.id === 'other'
+          ? otherReasonText
+          : selectedCancelReason?.label;
       // Здесь можно передать причину отмены на сервер, если API поддерживает
       await apiService.cancelOrder(order._id, reason);
       setIsCancelModalVisible(false);
@@ -203,23 +233,26 @@ const OrderStatusScreen: React.FC = () => {
       console.log('🔄 OrderStatusScreen: handleCallCourier response', response);
       const updatedOrder = response.order;
       setOrder(updatedOrder);
-      
+
       // Проверяем наличие курьера в обновленных данных
       const courierAggregator = updatedOrder.courierAggregator;
-      
+
       if (!courierAggregator) {
         // Курьер еще не назначен
         Alert.alert(
           'Курьер не назначен',
           'Курьер еще не назначен на ваш заказ. Пожалуйста, подождите.',
-          [{ text: 'Понятно' }]
+          [{text: 'Понятно'}],
         );
         return;
       }
-      
+
       // Сохраняем данные курьера (если есть)
       if (typeof courierAggregator === 'object') {
-        console.log('🔄 OrderStatusScreen: courierAggregator 141', courierAggregator);
+        console.log(
+          '🔄 OrderStatusScreen: courierAggregator 141',
+          courierAggregator,
+        );
         setCourierData({
           fullName: courierAggregator.fullName,
           phone: courierAggregator.phone || undefined,
@@ -227,7 +260,7 @@ const OrderStatusScreen: React.FC = () => {
       } else {
         setCourierData(null);
       }
-      
+
       // Показываем баннер перед действием
       setIsBannerVisible(true);
       setShouldShowCourierModal(true);
@@ -236,7 +269,7 @@ const OrderStatusScreen: React.FC = () => {
       Alert.alert(
         'Ошибка',
         'Не удалось обновить данные заказа. Попробуйте позже.',
-        [{ text: 'OK' }]
+        [{text: 'OK'}],
       );
     }
   };
@@ -252,34 +285,42 @@ const OrderStatusScreen: React.FC = () => {
   // Условный рендер в зависимости от статуса
   const renderOrderContent = () => {
     switch (order.status) {
-      case "awaitingOrder":
+      case 'awaitingOrder':
         return (
           <AwaitingOrderView
-            order={order} 
+            order={order}
             onCancelOrder={handleCancelOrder}
             onCallCourier={handleCallCourier}
             navigation={navigation}
           />
         );
-        
-      case "onTheWay":
+
+      case 'onTheWay':
         return (
           // <View></View>
           <OnTheWayView
             order={order}
             onCallCourier={handleCallCourier}
-            onChatWithCourier={() => navigation.navigate('CourierChat', { order })}
+            onChatWithCourier={() =>
+              navigation.navigate('CourierChat', {order})
+            }
           />
         );
-        
+
       default:
         // Для остальных статусов показываем стандартную страницу
         return (
-          <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.container}
+            showsVerticalScrollIndicator={false}>
             <View style={styles.content}>
               <View style={styles.orderHeader}>
                 <Text style={styles.orderTitle}>Заказ</Text>
-                <Text style={[styles.orderStatus, { color: getStatusColor(order.status) }]}>
+                <Text
+                  style={[
+                    styles.orderStatus,
+                    {color: getStatusColor(order.status)},
+                  ]}>
                   {getStatusText(order.status)}
                 </Text>
               </View>
@@ -287,13 +328,19 @@ const OrderStatusScreen: React.FC = () => {
               <View style={styles.infoCard}>
                 <Text style={styles.infoLabel}>Дата заказа:</Text>
                 <Text style={styles.infoValue}>
-                  {typeof order.date === 'string' ? order.date : order.date?.d || 'Не указана'}
+                  {typeof order.date === 'string'
+                    ? order.date
+                    : order.date?.d || 'Не указана'}
                 </Text>
               </View>
 
               <View style={styles.infoCard}>
                 <Text style={styles.infoLabel}>Статус:</Text>
-                <Text style={[styles.infoValue, { color: getStatusColor(order.status) }]}>
+                <Text
+                  style={[
+                    styles.infoValue,
+                    {color: getStatusColor(order.status)},
+                  ]}>
                   {getStatusText(order.status)}
                 </Text>
               </View>
@@ -302,7 +349,9 @@ const OrderStatusScreen: React.FC = () => {
                 <View style={styles.infoCard}>
                   <Text style={styles.infoLabel}>Курьер:</Text>
                   <Text style={styles.infoValue}>
-                    {typeof order.courier === 'string' ? 'ID: ' + order.courier : order.courier?.fullName || 'Неизвестно'}
+                    {typeof order.courier === 'string'
+                      ? 'ID: ' + order.courier
+                      : order.courier?.fullName || 'Неизвестно'}
                   </Text>
                 </View>
               )}
@@ -310,99 +359,119 @@ const OrderStatusScreen: React.FC = () => {
               <View style={styles.infoCard}>
                 <Text style={styles.infoLabel}>Способ оплаты:</Text>
                 <Text style={styles.infoValue}>
-                  {order.opForm === "fakt" ? "Нал_Карта_QR" : (order.opForm === "credit" || order.opForm === "coupon") ? "С баланса" : 'Нал_Карта_QR'}
+                  {order.opForm === 'fakt'
+                    ? 'Нал_Карта_QR'
+                    : order.opForm === 'credit' || order.opForm === 'coupon'
+                    ? 'С баланса'
+                    : 'Нал_Карта_QR'}
                 </Text>
               </View>
 
               <View style={styles.productsCard}>
                 <Text style={styles.cardTitle}>Товары в заказе:</Text>
-                {order && order.products && order.products.b12 && order.products.b12 > 0 && (
-                  <View style={styles.productItem}>
-                    <Text style={styles.productText}>
-                      Бутылка 12л: {order.products.b12} шт.
-                    </Text>
-                  </View>
-                )}
-                {order && order.products && order.products.b19 && order.products.b19 > 0 && (
-                  <View style={styles.productItem}>
-                    <Text style={styles.productText}>
-                      Бутылка 19л: {order.products.b19} шт.
-                    </Text>
-                  </View>
-                )}
+                {order &&
+                  order.products &&
+                  order.products.b12 &&
+                  order.products.b12 > 0 && (
+                    <View style={styles.productItem}>
+                      <Text style={styles.productText}>
+                        Бутылка 12л: {order.products.b12} шт.
+                      </Text>
+                    </View>
+                  )}
+                {order &&
+                  order.products &&
+                  order.products.b19 &&
+                  order.products.b19 > 0 && (
+                    <View style={styles.productItem}>
+                      <Text style={styles.productText}>
+                        Бутылка 19л: {order.products.b19} шт.
+                      </Text>
+                    </View>
+                  )}
               </View>
 
-              {order.status === "delivered" && order.clientNotes && order.clientNotes.length > 0 && (
-                <View style={styles.infoCard}>
-                  <Text style={styles.infoLabel}>Отзыв:</Text>
-                  <View style={styles.reviewsContainer}>
-                    {Array.isArray(order.clientNotes) ? (
-                      order.clientNotes.map((note: string, index: number) => (
-                        <View key={index} style={styles.reviewChip}>
-                          <Text style={styles.reviewChipText}>{note}</Text>
-                        </View>
-                      ))
-                    ) : (
-                      <Text style={styles.infoValue}>{String(order.clientNotes)}</Text>
+              {order.status === 'delivered' &&
+                order.clientNotes &&
+                order.clientNotes.length > 0 && (
+                  <View style={styles.infoCard}>
+                    <Text style={styles.infoLabel}>Отзыв:</Text>
+                    <View style={styles.reviewsContainer}>
+                      {Array.isArray(order.clientNotes) ? (
+                        order.clientNotes.map((note: string, index: number) => (
+                          <View key={index} style={styles.reviewChip}>
+                            <Text style={styles.reviewChipText}>{note}</Text>
+                          </View>
+                        ))
+                      ) : (
+                        <Text style={styles.infoValue}>
+                          {String(order.clientNotes)}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                )}
+
+              {order.status === 'delivered' &&
+                order.clientNotes.length === 0 && (
+                  <View style={styles.reviewCard}>
+                    <Text style={styles.reviewTitle}>Оставьте отзыв:</Text>
+                    <Text style={styles.reviewSubtitle}>
+                      Выберите один или несколько вариантов
+                    </Text>
+
+                    <View style={styles.reviewsContainer}>
+                      {readyReviews.map((review, index) => {
+                        const isSelected = selectedReviews.includes(review);
+                        return (
+                          <TouchableOpacity
+                            key={index}
+                            style={[
+                              styles.reviewChip,
+                              isSelected && styles.reviewChipSelected,
+                            ]}
+                            onPress={() => handleReviewToggle(review)}>
+                            <Text
+                              style={[
+                                styles.reviewChipText,
+                                isSelected && styles.reviewChipTextSelected,
+                              ]}>
+                              {review}
+                            </Text>
+                            {isSelected && (
+                              <View style={styles.reviewCheckmark}>
+                                <Text style={styles.reviewCheckmarkText}>
+                                  ✓
+                                </Text>
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+
+                    {selectedReviews.length > 0 && (
+                      <TouchableOpacity
+                        style={[
+                          styles.submitReviewButton,
+                          isSubmittingReview &&
+                            styles.submitReviewButtonDisabled,
+                        ]}
+                        onPress={handleSubmitReview}
+                        disabled={isSubmittingReview}>
+                        <Text style={styles.submitReviewButtonText}>
+                          {isSubmittingReview
+                            ? 'Отправка...'
+                            : `Отправить отзыв (${selectedReviews.length})`}
+                        </Text>
+                      </TouchableOpacity>
                     )}
                   </View>
-                </View>
-              )}
+                )}
 
-              {order.status === "delivered" && order.clientNotes.length === 0 && (
-                <View style={styles.reviewCard}>
-                  <Text style={styles.reviewTitle}>Оставьте отзыв:</Text>
-                  <Text style={styles.reviewSubtitle}>Выберите один или несколько вариантов</Text>
-                  
-                  <View style={styles.reviewsContainer}>
-                    {readyReviews.map((review, index) => {
-                      const isSelected = selectedReviews.includes(review);
-                      return (
-                        <TouchableOpacity
-                          key={index}
-                          style={[
-                            styles.reviewChip,
-                            isSelected && styles.reviewChipSelected
-                          ]}
-                          onPress={() => handleReviewToggle(review)}
-                        >
-                          <Text style={[
-                            styles.reviewChipText,
-                            isSelected && styles.reviewChipTextSelected
-                          ]}>
-                            {review}
-                          </Text>
-                          {isSelected && (
-                            <View style={styles.reviewCheckmark}>
-                              <Text style={styles.reviewCheckmarkText}>✓</Text>
-                            </View>
-                          )}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-
-                  {selectedReviews.length > 0 && (
-                    <TouchableOpacity
-                      style={[
-                        styles.submitReviewButton,
-                        isSubmittingReview && styles.submitReviewButtonDisabled
-                      ]}
-                      onPress={handleSubmitReview}
-                      disabled={isSubmittingReview}
-                    >
-                      <Text style={styles.submitReviewButtonText}>
-                        {isSubmittingReview ? 'Отправка...' : `Отправить отзыв (${selectedReviews.length})`}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.backButton}
-                onPress={() => navigation.goBack()}
-              >
+                onPress={() => navigation.goBack()}>
                 <Text style={styles.backButtonText}>Назад к заказам</Text>
               </TouchableOpacity>
             </View>
@@ -416,7 +485,7 @@ const OrderStatusScreen: React.FC = () => {
       style={[styles.safeArea, isBannerVisible && styles.safeAreaWithBanner]}
       edges={androidOnlySafeAreaEdges}>
       <Back navigation={navigation} title="Заказ" />
-      
+
       {renderOrderContent()}
 
       {/* Модальное окно для звонка курьеру */}
@@ -424,31 +493,27 @@ const OrderStatusScreen: React.FC = () => {
         visible={isCourierModalVisible}
         onRequestClose={() => setIsCourierModalVisible(false)}
         transparent={true}
-        animationType="slide"
-      >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
-          onPress={() => setIsCourierModalVisible(false)}
-        >
-          <TouchableOpacity 
-            style={styles.modalContainer} 
-            activeOpacity={1} 
-            onPress={(e) => e.stopPropagation()}
-          >
+        animationType="slide">
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setIsCourierModalVisible(false)}>
+          <TouchableOpacity
+            style={styles.modalContainer}
+            activeOpacity={1}
+            onPress={e => e.stopPropagation()}>
             <Text style={styles.modalTitle}>Позвонить курьеру</Text>
-            
+
             <View style={styles.modalDivider} />
-            
+
             {courierData && courierData.phone ? (
               <>
                 <Text style={styles.modalText}>
                   {courierData.fullName || 'Курьер'}
                 </Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.modalCallButton}
-                  onPress={handleCallCourierPhone}
-                >
+                  onPress={handleCallCourierPhone}>
                   <Text style={styles.modalCallButtonText}>
                     {courierData.phone}
                   </Text>
@@ -459,11 +524,10 @@ const OrderStatusScreen: React.FC = () => {
                 Курьер еще не назначен на ваш заказ.
               </Text>
             )}
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.modalCloseButton}
-              onPress={() => setIsCourierModalVisible(false)}
-            >
+              onPress={() => setIsCourierModalVisible(false)}>
               <Text style={styles.modalCloseButtonText}>Закрыть</Text>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -475,15 +539,17 @@ const OrderStatusScreen: React.FC = () => {
             <View style={styles.bannerContent}>
               <Text style={styles.bannerTitle}>Важно</Text>
               <Text style={styles.bannerText}>
-                Курьеры назначаются автоматически — по рейтингу и близости к вашему адресу.
+                Курьеры назначаются автоматически — по рейтингу и близости к
+                вашему адресу.
               </Text>
               <Text style={styles.bannerText}>
                 📌 Сохранять номер курьера не нужно.
               </Text>
               <Text style={styles.bannerText}>
-                📌 Оформляйте новые заказы только через приложение, чтобы избежать недоразумений.
+                📌 Оформляйте новые заказы только через приложение, чтобы
+                избежать недоразумений.
               </Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.bannerButton}
                 onPress={() => {
                   setIsBannerVisible(false);
@@ -499,8 +565,7 @@ const OrderStatusScreen: React.FC = () => {
                     }
                     setShouldShowCourierModal(false);
                   }
-                }}
-              >
+                }}>
                 <Text style={styles.bannerButtonText}>Понятно</Text>
               </TouchableOpacity>
             </View>
@@ -527,11 +592,10 @@ const OrderStatusScreen: React.FC = () => {
             }
           }}
           transparent={true}
-          animationType="slide"
-        >
-          <TouchableOpacity 
-            style={styles.modalOverlayBottom} 
-            activeOpacity={1} 
+          animationType="slide">
+          <TouchableOpacity
+            style={styles.modalOverlayBottom}
+            activeOpacity={1}
             onPress={() => {
               setIsBannerVisible(false);
               if (shouldShowCourierModal) {
@@ -545,25 +609,25 @@ const OrderStatusScreen: React.FC = () => {
                 }
                 setShouldShowCourierModal(false);
               }
-            }}
-          >
-            <TouchableOpacity 
-              style={styles.bannerModalContainer} 
-              activeOpacity={1} 
-              onPress={(e) => e.stopPropagation()}
-            >
+            }}>
+            <TouchableOpacity
+              style={styles.bannerModalContainer}
+              activeOpacity={1}
+              onPress={e => e.stopPropagation()}>
               <View style={styles.bannerContent}>
                 <Text style={styles.bannerTitle}>Важно</Text>
                 <Text style={styles.bannerText}>
-                  Курьеры назначаются автоматически — по рейтингу и близости к вашему адресу.
+                  Курьеры назначаются автоматически — по рейтингу и близости к
+                  вашему адресу.
                 </Text>
                 <Text style={styles.bannerText}>
                   📌 Сохранять номер курьера не нужно.
                 </Text>
                 <Text style={styles.bannerText}>
-                  📌 Оформляйте новые заказы только через приложение, чтобы избежать недоразумений.
+                  📌 Оформляйте новые заказы только через приложение, чтобы
+                  избежать недоразумений.
                 </Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.bannerButton}
                   onPress={() => {
                     setIsBannerVisible(false);
@@ -571,7 +635,10 @@ const OrderStatusScreen: React.FC = () => {
                     if (shouldShowCourierModal) {
                       if (courierData && courierData.phone) {
                         // Если есть номер, сразу звоним
-                        const phoneNumber = courierData.phone.replace(/\s/g, '');
+                        const phoneNumber = courierData.phone.replace(
+                          /\s/g,
+                          '',
+                        );
                         Linking.openURL(`tel:${phoneNumber}`);
                       } else {
                         // Если нет номера, показываем модальное окно
@@ -579,8 +646,7 @@ const OrderStatusScreen: React.FC = () => {
                       }
                       setShouldShowCourierModal(false);
                     }
-                  }}
-                >
+                  }}>
                   <Text style={styles.bannerButtonText}>Понятно</Text>
                 </TouchableOpacity>
               </View>
@@ -594,88 +660,101 @@ const OrderStatusScreen: React.FC = () => {
         visible={isCancelModalVisible}
         onRequestClose={() => setIsCancelModalVisible(false)}
         transparent={true}
-        animationType="slide"
-      >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
-          onPress={() => setIsCancelModalVisible(false)}
-        >
-          <TouchableOpacity 
-            style={styles.cancelModalContainer} 
-            activeOpacity={1} 
-            onPress={(e) => e.stopPropagation()}
-          >
-            <Text style={styles.cancelModalTitle}>Причина отмены заказа</Text>
-            <Text style={styles.cancelModalSubtitle}>Выберите причину отмены заказа</Text>
-            
-            <ScrollView style={styles.cancelReasonsContainer} showsVerticalScrollIndicator={false}>
-              {cancelReasons.map((reason) => (
+        animationType="slide">
+        <KeyboardAvoidingView
+          style={styles.modalKeyboardAvoiding}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setIsCancelModalVisible(false)}>
+            <TouchableOpacity
+              style={styles.cancelModalContainer}
+              activeOpacity={1}
+              onPress={e => e.stopPropagation()}>
+              <Text style={styles.cancelModalTitle}>Причина отмены заказа</Text>
+              <Text style={styles.cancelModalSubtitle}>
+                Выберите причину отмены заказа
+              </Text>
+
+              <ScrollView
+                style={styles.cancelReasonsContainer}
+                showsVerticalScrollIndicator={false}>
+                {cancelReasons.map(reason => (
+                  <TouchableOpacity
+                    key={reason.id}
+                    style={[
+                      styles.cancelReasonCard,
+                      selectedCancelReason?.id === reason.id &&
+                        styles.cancelReasonCardSelected,
+                    ]}
+                    onPress={() => {
+                      setSelectedCancelReason(reason);
+                      if (reason.id !== 'other') {
+                        setOtherReasonText('');
+                      }
+                    }}>
+                    <Text
+                      style={[
+                        styles.cancelReasonText,
+                        selectedCancelReason?.id === reason.id &&
+                          styles.cancelReasonTextSelected,
+                      ]}>
+                      {reason.label}
+                    </Text>
+                    {selectedCancelReason?.id === reason.id && (
+                      <View style={styles.selectedIndicator}>
+                        <Text style={styles.selectedIndicatorText}>✓</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {selectedCancelReason?.id === 'other' && (
+                <View style={styles.otherReasonContainer}>
+                  <TextInput
+                    style={[
+                      styles.otherReasonInput,
+                      {
+                        borderColor:
+                          selectedCancelReason?.id === 'other'
+                            ? '#DC1818'
+                            : 'transparent',
+                      },
+                    ]}
+                    placeholder="Укажите причину отмены"
+                    placeholderTextColor="#99A3B3"
+                    value={otherReasonText}
+                    onChangeText={setOtherReasonText}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+              )}
+
+              <View style={styles.cancelModalButtons}>
                 <TouchableOpacity
-                  key={reason.id}
-                  style={[
-                    styles.cancelReasonCard,
-                    selectedCancelReason?.id === reason.id && styles.cancelReasonCardSelected
-                  ]}
-                  onPress={() => {
-                    setSelectedCancelReason(reason);
-                    if (reason.id !== 'other') {
-                      setOtherReasonText('');
-                    }
-                  }}
-                >
-                  <Text style={[
-                    styles.cancelReasonText,
-                    selectedCancelReason?.id === reason.id && styles.cancelReasonTextSelected
-                  ]}>
-                    {reason.label}
-                  </Text>
-                  {selectedCancelReason?.id === reason.id && (
-                    <View style={styles.selectedIndicator}>
-                      <Text style={styles.selectedIndicatorText}>✓</Text>
-                    </View>
-                  )}
+                  style={styles.cancelModalCancelButton}
+                  onPress={() => setIsCancelModalVisible(false)}>
+                  <Text style={styles.cancelModalCancelButtonText}>Отмена</Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {selectedCancelReason?.id === 'other' && (
-              <View style={styles.otherReasonContainer}>
-                <TextInput
+                <TouchableOpacity
                   style={[
-                    styles.otherReasonInput,
-                    { borderColor: selectedCancelReason?.id === 'other' ? '#DC1818' : 'transparent' }
+                    styles.cancelModalConfirmButton,
+                    !selectedCancelReason?.id &&
+                      styles.cancelModalConfirmButtonDisabled,
                   ]}
-                  placeholder="Укажите причину отмены"
-                  placeholderTextColor="#99A3B3"
-                  value={otherReasonText}
-                  onChangeText={setOtherReasonText}
-                  multiline
-                  numberOfLines={3}
-                />
+                  onPress={handleConfirmCancel}
+                  disabled={!selectedCancelReason?.id}>
+                  <Text style={styles.cancelModalConfirmButtonText}>
+                    Подтвердить
+                  </Text>
+                </TouchableOpacity>
               </View>
-            )}
-
-            <View style={styles.cancelModalButtons}>
-              <TouchableOpacity 
-                style={styles.cancelModalCancelButton}
-                onPress={() => setIsCancelModalVisible(false)}
-              >
-                <Text style={styles.cancelModalCancelButtonText}>Отмена</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[
-                  styles.cancelModalConfirmButton,
-                  !selectedCancelReason?.id && styles.cancelModalConfirmButtonDisabled
-                ]}
-                onPress={handleConfirmCancel}
-                disabled={!selectedCancelReason?.id}
-              >
-                <Text style={styles.cancelModalConfirmButtonText}>Подтвердить</Text>
-              </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
           </TouchableOpacity>
-        </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -761,6 +840,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  modalKeyboardAvoiding: {
+    flex: 1,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -834,7 +916,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
+    shadowOffset: {width: 0, height: -2},
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 5,
@@ -860,7 +942,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
+    shadowOffset: {width: 0, height: -2},
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 10,
