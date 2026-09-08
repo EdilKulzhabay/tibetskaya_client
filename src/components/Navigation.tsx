@@ -166,6 +166,7 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 12,
     paddingBottom: 35,
+    paddingHorizontal: 20,
     backgroundColor: 'white',
   },
   navBlock: {

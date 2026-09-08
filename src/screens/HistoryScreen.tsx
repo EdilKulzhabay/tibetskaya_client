@@ -574,11 +574,13 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({navigation}) => {
           <View style={summaryStyles.monthSelector}>
             <TouchableOpacity
               onPress={goToPrevMonth}
+              hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}
               style={summaryStyles.arrowBtn}>
               <Text style={summaryStyles.arrowText}>{'‹'}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setMonthPickerVisible(true)}
+              hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
               style={summaryStyles.monthBtn}>
               <Text style={summaryStyles.monthText}>
                 {MONTH_NAMES[selectedMonth]} {selectedYear}
@@ -587,6 +589,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({navigation}) => {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={goToNextMonth}
+              hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}
               style={summaryStyles.arrowBtn}>
               <Text style={summaryStyles.arrowText}>{'›'}</Text>
             </TouchableOpacity>

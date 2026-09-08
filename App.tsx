@@ -54,10 +54,12 @@ import {TopUpBalanceProvider} from './src/context/TopUpBalanceContext';
 import {AuthProvider} from './src/hooks/useAuth';
 import {captureDeferredFbclid} from './src/utils/metaAttribution';
 import {Settings} from 'react-native-fbsdk-next';
+import {initAdjust} from './src/utils/adjustEvents';
 
 // Facebook SDK нужно явно инициализировать на JS-стороне — без этого
 // вызова AppEventsLogger.logEvent() падает с FacebookSdkNotInitializedException.
 Settings.initializeSDK();
+initAdjust();
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 

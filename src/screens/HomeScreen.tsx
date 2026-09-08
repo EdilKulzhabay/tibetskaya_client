@@ -55,6 +55,7 @@ import {
   getDeliveryAcceptTextFromYmd,
 } from '../utils/orderDeliveryDate';
 import {logOrderPurchaseEvents} from '../utils/facebookEvents';
+import {logAdjustOrderCreated} from '../utils/adjustEvents';
 
 /** Скелетон блока «Повторить последний заказ» — те же размеры/отступы, что и у самого блока, чтобы контент под ним не прыгал во время загрузки. */
 const RepeatOrderSkeleton: React.FC<{roundedBottom: boolean}> = ({
@@ -770,6 +771,7 @@ const HomeScreen: React.FC = () => {
             totalAmount: orderSum,
             orderId: (res as {order?: {_id?: string}}).order?._id,
           });
+          logAdjustOrderCreated(orderSum);
           setPaymentModalVisible(false);
           setNotEnoughBalanceModalVisible(false);
           setPendingCustomOrder(null);
@@ -1173,6 +1175,7 @@ const HomeScreen: React.FC = () => {
           totalAmount: payload.total,
           orderId: (res as {order?: {_id?: string}}).order?._id,
         });
+        logAdjustOrderCreated(payload.total);
         const syncUserAndOrders = async () => {
           try {
             await refreshUserData();

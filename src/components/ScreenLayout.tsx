@@ -1,5 +1,5 @@
 import React from 'react';
-import {View, StyleSheet} from 'react-native';
+import {View, StyleSheet, Platform} from 'react-native';
 import Navigation from './Navigation';
 
 interface ScreenLayoutProps {
@@ -13,7 +13,7 @@ const ScreenLayout: React.FC<ScreenLayoutProps> = ({
 }) => {
   return (
     <View style={styles.container}>
-      <View style={{backgroundColor: "#fff", height: 30, width: "100%"}} />
+      <View style={styles.topSpacer} />
       <View style={styles.content}>{children}</View>
       {showNavigation && <Navigation />}
     </View>
@@ -27,6 +27,11 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  topSpacer: {
+    backgroundColor: '#fff',
+    height: Platform.OS === 'android' ? 10 : 35,
+    width: '100%',
   },
 });
 

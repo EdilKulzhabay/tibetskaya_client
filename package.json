@@ -20,6 +20,7 @@
     "axios": "^1.12.1",
     "react": "19.0.0",
     "react-native": "0.79.6",
+    "react-native-adjust": "^5.8.0",
     "react-native-blob-util": "^0.24.7",
     "react-native-fbsdk-next": "^13.4.3",
     "react-native-fs": "^2.20.0",

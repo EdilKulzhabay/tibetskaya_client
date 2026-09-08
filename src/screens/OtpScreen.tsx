@@ -20,6 +20,7 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {useAuth} from '../hooks';
 import {StableImage} from '../components';
 import {logRegistrationCompleted} from '../utils/facebookEvents';
+import {logAdjustRegistration} from '../utils/adjustEvents';
 
 type OtpScreenProps = NativeStackScreenProps<RootStackParamList, 'Otp'>;
 const OTP_LENGTH = 6;
@@ -75,6 +76,7 @@ const OtpScreen: React.FC<OtpScreenProps> = ({navigation, route}) => {
             }
             if (registerRes.success) {
               logRegistrationCompleted('phone');
+              logAdjustRegistration();
               navigation.navigate('RegisterAccepted');
             } else {
               Alert.alert('Ошибка', registerRes.message);
@@ -240,7 +242,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'white',
     position: 'relative',
-    marginTop: -30
+    marginTop: -30,
   },
   imageContainer: {
     width: '100%',

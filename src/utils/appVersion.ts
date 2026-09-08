@@ -3,7 +3,7 @@ import {getDateYmdAlmaty} from './dateAlmaty';
 
 /** Версия приложения — единственное место объявления, используется и для телеметрии
  * (HomeScreen отправляет её в CRM), и для сравнения с `latestAppVersion` из CRM. */
-export const APP_VERSION = '1.9.0';
+export const APP_VERSION = '2.0.0';
 
 const LAST_SHOWN_KEY = 'newVersionModalLastShownDate';
 

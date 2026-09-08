@@ -32,6 +32,7 @@ import {navigate} from '../navigation/navigationRef';
 import {getClientMongoId} from '../utils/clientId';
 import {clientHasInvoiceLegalData} from '../utils/clientInvoiceProfile';
 import {apiService} from '../api/services';
+import {logAdjustBalanceTopUp} from '../utils/adjustEvents';
 import type {User} from '../types';
 
 /** Очищает base64 от пробелов/префикса data-URI — иначе на iOS PDF может не открыться. */
@@ -277,6 +278,7 @@ export const TopUpBalanceProvider: React.FC<{children: React.ReactNode}> = ({
       setPaymentWebViewVisible(false);
       setTopUpSum('');
       if (!paymentCompleted) return;
+      logAdjustBalanceTopUp(paymentWebViewAmount);
       void (async () => {
         const firstFresh = await refreshUserData();
         // Webhook Payplus может обновить баланс на CRM с задержкой — повторяем запрос
@@ -285,7 +287,7 @@ export const TopUpBalanceProvider: React.FC<{children: React.ReactNode}> = ({
         notifyTopUpSuccess((secondFresh ?? firstFresh ?? null) as User | null);
       })();
     },
-    [refreshUserData, notifyTopUpSuccess],
+    [refreshUserData, notifyTopUpSuccess, paymentWebViewAmount],
   );
 
   const handleTopUpSavedCard = useCallback(() => {
@@ -363,6 +365,7 @@ export const TopUpBalanceProvider: React.FC<{children: React.ReactNode}> = ({
       if (status === 'paid') {
         pendingKaspiInvoiceIdRef.current = null;
         kaspiStatusCheckAttemptsRef.current = 0;
+        logAdjustBalanceTopUp(Number(res?.invoice?.amount) || undefined);
         const firstFresh = await refreshUserData();
         await new Promise<void>(r => setTimeout(() => r(), 2000));
         const secondFresh = await refreshUserData();

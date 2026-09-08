@@ -24,6 +24,7 @@ import {getWalletOpFormForUser} from '../utils/invoiceClientOrderPayment';
 import {buildSelectableDeliveryDates} from '../utils/orderDeliveryDate';
 import {getClientMongoId} from '../utils/clientId';
 import {logOrderPurchaseEvents} from '../utils/facebookEvents';
+import {logAdjustOrderCreated} from '../utils/adjustEvents';
 
 const calls = [
   {label: 'Позвонить заранее', value: true},
@@ -293,6 +294,7 @@ const AddOrderScreen: React.FC<{navigation: any; route: any}> = ({
           totalAmount: count12 * price12 + count19 * price19,
           orderId: (res as {order?: {_id?: string}}).order?._id,
         });
+        logAdjustOrderCreated(count12 * price12 + count19 * price19);
         /** Сбрасываем способ оплаты: экран оформления может оставаться в стеке, глобальное пополнение не должно «прилипать» к уже завершённому заказу. */
         setSelectedPayment(null);
         Alert.alert('Успешно', 'Заказ оформлен', [
