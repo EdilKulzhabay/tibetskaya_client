@@ -8,7 +8,6 @@ import {
   Alert,
   DeviceEventEmitter,
   Modal,
-  Linking,
   TextInput,
   KeyboardAvoidingView,
   Platform,
@@ -21,6 +20,7 @@ import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../types/navigation';
 import {AwaitingOrderView, OnTheWayView, Back} from '../components';
 import {apiService} from '../api/services';
+import {callManager} from '../features/calls';
 
 type OrderStatusRouteProp = RouteProp<RootStackParamList, 'OrderStatus'>;
 type OrderStatusNavigationProp = NativeStackNavigationProp<
@@ -34,13 +34,11 @@ const OrderStatusScreen: React.FC = () => {
 
   // Получаем данные заказа из параметров и храним в state
   const [order, setOrder] = useState(route.params.order);
-  const [isCourierModalVisible, setIsCourierModalVisible] = useState(false);
   const [isBannerVisible, setIsBannerVisible] = useState(false);
-  const [courierData, setCourierData] = useState<{
-    fullName?: string;
-    phone?: string;
-  } | null>(null);
-  const [shouldShowCourierModal, setShouldShowCourierModal] = useState(false);
+  // Имя курьера, которому позвоним после закрытия баннера «Важно»
+  const [pendingCallCourierName, setPendingCallCourierName] = useState<
+    string | null
+  >(null);
   const [isCancelModalVisible, setIsCancelModalVisible] = useState(false);
   const [selectedCancelReason, setSelectedCancelReason] = useState<any>(null);
   const [otherReasonText, setOtherReasonText] = useState('');
@@ -247,23 +245,14 @@ const OrderStatusScreen: React.FC = () => {
         return;
       }
 
-      // Сохраняем данные курьера (если есть)
-      if (typeof courierAggregator === 'object') {
-        console.log(
-          '🔄 OrderStatusScreen: courierAggregator 141',
-          courierAggregator,
-        );
-        setCourierData({
-          fullName: courierAggregator.fullName,
-          phone: courierAggregator.phone || undefined,
-        });
-      } else {
-        setCourierData(null);
-      }
+      const courierName =
+        typeof courierAggregator === 'object' && courierAggregator.fullName
+          ? courierAggregator.fullName
+          : 'Курьер';
 
-      // Показываем баннер перед действием
+      // Показываем баннер, после «Понятно» — звонок через интернет
+      setPendingCallCourierName(courierName);
       setIsBannerVisible(true);
-      setShouldShowCourierModal(true);
     } catch (error) {
       console.error('Ошибка при обновлении заказа:', error);
       Alert.alert(
@@ -274,11 +263,11 @@ const OrderStatusScreen: React.FC = () => {
     }
   };
 
-  const handleCallCourierPhone = () => {
-    if (courierData && courierData.phone) {
-      const phoneNumber = courierData.phone.replace(/\s/g, ''); // Убираем пробелы
-      Linking.openURL(`tel:${phoneNumber}`);
-      setIsCourierModalVisible(false);
+  const dismissBannerAndCall = () => {
+    setIsBannerVisible(false);
+    if (pendingCallCourierName) {
+      callManager.startCall(order._id, pendingCallCourierName);
+      setPendingCallCourierName(null);
     }
   };
 
@@ -488,128 +477,17 @@ const OrderStatusScreen: React.FC = () => {
 
       {renderOrderContent()}
 
-      {/* Модальное окно для звонка курьеру */}
-      <Modal
-        visible={isCourierModalVisible}
-        onRequestClose={() => setIsCourierModalVisible(false)}
-        transparent={true}
-        animationType="slide">
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setIsCourierModalVisible(false)}>
-          <TouchableOpacity
-            style={styles.modalContainer}
-            activeOpacity={1}
-            onPress={e => e.stopPropagation()}>
-            <Text style={styles.modalTitle}>Позвонить курьеру</Text>
-
-            <View style={styles.modalDivider} />
-
-            {courierData && courierData.phone ? (
-              <>
-                <Text style={styles.modalText}>
-                  {courierData.fullName || 'Курьер'}
-                </Text>
-                <TouchableOpacity
-                  style={styles.modalCallButton}
-                  onPress={handleCallCourierPhone}>
-                  <Text style={styles.modalCallButtonText}>
-                    {courierData.phone}
-                  </Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <Text style={styles.modalText}>
-                Курьер еще не назначен на ваш заказ.
-              </Text>
-            )}
-
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setIsCourierModalVisible(false)}>
-              <Text style={styles.modalCloseButtonText}>Закрыть</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </TouchableOpacity>
-
-        {/* Баннер-сниппет с информацией о курьерах - поверх модального окна */}
-        {isBannerVisible && (
-          <View style={styles.bannerContainerModal}>
-            <View style={styles.bannerContent}>
-              <Text style={styles.bannerTitle}>Важно</Text>
-              <Text style={styles.bannerText}>
-                Курьеры назначаются автоматически — по рейтингу и близости к
-                вашему адресу.
-              </Text>
-              <Text style={styles.bannerText}>
-                📌 Сохранять номер курьера не нужно.
-              </Text>
-              <Text style={styles.bannerText}>
-                📌 Оформляйте новые заказы только через приложение, чтобы
-                избежать недоразумений.
-              </Text>
-              <TouchableOpacity
-                style={styles.bannerButton}
-                onPress={() => {
-                  setIsBannerVisible(false);
-                  // Если нужно звонить или показать модальное окно после закрытия баннера
-                  if (shouldShowCourierModal) {
-                    if (courierData && courierData.phone) {
-                      // Если есть номер, сразу звоним
-                      const phoneNumber = courierData.phone.replace(/\s/g, '');
-                      Linking.openURL(`tel:${phoneNumber}`);
-                    } else {
-                      // Если нет номера, показываем модальное окно
-                      setIsCourierModalVisible(true);
-                    }
-                    setShouldShowCourierModal(false);
-                  }
-                }}>
-                <Text style={styles.bannerButtonText}>Понятно</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-      </Modal>
-
       {/* Баннер-сниппет с информацией о курьерах - вне модального окна */}
-      {isBannerVisible && !isCourierModalVisible && (
+      {isBannerVisible && (
         <Modal
           visible={isBannerVisible}
-          onRequestClose={() => {
-            setIsBannerVisible(false);
-            if (shouldShowCourierModal) {
-              if (courierData && courierData.phone) {
-                // Если есть номер, сразу звоним
-                const phoneNumber = courierData.phone.replace(/\s/g, '');
-                Linking.openURL(`tel:${phoneNumber}`);
-              } else {
-                // Если нет номера, показываем модальное окно
-                setIsCourierModalVisible(true);
-              }
-              setShouldShowCourierModal(false);
-            }
-          }}
+          onRequestClose={dismissBannerAndCall}
           transparent={true}
           animationType="slide">
           <TouchableOpacity
             style={styles.modalOverlayBottom}
             activeOpacity={1}
-            onPress={() => {
-              setIsBannerVisible(false);
-              if (shouldShowCourierModal) {
-                if (courierData && courierData.phone) {
-                  // Если есть номер, сразу звоним
-                  const phoneNumber = courierData.phone.replace(/\s/g, '');
-                  Linking.openURL(`tel:${phoneNumber}`);
-                } else {
-                  // Если нет номера, показываем модальное окно
-                  setIsCourierModalVisible(true);
-                }
-                setShouldShowCourierModal(false);
-              }
-            }}>
+            onPress={dismissBannerAndCall}>
             <TouchableOpacity
               style={styles.bannerModalContainer}
               activeOpacity={1}
@@ -621,32 +499,12 @@ const OrderStatusScreen: React.FC = () => {
                   вашему адресу.
                 </Text>
                 <Text style={styles.bannerText}>
-                  📌 Сохранять номер курьера не нужно.
-                </Text>
-                <Text style={styles.bannerText}>
                   📌 Оформляйте новые заказы только через приложение, чтобы
                   избежать недоразумений.
                 </Text>
                 <TouchableOpacity
                   style={styles.bannerButton}
-                  onPress={() => {
-                    setIsBannerVisible(false);
-                    // Если нужно звонить или показать модальное окно после закрытия баннера
-                    if (shouldShowCourierModal) {
-                      if (courierData && courierData.phone) {
-                        // Если есть номер, сразу звоним
-                        const phoneNumber = courierData.phone.replace(
-                          /\s/g,
-                          '',
-                        );
-                        Linking.openURL(`tel:${phoneNumber}`);
-                      } else {
-                        // Если нет номера, показываем модальное окно
-                        setIsCourierModalVisible(true);
-                      }
-                      setShouldShowCourierModal(false);
-                    }
-                  }}>
+                  onPress={dismissBannerAndCall}>
                   <Text style={styles.bannerButtonText}>Понятно</Text>
                 </TouchableOpacity>
               </View>
@@ -855,55 +713,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
   },
-  modalContainer: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 24,
-    width: '85%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#333',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  modalDivider: {
-    height: 1,
-    backgroundColor: '#EDEDED',
-    marginVertical: 16,
-  },
-  modalText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  modalCallButton: {
-    backgroundColor: '#DC1818',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalCallButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  modalCloseButton: {
-    borderWidth: 1,
-    borderColor: '#DC1818',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  modalCloseButtonText: {
-    color: '#DC1818',
-    fontSize: 16,
-    fontWeight: '600',
-  },
   bannerContainer: {
     position: 'absolute',
     bottom: 0,
@@ -929,24 +738,6 @@ const styles = StyleSheet.create({
     padding: 24,
     width: '100%',
     paddingBottom: 40,
-  },
-  bannerContainerModal: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: -2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 10,
-    zIndex: 2000,
   },
   bannerContent: {
     maxWidth: '100%',

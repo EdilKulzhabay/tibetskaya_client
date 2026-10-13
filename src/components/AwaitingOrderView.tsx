@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
-import { OrderData } from '../types/navigation';
+import {OrderData} from '../types/navigation';
 import CollapsibleSection from './CollapsibleSection';
 
 interface AwaitingOrderViewProps {
@@ -16,11 +16,16 @@ interface AwaitingOrderViewProps {
   navigation: any;
 }
 
-const AwaitingOrderView: React.FC<AwaitingOrderViewProps> = ({ order, onCancelOrder, onCallCourier, navigation }) => {
+const AwaitingOrderView: React.FC<AwaitingOrderViewProps> = ({
+  order,
+  onCancelOrder,
+  onCallCourier,
+  navigation,
+}) => {
   const [timeRemaining, setTimeRemaining] = useState(25 * 60); // 25 минут в секундах
 
   useEffect(() => {
-    console.log("order in AwaitingScreen = ", order)
+    console.log('order in AwaitingScreen = ', order);
     const timer = setInterval(() => {
       setTimeRemaining(prev => Math.max(0, prev - 1));
     }, 1000);
@@ -55,16 +60,26 @@ const AwaitingOrderView: React.FC<AwaitingOrderViewProps> = ({ order, onCancelOr
             </View>
           </View>
         </View>
-        
+
         <View style={styles.progressContainer}>
           <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+            <View
+              style={[styles.progressFill, {width: `${progress * 100}%`}]}
+            />
           </View>
           <View style={styles.progressLabels}>
-            <Text style={[styles.progressLabel, progress > 0.1 && styles.progressLabelActive]}>
+            <Text
+              style={[
+                styles.progressLabel,
+                progress > 0.1 && styles.progressLabelActive,
+              ]}>
               В очереди
             </Text>
-            <Text style={[styles.progressLabel, progress > 0.8 && styles.progressLabelActive]}>
+            <Text
+              style={[
+                styles.progressLabel,
+                progress > 0.8 && styles.progressLabelActive,
+              ]}>
               Доставляется
             </Text>
           </View>
@@ -74,20 +89,17 @@ const AwaitingOrderView: React.FC<AwaitingOrderViewProps> = ({ order, onCancelOr
       {/* Order Details - Always expanded first */}
       <View style={styles.detailsContainer}>
         {/* Products Section - Collapsible */}
-        <CollapsibleSection 
+        <CollapsibleSection
           title="Детали заказа"
           defaultExpanded={true}
-          containerStyle={styles.sectionContainer}
-        >
+          containerStyle={styles.sectionContainer}>
           {order.products.b12 > 0 && (
             <View style={styles.productRow}>
               <View style={styles.productInfo}>
                 <Text style={styles.productText}>Вода 12,5 л</Text>
                 <Text style={styles.productSubtext}>Негазированная</Text>
               </View>
-              <Text style={styles.productQuantity}>
-                x{order.products.b12}
-              </Text>
+              <Text style={styles.productQuantity}>x{order.products.b12}</Text>
             </View>
           )}
           {order.products.b19 > 0 && (
@@ -96,40 +108,41 @@ const AwaitingOrderView: React.FC<AwaitingOrderViewProps> = ({ order, onCancelOr
                 <Text style={styles.productText}>Вода 19 л</Text>
                 <Text style={styles.productSubtext}>Негазированная</Text>
               </View>
-              <Text style={styles.productQuantity}>
-                x{order.products.b19}
-              </Text>
+              <Text style={styles.productQuantity}>x{order.products.b19}</Text>
             </View>
           )}
         </CollapsibleSection>
 
         {/* Delivery Info Section - Collapsible */}
-        <CollapsibleSection 
+        <CollapsibleSection
           title="Информация о доставке"
           defaultExpanded={false}
-          containerStyle={styles.sectionContainer}
-        >
+          containerStyle={styles.sectionContainer}>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Адрес</Text>
             <Text style={styles.infoValue}>
               {order.address?.actual || order.address?.name || 'Самал-1'}
             </Text>
           </View>
-          
+
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Способ оплаты</Text>
             <Text style={styles.infoValue}>
-              {order.opForm === "fakt" ? "Нал_Карта_QR" : (order.opForm === "credit" || order.opForm === "coupon") ? "С баланса" : 'Нал_Карта_QR'}
+              {order.opForm === 'fakt'
+                ? 'Нал_Карта_QR'
+                : order.opForm === 'credit' || order.opForm === 'coupon'
+                ? 'С баланса'
+                : 'Нал_Карта_QR'}
             </Text>
           </View>
-          
+
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Время доставки</Text>
             <Text style={styles.infoValue}>
               {order.date?.d || order.deliveryTime || 'Пятница, 18 апреля'}
             </Text>
           </View>
-          
+
           {(order.sum || order.totalAmount) && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Сумма заказа</Text>
@@ -139,18 +152,21 @@ const AwaitingOrderView: React.FC<AwaitingOrderViewProps> = ({ order, onCancelOr
             </View>
           )}
 
-          <TouchableOpacity style={styles.callCourierButton} onPress={onCallCourier}>
+          <TouchableOpacity
+            style={styles.callCourierButton}
+            onPress={onCallCourier}>
             <Text style={styles.callCourierButtonText}>Позвонить курьеру</Text>
           </TouchableOpacity>
         </CollapsibleSection>
 
         {/* Support Section - Collapsible */}
-        <CollapsibleSection 
+        <CollapsibleSection
           title="Поддержка"
           defaultExpanded={false}
-          containerStyle={styles.sectionContainer}
-        >
-          <TouchableOpacity style={styles.supportButton} onPress={() => navigation.navigate('Chat')}>
+          containerStyle={styles.sectionContainer}>
+          <TouchableOpacity
+            style={styles.supportButton}
+            onPress={() => navigation.navigate('Chat')}>
             <View style={styles.supportIcon}>
               <Text style={styles.supportIconText}>?</Text>
             </View>

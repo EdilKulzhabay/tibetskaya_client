@@ -7,6 +7,9 @@ import FirebaseMessaging
 import UserNotifications
 import FBSDKCoreKit
 import AppTrackingTransparency
+import PushKit
+import RNCallKeep
+import RNVoipPushNotification
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate, MessagingDelegate {
@@ -15,7 +18,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
   var reactNativeDelegate: ReactNativeDelegate?
   var reactNativeFactory: RCTReactNativeFactory?
 
-  private var didRequestTrackingAuthorization = false
+  /// Запрос ATT уже отправлен и ждёт ответа — не дублируем его на повторных didBecomeActive
+  private var isTrackingAuthorizationPending = false
 
   func application(
     _ application: UIApplication,
@@ -38,7 +42,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     // Это должно быть вызвано синхронно, не внутри completion handler
     application.registerForRemoteNotifications()
     print("📱 [AppDelegate] Зарегистрировано для удаленных уведомлений")
-    
+
+    // 4. CallKit и PushKit — до запуска React Native: VoIP-пуш может разбудить убитое приложение,
+    // и CallKit нужно показать раньше, чем загрузится JS
+    setUpIncomingCalls()
+
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
@@ -73,14 +81,24 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     requestTrackingAuthorizationIfNeeded()
   }
 
+  /// iOS не показывает диалог ATT, пока на экране другой системный алерт (например, запрос
+  /// уведомлений), и молча возвращает .notDetermined. Поэтому ориентируемся на текущий статус,
+  /// а не на флаг «уже спрашивали»: закрытие чужого алерта снова вызывает didBecomeActive,
+  /// и запрос повторится.
   private func requestTrackingAuthorizationIfNeeded() {
-    guard !didRequestTrackingAuthorization else { return }
-    didRequestTrackingAuthorization = true
+    guard !isTrackingAuthorizationPending,
+          ATTrackingManager.trackingAuthorizationStatus == .notDetermined else { return }
+    isTrackingAuthorizationPending = true
 
     // Небольшая задержка, чтобы системный диалог ATT не появился поверх ещё не отрисованного UI
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+      guard UIApplication.shared.applicationState == .active else {
+        self?.isTrackingAuthorizationPending = false
+        return
+      }
       ATTrackingManager.requestTrackingAuthorization { status in
         print("📱 [AppDelegate] ATT authorization status: \(status.rawValue)")
+        DispatchQueue.main.async { self?.isTrackingAuthorizationPending = false }
       }
     }
   }
@@ -144,6 +162,77 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                              withCompletionHandler completionHandler: @escaping () -> Void) {
     print("👆 Notification tapped")
     completionHandler()
+  }
+}
+
+// MARK: - Входящие VoIP-звонки (PushKit + CallKit)
+
+extension AppDelegate: PKPushRegistryDelegate {
+  /// CXCallEndedReason.unanswered — для звонков, которые уже не актуальны к приходу пуша
+  private static let unansweredEndReason: Int32 = 3
+
+  /// Опции совпадают с CallKit-частью JS (src/features/calls/callPlatform.ios.ts)
+  func setUpIncomingCalls() {
+    RNCallKeep.setup([
+      "appName": "Тибетская",
+      "supportsVideo": false,
+      "maximumCallGroups": "1",
+      "maximumCallsPerCallGroup": "1",
+      "includesCallsInRecents": false,
+    ])
+    // Делегатом PKPushRegistry становится AppDelegate (методы ниже)
+    RNVoipPushNotificationManager.voipRegistration()
+  }
+
+  func pushRegistry(
+    _ registry: PKPushRegistry,
+    didUpdate pushCredentials: PKPushCredentials,
+    for type: PKPushType
+  ) {
+    RNVoipPushNotificationManager.didUpdate(pushCredentials, forType: type.rawValue)
+  }
+
+  func pushRegistry(_ registry: PKPushRegistry, didInvalidatePushTokenFor type: PKPushType) {
+    // Токен удалит сервер по ответу APNs (410 Unregistered)
+  }
+
+  /// iOS требует показать CallKit на КАЖДЫЙ VoIP-пуш — иначе система перестанет их доставлять.
+  /// Поэтому даже просроченный или битый пуш показываем и сразу завершаем.
+  func pushRegistry(
+    _ registry: PKPushRegistry,
+    didReceiveIncomingPushWith payload: PKPushPayload,
+    for type: PKPushType,
+    completion: @escaping () -> Void
+  ) {
+    let data = payload.dictionaryPayload
+    let callUuid = (data["callUuid"] as? String).flatMap { UUID(uuidString: $0)?.uuidString }
+    let uuid = callUuid ?? UUID().uuidString
+    let callerName = (data["callerName"] as? String) ?? "Входящий звонок"
+    let expiresAtMs = (data["expiresAt"] as? NSNumber)?.doubleValue ?? 0
+    let isActual = callUuid != nil && expiresAtMs > Date().timeIntervalSince1970 * 1000
+
+    // Событие для JS (если он уже загружен — сразу, иначе в очереди до загрузки)
+    RNVoipPushNotificationManager.didReceiveIncomingPush(with: payload, forType: type.rawValue)
+
+    RNCallKeep.reportNewIncomingCall(
+      uuid,
+      handle: callerName,
+      handleType: "generic",
+      hasVideo: false,
+      localizedCallerName: callerName,
+      supportsHolding: false,
+      supportsDTMF: false,
+      supportsGrouping: false,
+      supportsUngrouping: false,
+      fromPushKit: true,
+      payload: data,
+      withCompletionHandler: {
+        if !isActual {
+          RNCallKeep.endCall(withUUID: uuid, reason: AppDelegate.unansweredEndReason)
+        }
+        completion()
+      }
+    )
   }
 }
 

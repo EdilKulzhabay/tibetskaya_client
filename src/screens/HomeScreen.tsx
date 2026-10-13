@@ -36,7 +36,12 @@ import {apiService} from '../api/services';
 const {tokenStorage} = require('../utils/storage');
 import {useFocusEffect} from '@react-navigation/native';
 import {useTopUpBalance} from '../context/TopUpBalanceContext';
-import {clientHasInvoiceLegalData} from '../utils/clientInvoiceProfile';
+import {useAvrBlock} from '../context/AvrBlockContext';
+import {isAvrBlockedError} from '../utils/avrBlock';
+import {
+  canPayCashToCourier,
+  clientHasInvoiceLegalData,
+} from '../utils/clientInvoiceProfile';
 import {getClientMongoId} from '../utils/clientId';
 import {getWalletOpFormForUser} from '../utils/invoiceClientOrderPayment';
 import {resolveRepeatOrderAddress} from '../utils/orderAddress';
@@ -166,6 +171,7 @@ const HomeScreen: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const {user, loadingState, refreshUserData, updateUser} = useAuth();
+  const {ensureOrderAllowed} = useAvrBlock();
   const {openTopUpModal} = useTopUpBalance();
   /**
    * refreshUserData() кладёт в user новый объект при каждом обновлении, даже если данные
@@ -548,6 +554,8 @@ const HomeScreen: React.FC = () => {
                 ? {
                     ...order,
                     courierAggregator: orderData?.courierAggregator,
+                    // Причину отмены (в т.ч. курьером) показывает CancelledOrderCard
+                    reason: orderData?.reason ?? order.reason,
                     status: newStatus,
                     updatedAt: orderData?.updatedAt || new Date().toISOString(),
                   }
@@ -567,6 +575,7 @@ const HomeScreen: React.FC = () => {
             ? {
                 ...prevLastOrder,
                 courierAggregator: orderData?.courierAggregator,
+                reason: orderData?.reason ?? prevLastOrder.reason,
                 status: newStatus,
                 updatedAt: orderData?.updatedAt || new Date().toISOString(),
               }
@@ -719,6 +728,12 @@ const HomeScreen: React.FC = () => {
           orderEmptyBottles,
         );
       } catch (error: any) {
+        if (isAvrBlockedError(error)) {
+          // Модалку «Подтвердите АВР» уже показал AvrBlockProvider
+          setPaymentModalVisible(false);
+          setNotEnoughBalanceModalVisible(false);
+          return;
+        }
         const message = error?.response?.data?.message;
         if (message === 'Недостаточно средств на балансе') {
           setPaymentModalVisible(false);
@@ -822,6 +837,7 @@ const HomeScreen: React.FC = () => {
   /** Повтор последнего заказа: 1) дата 2) кошелёк или пополнение. */
   const startRepeatLastOrderFlow = () => {
     if (!user || !lastOrder) return;
+    if (!ensureOrderAllowed()) return;
     repeatOrderDeliveryYmdRef.current = null;
     setPendingCustomOrder(null);
     setRepeatAvailableDates(buildSelectableDeliveryDates(user ?? null));
@@ -1025,7 +1041,7 @@ const HomeScreen: React.FC = () => {
     }
 
     // Без типичного «кошелька» — форма оплаты повторяет прошлый заказ, но требует подтверждения.
-    if (lastOrder.opForm === 'fakt') {
+    if (lastOrder.opForm === 'fakt' && canPayCashToCourier(user)) {
       setSelectedPayment({label: 'Наличными', value: 'fakt'});
     } else if (lastOrder.opForm === 'credit' || lastOrder.opForm === 'coupon') {
       const balanceValue =
@@ -1203,6 +1219,10 @@ const HomeScreen: React.FC = () => {
         Alert.alert('Ошибка', res.message);
       }
     } catch (error: any) {
+      if (isAvrBlockedError(error)) {
+        setFirstOrderModalVisible(false);
+        return;
+      }
       const message = error?.response?.data?.message;
       if (message === 'Недостаточно средств на балансе') {
         setFirstOrderModalVisible(false);
@@ -1236,6 +1256,7 @@ const HomeScreen: React.FC = () => {
         navigation.navigate('Login');
         return;
       }
+      if (!ensureOrderAllowed()) return;
       if (!user?.addresses?.length) {
         setAddressModalVisible(true);
         return;
@@ -1254,7 +1275,7 @@ const HomeScreen: React.FC = () => {
       setPendingCustomOrder(payload);
       setRepeatDateModalVisible(true);
     },
-    [lastOrder, user, navigation],
+    [lastOrder, user, navigation, ensureOrderAllowed],
   );
 
   const handleChatWithCourierFromMainCard = useCallback(
@@ -1427,7 +1448,12 @@ const HomeScreen: React.FC = () => {
         showBonus={true}
         onBonusPress={openTopUpModal}
       />
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      {/* handled: модалки карточек (комментарий к заказу) — React-потомки этого ScrollView,
+          иначе первое нажатие «Сохранить» только закрывает клавиатуру */}
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled">
         <View style={styles.content}>
           <MainOrderCard
             address={homeAddress}
@@ -1574,7 +1600,7 @@ const HomeScreen: React.FC = () => {
               }}>
               Способ оплаты
             </Text>
-            {!clientHasInvoiceLegalData(user) ? (
+            {canPayCashToCourier(user) ? (
               <TouchableOpacity
                 style={styles.modalAddress}
                 onPress={() => {
@@ -1855,7 +1881,7 @@ const HomeScreen: React.FC = () => {
                 <Text style={styles.buttonText}>Пополнить баланс</Text>
               )}
             </TouchableOpacity>
-            {!clientHasInvoiceLegalData(user) ? (
+            {canPayCashToCourier(user) ? (
               <TouchableOpacity
                 style={{
                   backgroundColor: '#DC1818',

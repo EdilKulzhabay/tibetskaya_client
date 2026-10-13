@@ -11,6 +11,7 @@ import {User, RegisterData, LoadingState} from '../types';
 import {userStorage, tokenStorage, clearAllData} from '../utils/storage';
 import {apiService} from '../api/services';
 import pushNotificationService from '../services/pushNotifications';
+import {unregisterCallPush} from '../features/calls/callPushRegistration';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {getClientMongoId} from '../utils/clientId';
 
@@ -126,6 +127,8 @@ const useAuthState = (): UseAuthReturn => {
         createdAt: clientData.createdAt,
         isStartedHydration: clientData.isStartedHydration || false,
         showRepairMasterInApp: clientData.showRepairMasterInApp !== false,
+        avrBlocked: clientData.avrBlocked === true,
+        onlinePaymentOnly: clientData.onlinePaymentOnly === true,
         referralCode: clientData.referralCode,
         appOrdersPlacedCount: clientData.appOrdersPlacedCount ?? 0,
         paymentMethod: clientData.paymentMethod,
@@ -227,6 +230,12 @@ const useAuthState = (): UseAuthReturn => {
         await pushNotificationService.removeTokenFromServer();
       } catch (e) {
         console.error('Ошибка при удалении FCM-токена:', e);
+      }
+      // Отвязываем устройство от пушей о звонках, пока токен авторизации ещё есть
+      try {
+        await unregisterCallPush();
+      } catch (e) {
+        console.error('Ошибка при удалении токена звонков:', e);
       }
       await clearAllData();
 

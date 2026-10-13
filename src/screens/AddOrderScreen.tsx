@@ -15,11 +15,16 @@ import {androidOnlySafeAreaEdges} from '../utils/safeArea';
 import Back from '../components/Back';
 import {useAuth} from '../hooks';
 import {useTopUpBalance} from '../context/TopUpBalanceContext';
+import {useAvrBlock} from '../context/AvrBlockContext';
+import {isAvrBlockedError} from '../utils/avrBlock';
 import {useState, useCallback, useEffect, useRef} from 'react';
 import {apiService} from '../api/services';
 import {useFocusEffect} from '@react-navigation/native';
 import ReferralPromoModal from '../components/ReferralPromoModal';
-import {clientHasInvoiceLegalData} from '../utils/clientInvoiceProfile';
+import {
+  canPayCashToCourier,
+  clientHasInvoiceLegalData,
+} from '../utils/clientInvoiceProfile';
 import {getWalletOpFormForUser} from '../utils/invoiceClientOrderPayment';
 import {buildSelectableDeliveryDates} from '../utils/orderDeliveryDate';
 import {getClientMongoId} from '../utils/clientId';
@@ -44,6 +49,7 @@ const AddOrderScreen: React.FC<{navigation: any; route: any}> = ({
 }) => {
   const {products, order} = route.params;
   const {user, refreshUserData} = useAuth();
+  const {ensureOrderAllowed} = useAvrBlock();
   const {openTopUpModal} = useTopUpBalance();
 
   const [price12, setPrice12] = useState(user?.price12 || 1100);
@@ -174,6 +180,9 @@ const AddOrderScreen: React.FC<{navigation: any; route: any}> = ({
   const handleOrder = async (options: HandleOrderOptions = {}) => {
     // Защита от двойного нажатия (синхронная проверка)
     if (isSubmittingRef.current) {
+      return;
+    }
+    if (!ensureOrderAllowed()) {
       return;
     }
     isSubmittingRef.current = true;
@@ -315,6 +324,10 @@ const AddOrderScreen: React.FC<{navigation: any; route: any}> = ({
         Alert.alert('Ошибка', res.message);
       }
     } catch (error: unknown) {
+      if (isAvrBlockedError(error)) {
+        // Модалку «Подтвердите АВР» уже показал AvrBlockProvider
+        return;
+      }
       console.error('Ошибка при оформлении заказа:', error);
       const msg =
         typeof error === 'object' &&
@@ -928,7 +941,7 @@ const AddOrderScreen: React.FC<{navigation: any; route: any}> = ({
               }}>
               Способ оплаты
             </Text>
-            {!clientHasInvoiceLegalData(user) && (
+            {canPayCashToCourier(user) && (
               <TouchableOpacity
                 style={styles.modalAddress}
                 onPress={() => {
@@ -1318,7 +1331,7 @@ const AddOrderScreen: React.FC<{navigation: any; route: any}> = ({
                 <Text style={styles.buttonText}>Пополнить баланс</Text>
               )}
             </TouchableOpacity>
-            {!clientHasInvoiceLegalData(user) ? (
+            {canPayCashToCourier(user) ? (
               <TouchableOpacity
                 style={[
                   styles.modalButton,

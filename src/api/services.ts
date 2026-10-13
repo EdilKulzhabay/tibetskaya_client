@@ -2,7 +2,9 @@
 import api from './axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {RegisterData, SupportMessage} from '../types';
+import {getDeviceId} from '../utils/deviceId';
 import {consumeStoredFbclid} from '../utils/metaAttribution';
+import {isAvrBlockedError, notifyAvrBlocked} from '../utils/avrBlock';
 
 // Примеры API-сервисов
 export const apiService = {
@@ -116,10 +118,15 @@ export const apiService = {
     pendingOrderDraft?: unknown,
   ) => {
     try {
+      // Заказ из черновика создаст сервер после оплаты — устройство передаём заранее
+      const draft =
+        pendingOrderDraft && typeof pendingOrderDraft === 'object'
+          ? {...pendingOrderDraft, deviceId: await getDeviceId()}
+          : pendingOrderDraft;
       const response = await api.post('/api/apipay/qr/create', {
         amount,
         clientId,
-        pendingOrderDraft,
+        pendingOrderDraft: draft,
       });
       return response.data;
     } catch (error: any) {
@@ -157,6 +164,8 @@ export const apiService = {
   ) => {
     try {
       const fcmToken = await AsyncStorage.getItem('fcmToken');
+      // Звонок курьера по заказу придёт только на это устройство
+      const deviceId = await getDeviceId();
       const response = await api.post('/addOrderClientMobile', {
         clientId,
         address,
@@ -168,9 +177,13 @@ export const apiService = {
         comment,
         emptyBottles,
         notificationToken: fcmToken || '',
+        deviceId,
       });
       return response.data;
     } catch (error) {
+      if (isAvrBlockedError(error)) {
+        notifyAvrBlocked();
+      }
       throw error;
     }
   },
@@ -297,6 +310,27 @@ export const apiService = {
       };
     }
   },
+  updateOrderComment: async (
+    orderId: string,
+    clientId: string,
+    comment: string,
+  ): Promise<{success: boolean; comment?: string; message?: string}> => {
+    try {
+      const response = await api.post('/updateOrderCommentMobile', {
+        orderId,
+        clientId,
+        comment,
+      });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        message:
+          error?.response?.data?.message || 'Не удалось сохранить комментарий',
+      };
+    }
+  },
+
   updateOrderData: async (orderId: string, field: string, value: any) => {
     try {
       const response = await api.post('/updateOrderDataMobile', {

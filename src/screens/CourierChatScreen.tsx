@@ -7,7 +7,6 @@ import {
   TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
-  Platform,
   Alert,
   Keyboard,
   TouchableWithoutFeedback,
@@ -17,6 +16,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {androidOnlySafeAreaEdges} from '../utils/safeArea';
 import {RouteProp, useRoute} from '@react-navigation/native';
 import {Back} from '../components';
+import {SCREEN_TOP_SPACER_HEIGHT} from '../components/ScreenLayout';
 import {apiService} from '../api/services';
 import {OrderChatMessage} from '../types';
 import {RootStackParamList} from '../types/navigation';
@@ -181,8 +181,10 @@ const CourierChatScreen: React.FC<{navigation: any}> = ({navigation}) => {
 
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}>
+        // На Android с targetSdk 35+ включён edge-to-edge, и adjustResize больше не
+        // сжимает окно — без padding клавиатура перекрывает поле ввода и там.
+        behavior="padding"
+        keyboardVerticalOffset={SCREEN_TOP_SPACER_HEIGHT}>
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <View style={styles.touchableArea} />
         </TouchableWithoutFeedback>

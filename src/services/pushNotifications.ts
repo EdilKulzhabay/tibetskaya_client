@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import messaging from '@react-native-firebase/messaging';
 import notifee, {AndroidImportance} from '@notifee/react-native';
+import {isCallPushData} from '../features/calls/callPushPayload';
 import {navigate} from '../navigation/navigationRef';
 import type {OrderData} from '../types/navigation';
 
@@ -441,6 +442,11 @@ class PushNotificationService {
     // Foreground уведомления (приложение открыто)
     const unsubscribeOnMessage = messaging().onMessage(async remoteMessage => {
       const data = remoteMessage.data;
+
+      // Пуши о звонках обрабатывает модуль звонков (features/calls) — без баннера
+      if (isCallPushData(data)) {
+        return;
+      }
       const isSilentBalance =
         data?.newStatus === 'balanceTopUpSuccess' ||
         String(data?.newStatus || '').toLowerCase() === 'balancetopupsuccess';

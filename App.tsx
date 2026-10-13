@@ -3,7 +3,7 @@
  * @format
  */
 
-import React, {useEffect} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {StatusBar, useColorScheme} from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
@@ -11,6 +11,7 @@ import {SafeAreaProvider} from 'react-native-safe-area-context';
 import AuthWrapper from './src/components/AuthWrapper';
 import ImagePreloader from './src/components/ImagePreloader';
 import ErrorBoundary from './src/components/ErrorBoundary';
+import IntroVideo from './src/components/IntroVideo';
 
 // Импорт наших экранов
 import {
@@ -52,6 +53,8 @@ import {navigationRef} from './src/navigation/navigationRef';
 import {ScreenLayout} from './src/components';
 import {TopUpBalanceProvider} from './src/context/TopUpBalanceContext';
 import {AuthProvider} from './src/hooks/useAuth';
+import {AvrBlockProvider} from './src/context/AvrBlockContext';
+import {CallHost} from './src/features/calls';
 import {captureDeferredFbclid} from './src/utils/metaAttribution';
 import {Settings} from 'react-native-fbsdk-next';
 import {initAdjust} from './src/utils/adjustEvents';
@@ -85,6 +88,10 @@ function App() {
     captureDeferredFbclid();
   }, []);
 
+  // Видео-интро только при холодном старте; приложение под ним уже грузится
+  const [isIntroVisible, setIsIntroVisible] = useState(true);
+  const hideIntro = useCallback(() => setIsIntroVisible(false), []);
+
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
@@ -92,164 +99,168 @@ function App() {
           <AuthProvider>
             <AuthWrapper>
               <NavigationContainer ref={navigationRef}>
-                <TopUpBalanceProvider>
-                  <Stack.Navigator
-                    initialRouteName="Home"
-                    screenOptions={{
-                      headerShown: false, // Скрываем стандартный заголовок
-                    }}>
-                    {/* Все экраны с нижней навигацией */}
-                    <Stack.Screen
-                      name="Home"
-                      component={withLayout(HomeScreen)}
-                      options={{
-                        gestureEnabled: false, // Отключаем свайп назад
-                      }}
-                    />
-                    <Stack.Screen
-                      name="Profile"
-                      component={withLayout(ProfileScreen)}
-                      options={{
-                        gestureEnabled: false, // Отключаем свайп назад
-                      }}
-                    />
-                    <Stack.Screen
-                      name="History"
-                      component={withLayout(HistoryScreen)}
-                      options={{
-                        gestureEnabled: false, // Отключаем свайп назад
-                      }}
-                    />
-                    <Stack.Screen
-                      name="Support"
-                      component={withLayout(SupportScreen)}
-                      options={{
-                        gestureEnabled: false, // Отключаем свайп назад
-                      }}
-                    />
-                    <Stack.Screen
-                      name="OrderStatus"
-                      component={withLayout(OrderStatusScreen)}
-                    />
-                    <Stack.Screen
-                      name="Bonus"
-                      component={withLayout(BonusScreen)}
-                    />
-                    <Stack.Screen
-                      name="Wallet"
-                      component={withLayout(WalletScreen)}
-                    />
-                    <Stack.Screen
-                      name="Chat"
-                      component={withLayout(ChatScreen, false)}
-                    />
-                    <Stack.Screen
-                      name="CourierChat"
-                      component={withLayout(CourierChatScreen, false)}
-                    />
-                    <Stack.Screen
-                      name="Address"
-                      component={withLayout(AddressScreen)}
-                    />
-                    <Stack.Screen
-                      name="AddOrUpdateAddress"
-                      component={withLayout(AddOrUpdateAddress)}
-                    />
-                    <Stack.Screen
-                      name="Login"
-                      component={withLayout(LoginScreen)}
-                      options={{
-                        gestureEnabled: false, // Отключаем смахивание
-                        headerLeft: () => null, // Убираем кнопку назад в заголовке
-                      }}
-                    />
-                    <Stack.Screen
-                      name="LoginOtp"
-                      component={withLayout(LoginOtpScreen)}
-                    />
-                    <Stack.Screen
-                      name="Register"
-                      component={withLayout(RegisterScreen)}
-                    />
-                    <Stack.Screen
-                      name="Otp"
-                      component={withLayout(OtpScreen)}
-                    />
-                    <Stack.Screen
-                      name="RegisterAccepted"
-                      component={withLayout(RegisterAcceptedScreen)}
-                    />
-                    <Stack.Screen
-                      name="ChangeData"
-                      component={withLayout(ChangeDataScreen)}
-                    />
-                    <Stack.Screen
-                      name="Tarrifs"
-                      component={withLayout(TarrifsScreen)}
-                    />
-                    <Stack.Screen
-                      name="FAQ"
-                      component={withLayout(FAQScreen)}
-                    />
-                    <Stack.Screen
-                      name="Hydration"
-                      component={withLayout(HydrationScreen)}
-                    />
-                    <Stack.Screen
-                      name="TakePartHydration"
-                      component={withLayout(TakePartHydrationScreen)}
-                    />
-                    <Stack.Screen
-                      name="TakePartInvite"
-                      component={withLayout(TakePartInviteScreen)}
-                    />
-                    <Stack.Screen
-                      name="StartHydration"
-                      component={withLayout(StartHydrationScreen)}
-                    />
-                    <Stack.Screen
-                      name="StartHydration2"
-                      component={withLayout(StartHydrationScreen2)}
-                    />
-                    <Stack.Screen
-                      name="AddOrder"
-                      component={withLayout(AddOrderScreen)}
-                    />
-                    <Stack.Screen
-                      name="Settings"
-                      component={withLayout(SettingsScreen)}
-                    />
-                    <Stack.Screen
-                      name="WhatIsMyBalance"
-                      component={withLayout(WhatIsMyBalanceScreen)}
-                    />
-                    <Stack.Screen
-                      name="HowToTopUp"
-                      component={withLayout(HowToTopUpScreen)}
-                    />
-                    <Stack.Screen
-                      name="DeleteAccount"
-                      component={withLayout(DeleteAccountScreen)}
-                    />
-                    <Stack.Screen
-                      name="ForgotPassword"
-                      component={withLayout(ForgotPasswordScreen)}
-                    />
-                    <Stack.Screen
-                      name="OtpForgotPassword"
-                      component={withLayout(OtpForgotPasswordScreen)}
-                    />
-                    <Stack.Screen
-                      name="NewPassword"
-                      component={withLayout(NewPasswordScreen)}
-                    />
-                  </Stack.Navigator>
-                </TopUpBalanceProvider>
+                <AvrBlockProvider>
+                  <TopUpBalanceProvider>
+                    <Stack.Navigator
+                      initialRouteName="Home"
+                      screenOptions={{
+                        headerShown: false, // Скрываем стандартный заголовок
+                      }}>
+                      {/* Все экраны с нижней навигацией */}
+                      <Stack.Screen
+                        name="Home"
+                        component={withLayout(HomeScreen)}
+                        options={{
+                          gestureEnabled: false, // Отключаем свайп назад
+                        }}
+                      />
+                      <Stack.Screen
+                        name="Profile"
+                        component={withLayout(ProfileScreen)}
+                        options={{
+                          gestureEnabled: false, // Отключаем свайп назад
+                        }}
+                      />
+                      <Stack.Screen
+                        name="History"
+                        component={withLayout(HistoryScreen)}
+                        options={{
+                          gestureEnabled: false, // Отключаем свайп назад
+                        }}
+                      />
+                      <Stack.Screen
+                        name="Support"
+                        component={withLayout(SupportScreen)}
+                        options={{
+                          gestureEnabled: false, // Отключаем свайп назад
+                        }}
+                      />
+                      <Stack.Screen
+                        name="OrderStatus"
+                        component={withLayout(OrderStatusScreen)}
+                      />
+                      <Stack.Screen
+                        name="Bonus"
+                        component={withLayout(BonusScreen)}
+                      />
+                      <Stack.Screen
+                        name="Wallet"
+                        component={withLayout(WalletScreen)}
+                      />
+                      <Stack.Screen
+                        name="Chat"
+                        component={withLayout(ChatScreen, false)}
+                      />
+                      <Stack.Screen
+                        name="CourierChat"
+                        component={withLayout(CourierChatScreen, false)}
+                      />
+                      <Stack.Screen
+                        name="Address"
+                        component={withLayout(AddressScreen)}
+                      />
+                      <Stack.Screen
+                        name="AddOrUpdateAddress"
+                        component={withLayout(AddOrUpdateAddress)}
+                      />
+                      <Stack.Screen
+                        name="Login"
+                        component={withLayout(LoginScreen)}
+                        options={{
+                          gestureEnabled: false, // Отключаем смахивание
+                          headerLeft: () => null, // Убираем кнопку назад в заголовке
+                        }}
+                      />
+                      <Stack.Screen
+                        name="LoginOtp"
+                        component={withLayout(LoginOtpScreen)}
+                      />
+                      <Stack.Screen
+                        name="Register"
+                        component={withLayout(RegisterScreen)}
+                      />
+                      <Stack.Screen
+                        name="Otp"
+                        component={withLayout(OtpScreen)}
+                      />
+                      <Stack.Screen
+                        name="RegisterAccepted"
+                        component={withLayout(RegisterAcceptedScreen)}
+                      />
+                      <Stack.Screen
+                        name="ChangeData"
+                        component={withLayout(ChangeDataScreen)}
+                      />
+                      <Stack.Screen
+                        name="Tarrifs"
+                        component={withLayout(TarrifsScreen)}
+                      />
+                      <Stack.Screen
+                        name="FAQ"
+                        component={withLayout(FAQScreen)}
+                      />
+                      <Stack.Screen
+                        name="Hydration"
+                        component={withLayout(HydrationScreen)}
+                      />
+                      <Stack.Screen
+                        name="TakePartHydration"
+                        component={withLayout(TakePartHydrationScreen)}
+                      />
+                      <Stack.Screen
+                        name="TakePartInvite"
+                        component={withLayout(TakePartInviteScreen)}
+                      />
+                      <Stack.Screen
+                        name="StartHydration"
+                        component={withLayout(StartHydrationScreen)}
+                      />
+                      <Stack.Screen
+                        name="StartHydration2"
+                        component={withLayout(StartHydrationScreen2)}
+                      />
+                      <Stack.Screen
+                        name="AddOrder"
+                        component={withLayout(AddOrderScreen)}
+                      />
+                      <Stack.Screen
+                        name="Settings"
+                        component={withLayout(SettingsScreen)}
+                      />
+                      <Stack.Screen
+                        name="WhatIsMyBalance"
+                        component={withLayout(WhatIsMyBalanceScreen)}
+                      />
+                      <Stack.Screen
+                        name="HowToTopUp"
+                        component={withLayout(HowToTopUpScreen)}
+                      />
+                      <Stack.Screen
+                        name="DeleteAccount"
+                        component={withLayout(DeleteAccountScreen)}
+                      />
+                      <Stack.Screen
+                        name="ForgotPassword"
+                        component={withLayout(ForgotPasswordScreen)}
+                      />
+                      <Stack.Screen
+                        name="OtpForgotPassword"
+                        component={withLayout(OtpForgotPasswordScreen)}
+                      />
+                      <Stack.Screen
+                        name="NewPassword"
+                        component={withLayout(NewPasswordScreen)}
+                      />
+                    </Stack.Navigator>
+                  </TopUpBalanceProvider>
+                </AvrBlockProvider>
               </NavigationContainer>
             </AuthWrapper>
+            <CallHost />
           </AuthProvider>
         </ImagePreloader>
       </ErrorBoundary>
+      {isIntroVisible && <IntroVideo onFinish={hideIntro} />}
     </SafeAreaProvider>
   );
 }

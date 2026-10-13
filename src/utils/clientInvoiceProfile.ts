@@ -36,3 +36,11 @@ export function clientHasInvoiceLegalData(user: User | null | undefined): boolea
   if (!user) return false;
   return !!invoiceLegalAsString(user.invoiceLegalData);
 }
+
+/**
+ * Можно ли предлагать «Наличными курьеру»: нет для клиентов со счётом (юр. данные)
+ * и для отмеченных в CRM «Оплата только онлайн» (сервер такой заказ тоже отклонит).
+ */
+export function canPayCashToCourier(user: User | null | undefined): boolean {
+  return !clientHasInvoiceLegalData(user) && user?.onlinePaymentOnly !== true;
+}

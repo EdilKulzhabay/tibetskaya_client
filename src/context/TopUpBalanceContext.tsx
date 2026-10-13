@@ -30,7 +30,10 @@ import {useAuth} from '../hooks/useAuth';
 import PaymentWebView from '../components/PaymentWebView';
 import {navigate} from '../navigation/navigationRef';
 import {getClientMongoId} from '../utils/clientId';
-import {clientHasInvoiceLegalData} from '../utils/clientInvoiceProfile';
+import {
+  canPayCashToCourier,
+  clientHasInvoiceLegalData,
+} from '../utils/clientInvoiceProfile';
 import {apiService} from '../api/services';
 import {logAdjustBalanceTopUp} from '../utils/adjustEvents';
 import type {User} from '../types';
@@ -237,7 +240,12 @@ export const TopUpBalanceProvider: React.FC<{children: React.ReactNode}> = ({
         } else {
           setTopUpSum('');
         }
-        setTopUpOptions(options);
+        // «Оплата только онлайн» из CRM перекрывает showCashPayment всех вызывающих экранов
+        setTopUpOptions(
+          options.showCashPayment && !canPayCashToCourier(profileUser)
+            ? {...options, showCashPayment: false, onCashPayment: undefined}
+            : options,
+        );
         armTopUpBackdrop(topUpMethodsBackdropSafeRef);
         setTopUpMethodsVisible(true);
       })();
@@ -789,9 +797,9 @@ export const TopUpBalanceProvider: React.FC<{children: React.ReactNode}> = ({
         presentationStyle={
           Platform.OS === 'ios' ? 'overFullScreen' : undefined
         }>
-        <KeyboardAvoidingView
-          style={{flex: 1}}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {/* statusBarTranslucent-модалка на Android (edge-to-edge) не сжимается
+            по adjustResize — поднимаем лист над клавиатурой сами на обеих платформах */}
+        <KeyboardAvoidingView style={{flex: 1}} behavior="padding">
           <TouchableOpacity
             style={styles.bottomSheetOverlay}
             activeOpacity={1}
@@ -1060,9 +1068,9 @@ export const TopUpBalanceProvider: React.FC<{children: React.ReactNode}> = ({
         transparent={true}
         animationType="slide"
         statusBarTranslucent={Platform.OS === 'android'}>
-        <KeyboardAvoidingView
-          style={{flex: 1}}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {/* statusBarTranslucent-модалка на Android (edge-to-edge) не сжимается
+            по adjustResize — поднимаем лист над клавиатурой сами на обеих платформах */}
+        <KeyboardAvoidingView style={{flex: 1}} behavior="padding">
           <TouchableOpacity
             style={styles.bottomSheetOverlay}
             activeOpacity={1}

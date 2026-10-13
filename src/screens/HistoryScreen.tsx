@@ -18,7 +18,12 @@ import {useFocusEffect} from '@react-navigation/native';
 import {apiService} from '../api/services';
 import {useAuth} from '../hooks/useAuth';
 import {useTopUpBalance} from '../context/TopUpBalanceContext';
-import {clientHasInvoiceLegalData} from '../utils/clientInvoiceProfile';
+import {useAvrBlock} from '../context/AvrBlockContext';
+import {isAvrBlockedError} from '../utils/avrBlock';
+import {
+  canPayCashToCourier,
+  clientHasInvoiceLegalData,
+} from '../utils/clientInvoiceProfile';
 import {getWalletOpFormForUser} from '../utils/invoiceClientOrderPayment';
 import ReferralPromoModal from '../components/ReferralPromoModal';
 import {
@@ -50,6 +55,7 @@ interface HistoryScreenProps {
 
 const HistoryScreen: React.FC<HistoryScreenProps> = ({navigation}) => {
   const {user, loadingState, refreshUserData} = useAuth();
+  const {ensureOrderAllowed} = useAvrBlock();
   const {openTopUpModal} = useTopUpBalance();
   /** Стабильный id вместо объекта user — refreshUserData() пересобирает user на каждый вызов. */
   const clientId = getClientMongoId(user);
@@ -356,6 +362,11 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({navigation}) => {
         Alert.alert('Ошибка', res.message);
       }
     } catch (error: any) {
+      if (isAvrBlockedError(error)) {
+        // Модалку «Подтвердите АВР» уже показал AvrBlockProvider
+        setPaymentModalVisible(false);
+        return;
+      }
       const message = error?.response?.data?.message;
       if (message === 'Недостаточно средств на балансе') {
         setPaymentModalVisible(false);
@@ -407,6 +418,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({navigation}) => {
   };
 
   const beginHistoryRepeatFlow = (order: any) => {
+    if (!ensureOrderAllowed()) return;
     repeatTargetOrderRef.current = order;
     setSelectedOrder(order);
     repeatOrderDeliveryYmdRef.current = null;
@@ -503,7 +515,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({navigation}) => {
     }
 
     // Без типичного «кошелька» — форма оплаты повторяет прошлый заказ, но требует подтверждения.
-    if (order.opForm === 'fakt') {
+    if (order.opForm === 'fakt' && canPayCashToCourier(user)) {
       setSelectedPayment({label: 'Наличными', value: 'fakt'});
     } else if (order.opForm === 'credit' || order.opForm === 'coupon') {
       const balanceValue =
@@ -810,7 +822,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({navigation}) => {
               }}>
               Способ оплаты
             </Text>
-            {!clientHasInvoiceLegalData(user) ? (
+            {canPayCashToCourier(user) ? (
               <TouchableOpacity
                 style={styles.modalAddress}
                 onPress={() => {
@@ -1183,7 +1195,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({navigation}) => {
                 <Text style={styles.buttonText}>Пополнить баланс</Text>
               )}
             </TouchableOpacity>
-            {!clientHasInvoiceLegalData(user) ? (
+            {canPayCashToCourier(user) ? (
               <TouchableOpacity
                 style={{
                   padding: 16,

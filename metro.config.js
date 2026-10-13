@@ -8,7 +8,8 @@ const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
  */
 const config = {
   resolver: {
-    assetExts: ['png', 'jpg', 'jpeg', 'gif', 'webp'],
+    // mp4 — интро-видео при запуске (src/assets/video/intro.mp4)
+    assetExts: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4'],
   },
   serializer: {
     // Улучшаем кэширование изображений

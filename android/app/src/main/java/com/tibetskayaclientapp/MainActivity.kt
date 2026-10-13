@@ -13,6 +13,12 @@ class MainActivity : ReactActivity() {
    */
   override fun getMainComponentName(): String = "tibetskayaClientApp"
 
+  // Запуск full-screen intent'ом входящего звонка: показать поверх блокировки до загрузки JS
+  override fun onResume() {
+    IncomingCallLockScreen.apply(this)
+    super.onResume()
+  }
+
   /**
    * Returns the instance of the [ReactActivityDelegate]. We use [DefaultReactActivityDelegate]
    * which allows you to enable New Architecture with a single boolean flags [fabricEnabled]

@@ -13,6 +13,8 @@ import {
   View,
 } from 'react-native';
 import MapProvider from './MapProvider';
+import OrderCommentSection from './OrderCommentSection';
+import {callManager} from '../features/calls';
 import {OrderAddress, OrderData, OrderProduct} from '../types/navigation';
 import {getDateYmdAlmaty, nextYmd, formatYmdRu} from '../utils/dateAlmaty';
 
@@ -343,6 +345,7 @@ const MainOrderCard: React.FC<MainOrderCardProps> = ({
                 decelerationRate="fast"
                 onScroll={handleStatusOrdersScroll}
                 scrollEventThrottle={16}
+                keyboardShouldPersistTaps="handled"
                 contentContainerStyle={styles.activeOrdersCarousel}>
                 {statusOrders.map((item, index) => (
                   <View
@@ -682,20 +685,50 @@ const ActiveOrderCard: React.FC<{
       </View>
 
       {isOnTheWay ? (
-        <TouchableOpacity
-          style={styles.chatButton}
-          onPress={() => onChatWithCourier(order)}
-          accessibilityRole="button"
-          accessibilityLabel="Написать курьеру">
-          <View />
-          <Text style={styles.chatButtonText}>Написать курьеру</Text>
-          <Image
-            source={require('../assets/greenChevronRight.png')}
-            style={{width: 16, height: 16}}
-          />
-        </TouchableOpacity>
+        <View style={styles.courierActions}>
+          <TouchableOpacity
+            style={[styles.courierActionButton, styles.callButton]}
+            onPress={() =>
+              callManager.startCall(
+                order._id,
+                courierAggregator?.fullName || 'Курьер',
+              )
+            }
+            accessibilityRole="button"
+            accessibilityLabel="Позвонить курьеру">
+            <Image
+              source={require('../assets/calls/call.png')}
+              style={styles.callButtonIcon}
+              tintColor="white"
+            />
+            <Text
+              style={styles.callButtonText}
+              numberOfLines={1}
+              adjustsFontSizeToFit>
+              Позвонить курьеру
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.chatButton, styles.courierActionButton]}
+            onPress={() => onChatWithCourier(order)}
+            accessibilityRole="button"
+            accessibilityLabel="Написать курьеру">
+            <View />
+            <Text
+              style={styles.chatButtonText}
+              numberOfLines={1}
+              adjustsFontSizeToFit>
+              Написать курьеру
+            </Text>
+            <Image
+              source={require('../assets/greenChevronRight.png')}
+              style={{width: 16, height: 16}}
+            />
+          </TouchableOpacity>
+        </View>
       ) : (
         <>
+          <OrderCommentSection order={order} />
           <View style={styles.queueNotice}>
             <Text style={styles.queueNoticeText}>
               Ваш заказ в очереди, пожалуйста, ожидайте
@@ -1734,9 +1767,41 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   chatButtonText: {
+    flexShrink: 1,
     fontSize: 14,
     fontWeight: '600',
     color: '#1E9E36',
+  },
+  courierActions: {
+    marginTop: 12,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  courierActionButton: {
+    flex: 1,
+    marginTop: 0,
+    paddingHorizontal: 12,
+  },
+  callButton: {
+    backgroundColor: '#1E9E36',
+    borderWidth: 1,
+    borderColor: '#1E9E36',
+    borderRadius: 10,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  callButtonIcon: {
+    width: 16,
+    height: 16,
+  },
+  callButtonText: {
+    flexShrink: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'white',
   },
   chatButtonChevron: {
     fontSize: 18,

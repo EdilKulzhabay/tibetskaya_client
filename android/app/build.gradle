@@ -92,8 +92,8 @@ android {
         applicationId "com.tibetskayaclientapp"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 22
-        versionName "2.0.0"
+        versionCode 23
+        versionName "2.1.0"
     }
     signingConfigs {
         debug {
@@ -137,4 +137,21 @@ dependencies {
     // not on :app's compile classpath by default — needed here to call FacebookSdk.sdkInitialize()
     // directly from MainApplication.kt. Version must match react-native-fbsdk-next/android/build.gradle.
     implementation "com.facebook.android:facebook-android-sdk:18.+"
+}
+
+// `gradlew clean` стирает codegen библиотек (node_modules/*/android/build), но не кэш CMake
+// приложения (.cxx). Следующая сборка настраивает CMake раньше, чем библиотеки заново
+// сгенерируют codegen, и падает с "add_subdirectory ... not an existing directory".
+// Поэтому: clean удаляет и .cxx, а сборка сначала генерирует codegen всех библиотек.
+tasks.named("clean") {
+    delete file(".cxx")
+}
+// Нативный clean сам запускает устаревший CMake и падает с той же ошибкой; .cxx удаляет clean выше
+tasks.matching { it.name.startsWith("externalNativeBuildClean") }.configureEach {
+    enabled = false
+}
+tasks.named("preBuild") {
+    rootProject.subprojects.findAll { it != project }.each { library ->
+        dependsOn library.tasks.matching { it.name == "generateCodegenArtifactsFromSchema" }
+    }
 }

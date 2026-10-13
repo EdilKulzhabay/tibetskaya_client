@@ -2,12 +2,21 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- VoIP-звонки курьеру (react-native-webrtc, react-native-incall-manager) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Экран входящего звонка поверх экрана блокировки (notifee fullScreenAction) -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Идущий звонок: foreground-сервис типа microphone, иначе свёрнутое приложение получает тишину -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <!-- Нужно для Facebook SDK (com.facebook.sdk.AdvertiserIDCollectionEnabled ниже) —
          без этого разрешения на Android 13+ рекламный идентификатор заменяется нулями,
@@ -21,6 +30,22 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove" />
 
+    <!-- Не используются: на Android карта без точки пользователя (showsUserLocation только iOS),
+         камера не открывается (только выбор из галереи). Библиотеки добавляют их сами. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.CAMERA" tools:node="remove" />
+    <!-- notifee: точные будильники нужны только для trigger-уведомлений, их нет.
+         На Android 14+ Google Play требует обоснование этого разрешения. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />
+    <!-- react-native-callkeep нужен только на iOS (CallKit); на Android звонки идут через notifee
+         (src/features/calls/callPlatform.ts). Его «телефонные» разрешения Google Play просит
+         обосновывать, а пользователю они покажут лишний запрос доступа к звонкам. -->
+    <uses-permission android:name="android.permission.CALL_PHONE" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" tools:node="remove" />
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" tools:node="remove" />
+
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
@@ -29,6 +54,14 @@
       android:allowBackup="false"
       android:theme="@style/AppTheme"
       android:supportsRtl="true">
+
+      <!-- notifee объявляет сервис как shortService; Android 14+ не даст запустить его
+           с типом microphone (src/features/calls/callForegroundService.ts) — переопределяем -->
+      <service
+        android:name="app.notifee.core.ForegroundService"
+        android:exported="false"
+        android:foregroundServiceType="microphone"
+        tools:replace="android:foregroundServiceType" />
       <activity
         android:name=".MainActivity"
         android:label="@string/app_name"
